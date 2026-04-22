@@ -1,0 +1,50 @@
+// Featured workshop jobs — showcase of bespoke fabrication
+
+export type FeaturedWork = {
+  id: string;
+  title: string;
+  description: string;
+  tag: string;
+  year: number;
+  category: string;
+  fullStory: string;
+};
+
+export const featuredWork: FeaturedWork[] = [
+  {
+    id: "f001",
+    title: "Aluminium bonnet scoop",
+    description: "Hand-formed from 2mm aluminium sheet for a 1275GT restoration. English wheel and shrinker-stretcher work throughout.",
+    tag: "Bespoke",
+    year: 2025,
+    category: "Fabrication",
+    fullStory: "A customer brought us a partly-finished 1275GT restoration needing a functional scoop that matched original Works rally specification. We formed it by hand over a timber buck, using our English wheel to achieve the smooth crown and shrinker-stretcher to tighten the returns. Final finish hand-polished before paint.",
+  },
+  {
+    id: "f002",
+    title: "Stainless four-branch exhaust manifold",
+    description: "TIG-welded 304 stainless four-branch for a Cooper S rally car. CAD-designed, mandrel-bent.",
+    tag: "Fabrication",
+    year: 2024,
+    category: "Fabrication",
+    fullStory: "Design brief called for equal-length primaries with minimum ground clearance interference. Mandrel-bent primaries TIG-welded to a laser-cut collector plate. Full flow-benched before delivery.",
+  },
+  {
+    id: "f003",
+    title: "Hub carrier refurbishment",
+    description: "Original hubs machined to spec, heat-treated and resurfaced. Back to better-than-new tolerances.",
+    tag: "Restoration",
+    year: 2024,
+    category: "Engineering",
+    fullStory: "Badly pitted original hub carriers stripped, dimensionally surveyed, then machined back to drawing tolerance. Heat treated to Rc 58-62 and ground finished. Restored pieces exceed new-part tolerance.",
+  },
+  {
+    id: "f004",
+    title: "Bespoke battery tray relocation",
+    description: "Custom-fabricated battery tray for a Mini engine bay relocation. Laser-cut, folded and powder-coated.",
+    tag: "One-off",
+    year: 2023,
+    category: "Fabrication",
+    fullStory: "Engine bay relocation for a full race build required a compact, sealed battery tray in stainless. Designed in CAD, laser cut, folded and TIG welded in-house, then powder coated satin black.",
+  },
+];
