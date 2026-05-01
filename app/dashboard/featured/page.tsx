@@ -18,6 +18,7 @@ export default function FeaturedDashboardPage() {
       year: new Date().getFullYear(),
       category: "Fabrication",
       fullStory: "",
+      imagePath: null,
     });
   };
 
@@ -45,17 +46,40 @@ export default function FeaturedDashboardPage() {
           <h1 className="font-display text-3xl text-racing">Featured workshop jobs</h1>
           <p className="text-ink-muted text-sm">{items.length} showcase {items.length === 1 ? "job" : "jobs"}</p>
         </div>
-        <button onClick={handleAdd} className="btn-primary">+ Add new job</button>
+      </div>
+
+      {/* How-to panel — replaces the previous mocked Add/Edit/Delete UI.
+          Real edits happen in data-source/featured-work.json so the changes
+          persist across deploys. The Phase 3 dashboard will replace this. */}
+      <div className="bg-cream-dark border border-racing/15 rounded-xl p-5 mb-6">
+        <h2 className="font-display text-lg text-racing mb-2">How to edit these</h2>
+        <ol className="text-sm text-ink-muted space-y-2 list-decimal pl-5">
+          <li>
+            Open <code className="bg-white px-1.5 py-0.5 rounded text-racing">data-source/featured-work.json</code> in
+            Notepad or any text editor.
+          </li>
+          <li>To add a job: copy an existing entry, give it a unique <code className="bg-white px-1.5 py-0.5 rounded text-racing">id</code>, fill in the fields.</li>
+          <li>To add a photo: drop the image into <code className="bg-white px-1.5 py-0.5 rounded text-racing">data-source/featured-images/</code> and put the filename in the <code className="bg-white px-1.5 py-0.5 rounded text-racing">image</code> field of that entry.</li>
+          <li>Save the JSON. The next daily sync (or <code className="bg-white px-1.5 py-0.5 rounded text-racing">npm run sync-data</code>) picks up the changes and refreshes the public site.</li>
+        </ol>
+        <p className="text-xs text-ink-muted mt-3 italic">
+          The editing UI you see below is preview-only — changes here aren&apos;t saved. A full in-browser edit dashboard arrives in Phase 3.
+        </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         {items.map((job) => (
           <div key={job.id} className="card bg-white">
-            <div className="aspect-video bg-cream-dark rounded-lg mb-4 flex items-center justify-center">
-              <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
-                <path d="M10 40 L30 15 L50 40 Z" />
-                <circle cx="30" cy="32" r="3" />
-              </svg>
+            <div className="aspect-video bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
+              {job.imagePath ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
+              ) : (
+                <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                  <path d="M10 40 L30 15 L50 40 Z" />
+                  <circle cx="30" cy="32" r="3" />
+                </svg>
+              )}
             </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="chip !bg-racing !text-cream !text-[10px]">{job.tag.toUpperCase()}</span>
@@ -64,8 +88,7 @@ export default function FeaturedDashboardPage() {
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
             <div className="flex gap-2">
-              <button onClick={() => setEditing(job)} className="btn-secondary text-xs py-1 px-3">Edit</button>
-              <button onClick={() => handleDelete(job.id)} className="text-xs text-red-700 hover:underline ml-auto">Delete</button>
+              <button onClick={() => setEditing(job)} className="btn-secondary text-xs py-1 px-3">Preview edit</button>
             </div>
           </div>
         ))}
@@ -73,8 +96,7 @@ export default function FeaturedDashboardPage() {
 
       {items.length === 0 && (
         <div className="bg-white rounded-xl border border-racing/10 p-12 text-center">
-          <p className="text-ink-muted mb-4">No featured jobs yet. Add one to showcase your workshop&apos;s capability.</p>
-          <button onClick={handleAdd} className="btn-primary">Add your first job</button>
+          <p className="text-ink-muted mb-4">No featured jobs yet. Add one to <code>data-source/featured-work.json</code>.</p>
         </div>
       )}
     </div>

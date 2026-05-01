@@ -6,13 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync-data": "python scripts/regen_website_data.py",
+    "sync-data-legacy": "node scripts/sync-data.mjs",
+    "sync-excel": "python scripts/phase2/sync_phase2.py",
+    "export-pdfs": "powershell -ExecutionPolicy Bypass -File scripts/phase2/export_pdfs.ps1",
+    "daily-sync": "npm run sync-data && npm run sync-excel && npm run export-pdfs"
   },
   "dependencies": {
     "next": "^16.2.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.160.0"
+    "three": "^0.160.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^20",

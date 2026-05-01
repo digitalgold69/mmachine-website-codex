@@ -23,11 +23,16 @@ export default function FeaturedPage() {
       <div className="grid md:grid-cols-2 gap-6 mb-12">
         {featuredWork.map((job) => (
           <article key={job.id} className="card bg-white">
-            <div className="aspect-[16/10] bg-cream-dark rounded-lg mb-5 flex items-center justify-center">
-              <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
-                <path d="M10 40 L30 15 L50 40 Z" />
-                <circle cx="30" cy="32" r="3" />
-              </svg>
+            <div className="aspect-[16/10] bg-cream-dark rounded-lg mb-5 overflow-hidden flex items-center justify-center">
+              {job.imagePath ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
+              ) : (
+                <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                  <path d="M10 40 L30 15 L50 40 Z" />
+                  <circle cx="30" cy="32" r="3" />
+                </svg>
+              )}
             </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="chip !bg-racing !text-cream !text-[10px]">{job.tag.toUpperCase()}</span>

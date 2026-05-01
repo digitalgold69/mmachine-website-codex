@@ -119,11 +119,16 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-6">
             {latestFeatured.map((job) => (
               <article key={job.id} className="card bg-white flex flex-col">
-                <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 flex items-center justify-center">
-                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
-                    <path d="M10 40 L30 15 L50 40 Z" />
-                    <circle cx="30" cy="32" r="3" />
-                  </svg>
+                <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
+                  {job.imagePath ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                      <path d="M10 40 L30 15 L50 40 Z" />
+                      <circle cx="30" cy="32" r="3" />
+                    </svg>
+                  )}
                 </div>
                 <p className="text-xs tracking-wider text-gold font-semibold mb-1">
                   {job.tag.toUpperCase()} · {job.year}

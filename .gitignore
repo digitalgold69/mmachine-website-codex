@@ -9,3 +9,37 @@ build/
 *.log
 .vercel
 next-env.d.ts
+
+# Master Excel files — owner's pricing data, not for the public repo
+data-source/*.xlsx
+data-source/*.xlsm
+data-source/*.xls
+
+# Featured-work source images — binaries stay local; sync copies the
+# referenced ones into public/featured/ which IS tracked
+data-source/featured-images/*.jpg
+data-source/featured-images/*.jpeg
+data-source/featured-images/*.png
+data-source/featured-images/*.webp
+data-source/featured-images/*.gif
+
+# Regenerated Excel files for the owner — binaries, not tracked in git
+outgoing-to-owner/*.xlsx
+outgoing-to-owner/*.xlsm
+
+# The clean delivery folder is also gitignored — daily sync regenerates it
+final-deliverables/*.xlsx
+final-deliverables/*.xlsm
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Python bytecode caches (used by scripts/phase2/ helpers)
+__pycache__/
+*.pyc
+
+# Office lock files left behind when Excel/LibreOffice has the file open
+.~lock.*
+~$*.xlsx
+~$*.xlsm
+~$*.docx
