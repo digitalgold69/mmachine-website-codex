@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
 import { products } from "@/lib/mini-data";
 import { featuredWork } from "@/lib/featured-data";
 
-export default function DashboardHomePage() {
+export default async function DashboardHomePage() {
+  if (!(await isLoggedIn())) redirect("/dashboard/login");
+
   const total = products.length;
   const inStock = products.filter((p) => p.stock === "in").length;
   const lowStock = products.filter((p) => p.stock === "low").length;

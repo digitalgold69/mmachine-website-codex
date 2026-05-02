@@ -1,0 +1,190 @@
+// /api/featured
+//
+// GET    → returns the current featured-work.json from the repo
+// POST   → upsert one entry (body: { entry, imageDataUrl? })
+// DELETE → remove an entry by id (body: { id })
+//
+// Each mutation:
+//   1. Reads current data-source/featured-work.json from the repo
+//   2. Applies the change in memory
+//   3. Commits the new JSON via the GitHub Contents API
+//   4. If imageDataUrl is provided, also commits the image bytes to
+//      data-source/featured-images/<id>.<ext>
+//
+// Vercel auto-deploys after each commit, so the live site reflects the
+// owner's change in ~30-60 seconds.
+
+import { NextResponse } from "next/server";
+import { requireLogin } from "@/lib/auth";
+import { readJsonFile, writeTextFile, writeBinaryFile } from "@/lib/github";
+
+const FEATURED_PATH = "data-source/featured-work.json";
+
+type FeaturedEntry = {
+  id: string;
+  title: string;
+  description: string;
+  tag: string;
+  year: number;
+  category: string;
+  fullStory: string;
+  image: string; // filename inside data-source/featured-images/
+};
+
+async function loadEntries(): Promise<FeaturedEntry[]> {
+  const data = await readJsonFile<FeaturedEntry[]>(FEATURED_PATH);
+  return Array.isArray(data) ? data : [];
+}
+
+function safeId(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) || `f${Date.now()}`;
+}
+
+function extFromDataUrl(url: string): string | null {
+  const m = url.match(/^data:image\/(jpe?g|png|webp|gif);base64,/i);
+  if (!m) return null;
+  const sub = m[1].toLowerCase();
+  if (sub === "jpeg") return "jpg";
+  return sub;
+}
+
+function bytesFromDataUrl(url: string): Uint8Array {
+  const idx = url.indexOf("base64,");
+  if (idx < 0) throw new Error("Image isn't a base64 data URL");
+  const b64 = url.slice(idx + "base64,".length);
+  return new Uint8Array(Buffer.from(b64, "base64"));
+}
+
+// ─── GET ────────────────────────────────────────────────────────────────
+
+export async function GET() {
+  const auth = await requireLogin();
+  if (auth) return auth;
+  try {
+    const entries = await loadEntries();
+    return NextResponse.json({ entries });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+}
+
+// ─── POST (create or update) ────────────────────────────────────────────
+
+export async function POST(req: Request) {
+  const auth = await requireLogin();
+  if (auth) return auth;
+
+  let body: { entry?: Partial<FeaturedEntry>; imageDataUrl?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+  const e = body.entry;
+  if (!e || !e.title) {
+    return NextResponse.json({ error: "Missing title" }, { status: 400 });
+  }
+
+  try {
+    const entries = await loadEntries();
+
+    // Determine the id we'll save under
+    let id = e.id && !e.id.startsWith("new-") ? safeId(e.id) : "";
+    if (!id) {
+      // Generate the next "f###" id that's free
+      const taken = new Set(entries.map((x) => x.id));
+      let n = 1;
+      while (taken.has(`f${String(n).padStart(3, "0")}`)) n++;
+      id = `f${String(n).padStart(3, "0")}`;
+    }
+
+    // Handle the image first so we know the filename to put in the JSON
+    let imageFilename = (e.image || "").trim();
+    if (body.imageDataUrl) {
+      const ext = extFromDataUrl(body.imageDataUrl);
+      if (!ext) {
+        return NextResponse.json(
+          { error: "Image must be JPG, PNG, WebP, or GIF" },
+          { status: 400 }
+        );
+      }
+      const bytes = bytesFromDataUrl(body.imageDataUrl);
+      // Cap at ~5 MB so we don't accidentally bloat the repo
+      if (bytes.byteLength > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: "Image is too large. Please use a photo under 5 MB." },
+          { status: 400 }
+        );
+      }
+      imageFilename = `${id}.${ext}`;
+      await writeBinaryFile({
+        path: `data-source/featured-images/${imageFilename}`,
+        bytes,
+        message: `Update featured-work image for ${id}`,
+      });
+    }
+
+    const merged: FeaturedEntry = {
+      id,
+      title: String(e.title).trim(),
+      description: String(e.description || "").trim(),
+      tag: String(e.tag || "Bespoke").trim(),
+      year: Number.isFinite(e.year as number) ? Number(e.year) : new Date().getFullYear(),
+      category: String(e.category || "Fabrication").trim(),
+      fullStory: String(e.fullStory || "").trim(),
+      image: imageFilename,
+    };
+
+    const idx = entries.findIndex((x) => x.id === id);
+    if (idx >= 0) entries[idx] = merged;
+    else entries.unshift(merged);
+
+    await writeTextFile({
+      path: FEATURED_PATH,
+      content: JSON.stringify(entries, null, 2) + "\n",
+      message: `Save featured-work entry: ${merged.title}`,
+    });
+
+    return NextResponse.json({ ok: true, entry: merged });
+  } catch (err) {
+    return NextResponse.json(
+      { error: (err as Error).message || "Save failed" },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── DELETE (by id) ─────────────────────────────────────────────────────
+
+export async function DELETE(req: Request) {
+  const auth = await requireLogin();
+  if (auth) return auth;
+
+  let body: { id?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+  if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const id = safeId(body.id);
+
+  try {
+    const entries = await loadEntries();
+    const next = entries.filter((x) => x.id !== id);
+    if (next.length === entries.length) {
+      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    }
+    await writeTextFile({
+      path: FEATURED_PATH,
+      content: JSON.stringify(next, null, 2) + "\n",
+      message: `Delete featured-work entry: ${id}`,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(
+      { error: (err as Error).message || "Delete failed" },
+      { status: 500 }
+    );
+  }
+}

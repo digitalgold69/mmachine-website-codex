@@ -170,16 +170,28 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      {/* Table */}
+      {/* Results — desktop table, mobile cards. Both versions share the same data
+          and filters; only the visual presentation changes at the md breakpoint. */}
       <div className="bg-white rounded-xl border border-racing/10 overflow-hidden mt-3">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+
+        {/* DESKTOP TABLE — md and up. Explicit column widths via colgroup so
+            the Part column doesn't push everything else into the right margin. */}
+        <div className="hidden md:block">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[14%]" />
+              <col />
+              <col className="w-[14%]" />
+              <col className="w-[7%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-3">Code</th>
                 <th className="text-left px-4 py-3">Part</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Fits</th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell">Section</th>
+                <th className="text-left px-4 py-3">Fits</th>
+                <th className="text-left px-4 py-3">Section</th>
                 <th className="text-left px-4 py-3">Stock</th>
                 <th className="text-right px-4 py-3">Price</th>
               </tr>
@@ -187,23 +199,22 @@ export default function MiniCataloguePage() {
             <tbody>
               {shown.map((p) => (
                 <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-ink-muted whitespace-nowrap">{p.code}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-racing">{p.name}</div>
-                    <div className="text-xs text-ink-muted md:hidden">{p.fits}</div>
+                  <td className="px-4 py-3 font-mono text-xs text-ink-muted whitespace-nowrap align-top">{p.code}</td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="font-medium text-racing leading-snug">{p.name}</div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink-muted hidden md:table-cell">{p.fits}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
+                  <td className="px-4 py-3 text-sm text-ink-muted align-top truncate" title={p.fits}>{p.fits}</td>
+                  <td className="px-4 py-3 align-top">
                     <span className="font-mono text-xs bg-cream-dark text-racing px-2 py-0.5 rounded">
                       {p.section}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap align-top">
                     <span className={`stock-badge stock-${p.stock}`}>
                       {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
                     {p.priceExVat !== null ? (
                       `£${(showVat ? p.priceIncVat : p.priceExVat)?.toFixed(2) ?? p.priceExVat.toFixed(2)}`
                     ) : (
@@ -221,6 +232,39 @@ export default function MiniCataloguePage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* MOBILE CARDS — under md. No horizontal scroll. */}
+        <div className="md:hidden divide-y divide-racing/5">
+          {shown.map((p) => (
+            <div key={p.id} className="p-4 hover:bg-cream-dark/50 transition-colors">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="font-medium text-racing leading-snug">{p.name}</div>
+                <div className="font-semibold text-racing whitespace-nowrap text-right">
+                  {p.priceExVat !== null ? (
+                    `£${(showVat ? p.priceIncVat : p.priceExVat)?.toFixed(2) ?? p.priceExVat.toFixed(2)}`
+                  ) : (
+                    <span className="text-xs text-ink-muted italic">POA</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="font-mono text-ink-muted">{p.code}</span>
+                <span className="text-ink-muted">{p.fits}</span>
+                <span className="font-mono bg-cream-dark text-racing px-1.5 py-0.5 rounded">
+                  {p.section}
+                </span>
+                <span className={`stock-badge stock-${p.stock} ml-auto`}>
+                  {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
+                </span>
+              </div>
+            </div>
+          ))}
+          {shown.length === 0 && (
+            <div className="text-center py-12 text-ink-muted px-4">
+              No parts match. Try a different section, clear filters, or call us on 01325 381300.
+            </div>
+          )}
         </div>
 
         {shown.length < filtered.length && (

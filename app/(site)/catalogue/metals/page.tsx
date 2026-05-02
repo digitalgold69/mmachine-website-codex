@@ -86,13 +86,21 @@ export default function MetalsCataloguePage() {
       </div>
 
       <div className="bg-white rounded-xl border border-racing/10 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* DESKTOP TABLE — md and up. Fixed column widths so Material doesn't push everything else. */}
+        <div className="hidden md:block">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[14%]" />
+              <col />
+              <col className="w-[16%]" />
+              <col className="w-[10%]" />
+              <col className="w-[14%]" />
+            </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-3">Grade</th>
                 <th className="text-left px-4 py-3">Material</th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell">Form</th>
+                <th className="text-left px-4 py-3">Form</th>
                 <th className="text-left px-4 py-3">Stock</th>
                 <th className="text-right px-4 py-3">From</th>
               </tr>
@@ -100,18 +108,18 @@ export default function MetalsCataloguePage() {
             <tbody>
               {filtered.map((p) => (
                 <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-racing font-semibold whitespace-nowrap">{p.code}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-racing">{p.name}</div>
+                  <td className="px-4 py-3 font-mono text-xs text-racing font-semibold whitespace-nowrap align-top">{p.code}</td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="font-medium text-racing leading-snug">{p.name}</div>
                     <div className="text-xs text-ink-muted mt-0.5">{p.description}</div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink-muted hidden sm:table-cell">{p.form}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-sm text-ink-muted truncate align-top" title={p.form}>{p.form}</td>
+                  <td className="px-4 py-3 whitespace-nowrap align-top">
                     <span className={`stock-badge stock-${p.stock}`}>
                       {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
                     {p.pricePerKg ? <>£{p.pricePerKg.toFixed(2)}<span className="text-xs text-ink-muted">/kg</span></> : <span className="text-xs text-ink-muted italic">POA</span>}
                   </td>
                 </tr>
@@ -121,6 +129,33 @@ export default function MetalsCataloguePage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* MOBILE CARDS — under md. No horizontal scroll needed. */}
+        <div className="md:hidden divide-y divide-racing/5">
+          {filtered.map((p) => (
+            <div key={p.id} className="p-4 hover:bg-cream-dark/50 transition-colors">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="font-medium text-racing leading-snug">{p.name}</div>
+                <div className="font-semibold text-racing whitespace-nowrap text-right">
+                  {p.pricePerKg ? <>£{p.pricePerKg.toFixed(2)}<span className="text-xs text-ink-muted">/kg</span></> : <span className="text-xs text-ink-muted italic">POA</span>}
+                </div>
+              </div>
+              <div className="text-xs text-ink-muted mb-2">{p.description}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="font-mono text-racing">{p.code}</span>
+                <span className="text-ink-muted">{p.form}</span>
+                <span className={`stock-badge stock-${p.stock} ml-auto`}>
+                  {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
+                </span>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-ink-muted px-4">
+              No grades match that search. Call us on 01325 381302 — we stock more than this list shows.
+            </div>
+          )}
         </div>
       </div>
 

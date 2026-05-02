@@ -581,23 +581,28 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       }
     };
 
-    const onPointerMove = (e: PointerEvent) => {
+    // Shared raycast: clientX/clientY -> section code+label or null
+    const raycastAt = (clientX: number, clientY: number) => {
       const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(getActiveTargets(), true);
       const hit = hits[0]?.object as THREE.Mesh | undefined;
       const code = hit?.userData?.sectionCode as string | undefined;
       const label = hit?.userData?.label as string | undefined;
-      if (code && label) {
-        highlightForCode(code);
-        setHovered({
-          code,
-          label,
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        });
+      return code && label
+        ? { code, label, localX: clientX - rect.left, localY: clientY - rect.top }
+        : null;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      // Touch devices have no hover — let the tap handler drive highlighting
+      if (e.pointerType === "touch") return;
+      const r = raycastAt(e.clientX, e.clientY);
+      if (r) {
+        highlightForCode(r.code);
+        setHovered({ code: r.code, label: r.label, x: r.localX, y: r.localY });
         renderer.domElement.style.cursor = "pointer";
       } else {
         clearHighlight();
@@ -606,23 +611,60 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       }
     };
 
-    const onClick = (e: MouseEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(getActiveTargets(), true);
-      const code = hits[0]?.object.userData?.sectionCode;
-      if (code) {
-        onSelect(code);
-      } else {
-        onSelect("all");
+    // For touch: track the start of the tap so a small finger movement still
+    // counts as a tap. OrbitControls handles real drags on its own.
+    let touchStart: { x: number; y: number; time: number } | null = null;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      touchStart = { x: e.clientX, y: e.clientY, time: Date.now() };
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || !touchStart) {
+        touchStart = null;
+        return;
+      }
+      const dx = Math.abs(e.clientX - touchStart.x);
+      const dy = Math.abs(e.clientY - touchStart.y);
+      const dt = Date.now() - touchStart.time;
+      touchStart = null;
+      // Tap = barely moved AND short press. 14px tolerance handles imprecise
+      // finger placement on small zones.
+      if (dx < 14 && dy < 14 && dt < 600) {
+        const r = raycastAt(e.clientX, e.clientY);
+        if (r) {
+          highlightForCode(r.code);
+          setHovered({ code: r.code, label: r.label, x: r.localX, y: r.localY });
+          onSelect(r.code);
+          // Auto-clear the tooltip after a moment so attention shifts to the
+          // parts list naturally
+          setTimeout(() => { setHovered(null); }, 1200);
+        } else {
+          clearHighlight();
+          setHovered(null);
+          onSelect("all");
+        }
       }
     };
 
+    const onClick = (e: MouseEvent) => {
+      // Touch is handled in onPointerUp above
+      if ((e as PointerEvent).pointerType === "touch") return;
+      const r = raycastAt(e.clientX, e.clientY);
+      if (r) onSelect(r.code);
+      else onSelect("all");
+    };
+
     renderer.domElement.addEventListener("pointermove", onPointerMove);
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointerup", onPointerUp);
+    renderer.domElement.addEventListener("pointercancel", () => { touchStart = null; });
     renderer.domElement.addEventListener("click", onClick);
     renderer.domElement.style.cursor = "grab";
+    // Skip 300ms tap-delay and double-tap zoom inside the canvas; OrbitControls
+    // still gets pan/zoom from the pan-x pan-y allowance.
+    renderer.domElement.style.touchAction = "pan-x pan-y";
 
     // --- Animation loop -----------------------------------------------------
     let rafId = 0;
@@ -651,6 +693,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", onResize);
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointerup", onPointerUp);
       renderer.domElement.removeEventListener("click", onClick);
       controls.dispose();
       renderer.dispose();
