@@ -108,27 +108,60 @@ def make_key(metal, spec, size, shape=""):
     ])
 
 def build_lookup_rows():
-    """Pure in-memory build. Returns a list of 9-tuples matching the _PriceLookup
-    column layout: (Key, Shape, Metal, Spec, Size, £ ex VAT, Unit, Source Sheet, Source Row).
-    Used by wire_catalogue.py and wire_invoice.py — neither needs to read a separate file.
+    """Pure in-memory build. Returns a list of 10-tuples:
+    (Key, Shape, Metal, Spec, Size, £ ex VAT, Unit, Source Sheet, Source Row, Code).
+
+    Used by wire_catalogue.py, wire_invoice.py, regen_website_data.py.
+    Codes are assigned via metal_codes.assign_codes() and persisted to
+    data-source/.metal-codes.json so they're stable across syncs.
     """
+    import sys as _sys
+    _here = Path(__file__).resolve().parent
+    if str(_here) not in _sys.path:
+        _sys.path.insert(0, str(_here))
+    from metal_codes import (
+        assign_codes, composite_key, load_codes_file, save_codes_file
+    )
+
     rows = parse_master()
     out = []
     seen = {}
     collisions = 0
+
+    # Build the input for the code assigner (one entry per master row)
+    code_inputs = [
+        {"metal": r["metal"], "spec": r["spec"], "size": r["size"], "shape": r["shape"]}
+        for r in rows
+    ]
+
+    # Load existing code mapping (preserves codes across syncs)
+    codes_path = PROJECT_ROOT / "data-source" / ".metal-codes.json"
+    existing = load_codes_file(codes_path)
+    code_map = assign_codes(code_inputs, existing=existing)
+
+    # Persist any newly-assigned codes back to disk
+    if code_map != existing:
+        save_codes_file(codes_path, code_map)
+
     for r in rows:
         k = make_key(r["metal"], r["spec"], r["size"], r["shape"])
         if k in seen:
             collisions += 1
             k = k + "#" + r["sourceSheet"] + ":" + str(r["sourceRow"])
         seen[k] = r
-        out.append((k, r["shape"], r["metal"], r["spec"], r["size"], r["priceEx"], r["unit"], r["sourceSheet"], r["sourceRow"]))
+        ckey = composite_key(r["metal"], r["spec"], r["size"], r["shape"])
+        code = code_map.get(ckey, "")
+        out.append((k, r["shape"], r["metal"], r["spec"], r["size"],
+                    r["priceEx"], r["unit"], r["sourceSheet"], r["sourceRow"],
+                    code))
     return out, collisions
 
 def main():
     print(f"Reading {MASTER}")
     rows, collisions = build_lookup_rows()
     print(f"  Built _PriceLookup in memory: {len(rows)} rows ({collisions} collision keys disambiguated)")
+    coded = sum(1 for r in rows if r[9])
+    print(f"  Codes assigned: {coded}/{len(rows)}")
 
 if __name__ == "__main__":
     main()

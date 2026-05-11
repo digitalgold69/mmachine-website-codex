@@ -29,6 +29,7 @@ CATALOGUE_SRC = str(PROJECT_ROOT / "data-source" / "Metals catalogue 2023.xlsx")
 CATALOGUE = str(PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx")
 
 from build_lookup import build_lookup_rows, normalise, make_key
+from metal_codes import candidate_code
 from surgical_xlsx import (
     open_for_surgery, repack_zip, add_sheet, remove_sheet_if_present,
     map_sheet_names_to_xml_files, edit_sheet_xml, extend_sheet_dimension,
@@ -84,10 +85,11 @@ def is_data_sheet(ws):
 
 def build_pricelookup_xml(rows):
     """Build the worksheet XML for the hidden _PriceLookup sheet.
-    Layout: Key | Shape | Metal | Spec | Size | £ ex VAT | Unit | Source Sheet | Source Row
+    Layout: Key | Shape | Metal | Spec | Size | £ ex VAT | Unit |
+            Source Sheet | Source Row | Code
     """
     headers = ["Key", "Shape", "Metal", "Spec", "Size", "£ ex VAT", "Unit",
-               "Source Sheet", "Source Row"]
+               "Source Sheet", "Source Row", "Code"]
     n_rows = len(rows) + 1
     last_col = col_letter(len(headers))
 
@@ -105,6 +107,7 @@ def build_pricelookup_xml(rows):
         '<col min="5" max="5" width="22" customWidth="1"/>',
         '<col min="6" max="6" width="10" customWidth="1"/>',
         '<col min="7" max="9" width="16" customWidth="1"/>',
+        '<col min="10" max="10" width="32" customWidth="1"/>',
         '</cols>',
         '<sheetData>',
     ]
@@ -116,7 +119,8 @@ def build_pricelookup_xml(rows):
 
     for ri, row in enumerate(rows, start=2):
         parts.append(f'<row r="{ri}">')
-        for ci, val in enumerate(row[:9], 1):
+        # row tuple length: 10 (Key, Shape, Metal, Spec, Size, £, Unit, Sheet, SrcRow, Code)
+        for ci, val in enumerate(row[:10], 1):
             ref = f"{col_letter(ci)}{ri}"
             if val is None or val == "":
                 continue
@@ -235,12 +239,23 @@ def wire_catalogue():
 
             row_edits = []
             if matched_key and confidence in HIGH_CONFIDENCE:
-                # Replace col E with VLOOKUP, set col K to the lookup key
+                # E (price) looks up via VLOOKUP. H (Code) does the same.
+                # The catalogue's _PriceLookup layout:
+                #   A=Key, B=Shape, C=Metal, D=Spec, E=Size, F=£ ex VAT, G=Unit,
+                #   H=Source Sheet, I=Source Row, J=Code
                 e_formula = f'IFERROR(VLOOKUP(K{row_idx},_PriceLookup!$A:$F,6,FALSE),0)'
+                h_formula = f'IFERROR(VLOOKUP(K{row_idx},_PriceLookup!$A:$J,10,FALSE),"")'
                 row_edits.append((f"E{row_idx}", cell_formula(f"E{row_idx}", e_formula)))
+                row_edits.append((f"H{row_idx}", cell_formula(f"H{row_idx}", h_formula)))
                 row_edits.append((f"K{row_idx}", cell_str(f"K{row_idx}", matched_key)))
                 counts["auto_linked"] += 1
             else:
+                # Not auto-linked — but still want a Code in column H so the
+                # owner / customers can read it off the catalogue. Use the
+                # candidate code from this row's own text (no master lookup).
+                fallback_code = candidate_code(metal, spec, size)
+                if fallback_code:
+                    row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", fallback_code)))
                 review_rows.append({
                     "sheet": sheet_name, "row": row_idx,
                     "shape": shape, "metal": metal, "spec": spec, "size": size,
@@ -288,8 +303,11 @@ def wire_catalogue():
                 continue
             sheet_path = Path(tempdir) / xml_rel
 
-            # Add a "Lookup Key" header at K1 if any K cells get added
+            # Add a "Code" header at H1 (next to £ Inc VAT) and a "Lookup Key"
+            # header at K1 (the existing hidden helper). H1 is visible — that's
+            # the column the owner shows customers.
             if edits:
+                edits.setdefault(1, []).append(("H1", cell_str("H1", "Code")))
                 edits.setdefault(1, []).append(("K1", cell_str("K1", "Lookup Key")))
 
             applied, missing = edit_sheet_xml(str(sheet_path), edits)

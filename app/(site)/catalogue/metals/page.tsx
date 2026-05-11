@@ -159,6 +159,20 @@ export default function MetalsCataloguePage() {
         </div>
       </div>
 
+      <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+        <Link href="/contact" className="btn-primary">
+          Enquire about metals →
+        </Link>
+        <a
+          href="/catalogue/metals-catalogue.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-secondary"
+        >
+          Download full PDF catalogue
+        </a>
+      </div>
+
       <div className="mt-8 bg-cream-dark rounded-xl p-6 border-l-4 border-gold">
         <h3 className="font-display text-lg text-racing mb-2">Need technical advice?</h3>
         <p className="text-sm text-ink-muted mb-3">

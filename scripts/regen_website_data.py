@@ -147,10 +147,50 @@ def category_from_metal_sheet(name):
 # Mini products — read product list from Mini Catalogue, prices from PartsbookBenji
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _find_code_desc_columns(header_row):
+    """Scan a header row and return list of (code_col, desc_col) pairs.
+
+    Different B-sheets in the Mini Catalogue use different column layouts:
+      120B-style: A=letter label, B=Code, C=Description, (D=Price), …, H=Code, I=Description
+      130B-style: A=Code,         B=Description, (C=Price), …, F=Code, G=Description
+
+    We read row 1 and find every column whose header is "Code" — the
+    description column is always the one immediately to its right. This
+    handles every layout the owner can throw at us without hardcoding.
+    """
+    pairs = []
+    for ci, val in enumerate(header_row, start=1):
+        if val is None: continue
+        if str(val).strip().lower() == "code":
+            # description is the next column over
+            desc_col = ci + 1
+            if desc_col <= len(header_row):
+                pairs.append((ci, desc_col))
+    return pairs
+
+
+_PART_CODE_REGEX = re.compile(r"^[\d.]+\.\d{2}\.\d{2}\.\d{2}[A-Z]?$|^[A-Z0-9-]{4,}$")
+
+
+def _looks_like_part_code(s):
+    """Reject things that aren't part codes — prices (numeric strings),
+    single letters, descriptions full of spaces, etc."""
+    if not s: return False
+    s = s.strip()
+    if not s: return False
+    if " " in s: return False                     # descriptions have spaces
+    if len(s) < 3 or len(s) > 30: return False    # part codes fit this range
+    # Try the part-code regex (e.g. 11.14.00.87 or 14A6901)
+    return bool(_PART_CODE_REGEX.match(s))
+
+
 def read_mini_catalogue_codes():
     """Walk Mini Catalogue's B-sheets (120B…510B) and APX1/APX2.
     Returns a list of (code, description, section) tuples preserving the
-    catalogue's left-then-right reading order."""
+    catalogue's reading order.
+
+    Detects column layout per sheet from the header row (different
+    sections use different layouts — see _find_code_desc_columns)."""
     if not MINI_CAT.exists():
         print(f"  ! Mini Catalogue not found at {MINI_CAT}; mini products will be empty")
         return []
@@ -158,35 +198,42 @@ def read_mini_catalogue_codes():
     wb = openpyxl.load_workbook(MINI_CAT, data_only=True)
     out = []
 
-    # Section sheets (120B, 130B, ...): left list cols B/C, right list cols H/I
     for sn in wb.sheetnames:
         m = re.fullmatch(r"(\d+)B", sn)
         if not m: continue
         section = m.group(1)
         ws = wb[sn]
-        for r in range(2, ws.max_row + 1):
-            # left
-            code = strip_str(ws.cell(r, 2).value)
-            desc = strip_str(ws.cell(r, 3).value)
-            if code and desc:
-                out.append((code, desc, section))
-            # right
-            code = strip_str(ws.cell(r, 8).value)
-            desc = strip_str(ws.cell(r, 9).value)
-            if code and desc:
-                out.append((code, desc, section))
 
-    # APX sheets — same layout but different section labels
+        # Build a header row big enough to cover both list halves
+        header = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+        col_pairs = _find_code_desc_columns(header)
+        if not col_pairs:
+            # No "Code" header in row 1 — fall back to the conservative
+            # 120B-style positions so we don't silently drop a sheet
+            col_pairs = [(2, 3), (8, 9)]
+
+        for r in range(2, ws.max_row + 1):
+            for code_col, desc_col in col_pairs:
+                code = strip_str(ws.cell(r, code_col).value)
+                desc = strip_str(ws.cell(r, desc_col).value)
+                if code and desc and _looks_like_part_code(code):
+                    out.append((code, desc, section))
+
+    # APX sheets — usually different layout again
     for sn, section in [("APX1", "Apx1"), ("APX2", "Apx2")]:
         if sn not in wb.sheetnames: continue
         ws = wb[sn]
+        header = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+        col_pairs = _find_code_desc_columns(header)
+        if not col_pairs:
+            col_pairs = [(2, 3), (8, 9), (1, 2), (5, 6)]
         for r in range(2, ws.max_row + 1):
-            for code_col, desc_col in [(2, 3), (8, 9), (1, 2), (5, 6)]:
+            for code_col, desc_col in col_pairs:
                 code = strip_str(ws.cell(r, code_col).value)
                 desc = strip_str(ws.cell(r, desc_col).value)
-                if code and desc and re.match(r"^[\d.]+(?:\.\d+)?$|^[A-Z0-9-]{3,}$", code):
+                if code and desc and _looks_like_part_code(code):
                     out.append((code, desc, section))
-                    break  # only one product per row pair
+                    break  # one product per row max
 
     return out
 
@@ -275,9 +322,18 @@ def build_metals_products():
         print(f"  ! Metals catalogue not found at {METALS_CAT}; metals products will be empty")
         return []
 
-    # Master lookup
+    # Master lookup (also loads + persists the .metal-codes.json mapping)
     rows, _collisions = build_lookup_rows()
     keys, by_metal_size, by_metal_spec_size = build_indexes(rows)
+
+    # Build a code-by-key index so we can attach the assigned code to each
+    # catalogue row that auto-links. master tuple has the code at index 9.
+    code_by_master_key = {row[0]: row[9] for row in rows}
+
+    # For unmatched catalogue rows we still want a sensible code. Use the
+    # same code-assigner so collisions across catalogue+master are handled.
+    sys.path.insert(0, str(HERE / "phase2"))
+    from metal_codes import composite_key as _ckey, candidate_code as _cand
 
     # Catalogue
     wb = openpyxl.load_workbook(METALS_CAT, data_only=True)
@@ -330,8 +386,16 @@ def build_metals_products():
 
             pieces = [shape, metal, spec, size]
             name = " — ".join(p for p in pieces if p)
-            code = ((spec or metal or shape or sheet_name).replace(" ", "")[:32] +
-                    ("-" + size.replace(" ", "") if size else ""))
+            # Code rule (matches what the wired Metals catalogue displays in
+            # its Code column):
+            #   HIGH_CONFIDENCE auto-link → use master's pre-assigned code
+            #   Anything else             → use candidate-code from this row's
+            #                                own text (so spec=HE30 produces
+            #                                "HE30-..." not "Aluminium-...")
+            if matched_key and confidence in HIGH_CONFIDENCE and matched_key in code_by_master_key:
+                code = code_by_master_key[matched_key] or _cand(metal, spec, size)
+            else:
+                code = _cand(metal, spec, size)
 
             # Always "in" — real stock tracking comes in Phase 3. Pricing
             # state is communicated via priceExVat (null = "POA" badge in UI).

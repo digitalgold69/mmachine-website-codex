@@ -281,7 +281,7 @@ export default function MiniCataloguePage() {
           Enquire about parts →
         </Link>
         <a
-          href="/downloads/panels_catalogue.pdf"
+          href="/catalogue/mini-catalogue.pdf"
           target="_blank"
           rel="noopener noreferrer"
           className="btn-secondary"

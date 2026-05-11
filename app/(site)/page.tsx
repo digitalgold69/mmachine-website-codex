@@ -59,47 +59,71 @@ export default function HomePage() {
           <p className="text-ink-muted">Browse online with our interactive 3D Mini, or download the full PDF.</p>
         </div>
         <div className="grid md:grid-cols-2 gap-6">
-          <Link href="/catalogue/mini" className="card group block">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-14 h-14 rounded-xl bg-cream-dark flex items-center justify-center group-hover:bg-gold/20 transition-colors">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F3D2E" strokeWidth="1.5">
-                  <path d="M3 12h2l2-5h10l2 5h2v6h-3a2 2 0 01-4 0H10a2 2 0 01-4 0H3v-6z" />
-                  <circle cx="8" cy="17" r="1.5" />
-                  <circle cx="16" cy="17" r="1.5" />
-                </svg>
+          <div className="card group block">
+            <Link href="/catalogue/mini" className="block">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-xl bg-cream-dark flex items-center justify-center group-hover:bg-gold/20 transition-colors">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F3D2E" strokeWidth="1.5">
+                    <path d="M3 12h2l2-5h10l2 5h2v6h-3a2 2 0 01-4 0H10a2 2 0 01-4 0H3v-6z" />
+                    <circle cx="8" cy="17" r="1.5" />
+                    <circle cx="16" cy="17" r="1.5" />
+                  </svg>
+                </div>
+                <span className="text-xs font-mono text-gold">{miniCount} PARTS</span>
               </div>
-              <span className="text-xs font-mono text-gold">{miniCount} PARTS</span>
+              <h3 className="font-display text-xl text-racing mb-2">Classic Mini panels</h3>
+              <p className="text-sm text-ink-muted mb-4">
+                Wings, floor pans, sills, A-panels, boot floors. Steel pressings for Mk1 through Mk5,
+                Cooper, Elf, Hornet, Clubman, Traveller, Van and Pick-Up. Organised across {sectionCount} sections
+                with an interactive 3D Mini to find exactly what you need.
+              </p>
+            </Link>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Link href="/catalogue/mini" className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1">
+                Browse catalogue →
+              </Link>
+              <a
+                href="/catalogue/mini-catalogue.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1"
+              >
+                Download PDF ↓
+              </a>
             </div>
-            <h3 className="font-display text-xl text-racing mb-2">Classic Mini panels</h3>
-            <p className="text-sm text-ink-muted mb-4">
-              Wings, floor pans, sills, A-panels, boot floors. Steel pressings for Mk1 through Mk5,
-              Cooper, Elf, Hornet, Clubman, Traveller, Van and Pick-Up. Organised across {sectionCount} sections
-              with an interactive 3D Mini to find exactly what you need.
-            </p>
-            <span className="text-sm font-medium text-racing group-hover:text-gold inline-flex items-center gap-1">
-              Browse catalogue →
-            </span>
-          </Link>
+          </div>
 
-          <Link href="/catalogue/metals" className="card group block">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-14 h-14 rounded-xl bg-cream-dark flex items-center justify-center group-hover:bg-gold/20 transition-colors">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F3D2E" strokeWidth="1.5">
-                  <rect x="3" y="8" width="18" height="8" rx="1" />
-                  <path d="M3 12h18M8 8v8M16 8v8" />
-                </svg>
+          <div className="card group block">
+            <Link href="/catalogue/metals" className="block">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-xl bg-cream-dark flex items-center justify-center group-hover:bg-gold/20 transition-colors">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F3D2E" strokeWidth="1.5">
+                    <rect x="3" y="8" width="18" height="8" rx="1" />
+                    <path d="M3 12h18M8 8v8M16 8v8" />
+                  </svg>
+                </div>
+                <span className="text-xs font-mono text-gold">{metalsCount} GRADES</span>
               </div>
-              <span className="text-xs font-mono text-gold">900+ GRADES</span>
+              <h3 className="font-display text-xl text-racing mb-2">Engineering metals</h3>
+              <p className="text-sm text-ink-muted mb-4">
+                Tool steels, stainless, aluminium, brass. Cut to size from stock. Same-day despatch
+                on orders placed before noon.
+              </p>
+            </Link>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Link href="/catalogue/metals" className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1">
+                Browse catalogue →
+              </Link>
+              <a
+                href="/catalogue/metals-catalogue.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1"
+              >
+                Download PDF ↓
+              </a>
             </div>
-            <h3 className="font-display text-xl text-racing mb-2">Engineering metals</h3>
-            <p className="text-sm text-ink-muted mb-4">
-              Tool steels, stainless, aluminium, brass. Cut to size from stock. Same-day despatch
-              on orders placed before noon.
-            </p>
-            <span className="text-sm font-medium text-racing group-hover:text-gold inline-flex items-center gap-1">
-              Browse catalogue →
-            </span>
-          </Link>
+          </div>
         </div>
       </section>
 

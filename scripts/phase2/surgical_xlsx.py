@@ -238,12 +238,31 @@ def _cell_pattern(ref):
     return re.compile(_CELL_REGEX_TEMPLATE.format(ref=re.escape(ref)), re.DOTALL)
 
 
+_STYLE_ATTR_REGEX = re.compile(r'\ss="(\d+)"')
+
+
 def replace_cell_in_row(row_xml, ref, new_cell_xml):
     """Replace the first <c r="{ref}".../> or <c r="{ref}">...</c> in row_xml.
+
+    PRESERVES the original cell's s="..." style index so borders, fills, fonts,
+    number formats etc. survive the edit. Without this, cells lose their
+    formatting (e.g. the invoice line items lose their borders).
+
     If no cell with that ref exists, insert new_cell_xml before </row>."""
     pat = _cell_pattern(ref)
-    if pat.search(row_xml):
-        return pat.sub(new_cell_xml, row_xml, count=1)
+    m = pat.search(row_xml)
+    if m:
+        original = m.group(0)
+        style_m = _STYLE_ATTR_REGEX.search(original)
+        if style_m and 's="' not in new_cell_xml:
+            # Inject the style attribute right after the r="..." attribute
+            new_cell_xml = re.sub(
+                r'(<c\s+r="[^"]+")',
+                rf'\1 s="{style_m.group(1)}"',
+                new_cell_xml,
+                count=1,
+            )
+        return row_xml[:m.start()] + new_cell_xml + row_xml[m.end():]
     # No existing cell — insert before </row>
     return row_xml.replace("</row>", new_cell_xml + "</row>", 1)
 
