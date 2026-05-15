@@ -81,16 +81,73 @@ def add_sheet(tempdir, sheet_name, sheet_xml, hidden=False):
     new_filename = f"sheet{max_n + 1}.xml"
     _write(tempdir, f"xl/worksheets/{new_filename}", sheet_xml)
 
-    # 2. Add a Relationship for the new sheet in xl/_rels/workbook.xml.rels
+    # 2. Add a Relationship for the new sheet in xl/_rels/workbook.xml.rels.
+    #
+    # Excel is fussy about some older workbooks: worksheet relationships should
+    # remain together before styles/theme/sharedStrings/calcChain relationships.
+    # If the next worksheet rId is already used by a non-worksheet relationship,
+    # shift those non-worksheet rIds up by one and insert the new worksheet
+    # relationship before them.
     rels = _read(tempdir, "xl/_rels/workbook.xml.rels")
-    used_rids = [int(m) for m in re.findall(r'Id="rId(\d+)"', rels)]
-    new_rid = max(used_rids) + 1
+    worksheet_rel_type = "relationships/worksheet"
+    rel_tags = re.findall(r"<Relationship\b[^>]*/>", rels)
+    worksheet_rids = []
+    for tag in rel_tags:
+        m = re.search(r'Id="rId(\d+)"', tag)
+        if m and worksheet_rel_type in tag:
+            worksheet_rids.append(int(m.group(1)))
+    new_rid = max(worksheet_rids, default=0) + 1
+
+    def shift_nonworksheet_rid(match):
+        tag = match.group(0)
+        m = re.search(r'Id="rId(\d+)"', tag)
+        if not m or worksheet_rel_type in tag:
+            return tag
+        rid = int(m.group(1))
+        if rid >= new_rid:
+            return tag.replace(f'Id="rId{rid}"', f'Id="rId{rid + 1}"', 1)
+        return tag
+
+    rels = re.sub(r"<Relationship\b[^>]*/>", shift_nonworksheet_rid, rels)
+
     new_rel = (
         f'<Relationship Id="rId{new_rid}" '
         f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
         f'Target="worksheets/{new_filename}"/>'
     )
-    rels = rels.replace("</Relationships>", new_rel + "</Relationships>")
+
+    insert_at = rels.find("</Relationships>")
+    for match in re.finditer(r"<Relationship\b[^>]*/>", rels):
+        if worksheet_rel_type not in match.group(0):
+            insert_at = match.start()
+            break
+    rels = rels[:insert_at] + new_rel + rels[insert_at:]
+
+    # Keep workbook relationships in a boring Excel-like order. The source
+    # metals catalogue has a strange but tolerated order; after adding sheets,
+    # Excel is less forgiving unless worksheet relationships are grouped.
+    root_match = re.search(r"<Relationships\b[^>]*>", rels)
+    open_end = root_match.end() if root_match else 0
+    close_start = rels.rfind("</Relationships>")
+    if open_end > 0 and close_start > open_end:
+        root_open = rels[:open_end]
+        root_close = rels[close_start:]
+        tags = re.findall(r"<Relationship\b[^>]*/>", rels[open_end:close_start])
+
+        def rid_num(tag):
+            m = re.search(r'Id="rId(\d+)"', tag)
+            return int(m.group(1)) if m else 10**9
+
+        worksheet_tags = sorted(
+            [tag for tag in tags if worksheet_rel_type in tag],
+            key=rid_num,
+        )
+        other_tags = sorted(
+            [tag for tag in tags if worksheet_rel_type not in tag],
+            key=rid_num,
+        )
+        rels = root_open + "".join(worksheet_tags + other_tags) + root_close
+
     _write(tempdir, "xl/_rels/workbook.xml.rels", rels)
 
     # 3. Add a <sheet> entry inside <sheets> in xl/workbook.xml

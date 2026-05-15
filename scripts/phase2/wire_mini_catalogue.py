@@ -22,7 +22,16 @@ import openpyxl
 import re
 import shutil
 import sys
+import warnings
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+
+warnings.filterwarnings("ignore", message="DrawingML support is incomplete.*")
+warnings.filterwarnings("ignore", message="Print area cannot be set.*")
+warnings.filterwarnings("ignore", message="Cannot parse header or footer.*")
+warnings.filterwarnings("ignore", message="Data Validation extension is not supported.*")
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -207,8 +216,8 @@ def wire_mini_catalogue():
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    print(f"  ✓ External 'Parts Data' references replaced with internal _PriceLookup")
-    print(f"  ✓ VBA, images, print settings — preserved byte-for-byte")
+    print("  OK External 'Parts Data' references replaced with internal _PriceLookup")
+    print("  OK VBA, images, and print settings preserved")
 
 
 if __name__ == "__main__":

@@ -1,30 +1,17 @@
-# Export-PDFs.ps1 — convert the wired Excel files to PDFs using Excel itself.
+# Export-PDFs.ps1
 #
-# Why use Excel and not LibreOffice?
-#   The owner's existing PDFs were made by Excel's PDF export. Excel renders
-#   vector logos (EMF/WMF), print settings, and headers/footers exactly as
-#   she sees them on screen. LibreOffice's headless export produces minor
-#   logo-rendering artifacts on the M-Machine letterhead. So this script
-#   uses Excel's COM automation interface for byte-perfect output.
+# Converts refreshed catalogue workbooks to PDFs using Microsoft Excel.
+# Excel is used because it preserves the owner's existing logo, page layout,
+# headers, footers, and print areas more reliably than headless converters.
 #
-# What it does:
-#   1. Open final-deliverables\Metals catalogue 2023.xlsx in Excel
-#   2. Hide the helper sheets (_PriceLookup, _ReviewMe) so they don't print
-#   3. Export the visible sheets as one PDF
-#   4. Save to public\catalogue\metals-catalogue.pdf for the website
-#   5. Restore sheet visibility, close Excel
-#
-# Run: powershell -ExecutionPolicy Bypass -File scripts\phase2\export_pdfs.ps1
-#
-# Requires: Microsoft Excel installed (any 2013+ version)
+# Run:
+#   powershell -ExecutionPolicy Bypass -File scripts\phase2\export_pdfs.ps1
 
 param(
-    # First file to export (metals).
     [string]$Source = "final-deliverables\Metals catalogue 2023.xlsx",
     [string]$Output = "public\catalogue\metals-catalogue.pdf",
     [string[]]$HideSheets = @("_PriceLookup", "_ReviewMe"),
 
-    # Second file (mini). Set to "" to skip the second export.
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
     [string]$Output2 = "public\catalogue\mini-catalogue.pdf",
     [string[]]$HideSheets2 = @("_PriceLookup")
@@ -32,7 +19,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Resolve to absolute paths from the script's parent dir (project root)
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 
@@ -43,27 +29,32 @@ function Export-CatalogueToPdf {
         [Parameter(Mandatory)] [string]$OutputPath,
         [string[]]$SheetsToHide = @()
     )
+
     if (-not (Test-Path $SourcePath)) {
-        Write-Host "  ! source file not found: $SourcePath — skipping" -ForegroundColor Yellow
+        Write-Host "  source file not found: $SourcePath - skipping" -ForegroundColor Yellow
         return
     }
+
     $outDir = Split-Path -Parent $OutputPath
     if (-not (Test-Path $outDir)) {
         New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     }
+
     Write-Host "Exporting $SourcePath -> $OutputPath ..."
     $wb = $Excel.Workbooks.Open($SourcePath, 0, $true)
+    $originalStates = @{}
+
     try {
-        $originalStates = @{}
         foreach ($sn in $SheetsToHide) {
             try {
                 $sheet = $wb.Sheets.Item($sn)
                 $originalStates[$sn] = $sheet.Visible
                 $sheet.Visible = 0
             } catch {
-                Write-Host "  (sheet '$sn' not present — skipping hide)"
+                Write-Host "  sheet '$sn' not present - skipping hide"
             }
         }
+
         $wb.ExportAsFixedFormat(
             0,
             $OutputPath,
@@ -74,13 +65,17 @@ function Export-CatalogueToPdf {
             [Type]::Missing,
             $false
         )
-        foreach ($sn in $originalStates.Keys) {
-            $wb.Sheets.Item($sn).Visible = $originalStates[$sn]
-        }
+        Write-Host "  PDF written"
     } finally {
+        foreach ($sn in $originalStates.Keys) {
+            try {
+                $wb.Sheets.Item($sn).Visible = $originalStates[$sn]
+            } catch {
+                Write-Host "  warning: could not restore visibility for $sn" -ForegroundColor Yellow
+            }
+        }
         $wb.Close($false)
     }
-    Write-Host "  ✓ PDF written"
 }
 
 $excel = New-Object -ComObject Excel.Application
