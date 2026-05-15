@@ -24,7 +24,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "mmachine-quote-cart";
 
 const money = (value: number | null) =>
-  value === null ? "POA" : `£${value.toFixed(2)}`;
+  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
 
 const itemLabel = (item: QuoteItem | PendingItem) =>
   item.catalogue === "metals"
@@ -108,7 +108,6 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       return [...current, { ...pending, qty: pendingQty }];
     });
     setPending(null);
-    setDrawerOpen(true);
     setMessage("");
   }
 
@@ -163,13 +162,13 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
     <CartContext.Provider value={{ items, count, beginAdd }}>
       {children}
 
-      {showCartUi && (
+      {showCartUi && count > 0 && (
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
           className="fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-racing px-5 text-sm font-semibold text-cream shadow-lg transition hover:bg-[#155040]"
         >
-          Quote cart
+          Checkout
           <span className="rounded-full bg-gold px-2 py-0.5 text-xs text-racing-dark">
             {count}
           </span>
@@ -318,7 +317,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm text-ink-muted">
                     Guide subtotal ex VAT:{" "}
-                    <strong className="text-racing">£{subtotal.toFixed(2)}</strong>
+                    <strong className="text-racing">{"\u00a3"}{subtotal.toFixed(2)}</strong>
                   </div>
                   <button type="submit" disabled={submitting || items.length === 0} className="btn-primary">
                     {submitting ? "Sending..." : "Send quote request"}
