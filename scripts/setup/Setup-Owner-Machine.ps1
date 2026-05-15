@@ -6,9 +6,11 @@
 #   1. Installs Node.js, Python, and Git via winget.
 #   2. Clones the mmachine-website repo to C:\mmachine.
 #   3. Installs npm and Python dependencies.
-#   4. Creates friendly desktop folders:
+#   4. Creates friendly desktop items:
 #        M-Machine Master Files   -> C:\mmachine\data-source
 #        M-Machine Customer Files -> C:\mmachine\final-deliverables
+#        Run M-Machine Sync Now.bat
+#        M-Machine Instructions.txt
 #   5. Creates a daily Windows Scheduled Task at noon.
 #
 # Daily sync behaviour:
@@ -209,6 +211,8 @@ Write-Step "Step 4 of 5 - Create desktop folders and scheduled task"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $masterFolder = Join-Path $desktopPath "M-Machine Master Files"
 $customerFolder = Join-Path $desktopPath "M-Machine Customer Files"
+$manualSyncButton = Join-Path $desktopPath "Run M-Machine Sync Now.bat"
+$ownerInstructions = Join-Path $desktopPath "M-Machine Instructions.txt"
 $dataSourcePath = Join-Path $InstallPath "data-source"
 $finalPath = Join-Path $InstallPath "final-deliverables"
 
@@ -254,6 +258,53 @@ echo [%date% %time%] Daily sync done >> "%LOG%"
 "@
 Set-Content -Path $BatPath -Value $BatContent -Encoding ASCII
 
+$ManualSyncContent = @"
+@echo off
+title M-Machine Sync
+call "$BatPath"
+echo.
+echo Sync finished. Check the M-Machine Customer Files folder.
+echo.
+pause
+"@
+Set-Content -Path $manualSyncButton -Value $ManualSyncContent -Encoding ASCII
+
+$OwnerInstructionsContent = @"
+M-MACHINE DAILY ROUTINE
+
+Use this desktop folder:
+
+M-Machine Master Files
+
+Put the newest master Excel files in there. If Windows asks whether to replace
+the old file, click Replace.
+
+For normal price changes, the files that matter are:
+
+Metals.xlsx
+PartsbookBenji2014.xlsx
+
+The other Excel files should stay in the folder too:
+
+Metals catalogue 2023.xlsx
+Mini Catalogue Self Updating.xlsm
+Metals Invoice.xlsm
+Mini Invoice Template.xlsm
+
+Do not rename the files.
+Close Excel after saving.
+
+The computer runs the update automatically every day.
+If you want to run it now, double-click:
+
+Run M-Machine Sync Now.bat
+
+Finished customer files appear in:
+
+M-Machine Customer Files
+"@
+Set-Content -Path $ownerInstructions -Value $OwnerInstructionsContent -Encoding ASCII
+
 $TaskName = "M-Machine Daily Sync"
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
@@ -271,6 +322,8 @@ Register-ScheduledTask `
     -Description "Daily noon sync for M-Machine: refresh website data, catalogue files, PDFs, and push to GitHub."
 
 Write-Host "  Scheduled task registered: $TaskName at $DailyRunTime daily" -ForegroundColor Green
+Write-Host "  Manual sync button created: Run M-Machine Sync Now.bat" -ForegroundColor Green
+Write-Host "  Instruction note created: M-Machine Instructions.txt" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 5 - optional first test run
@@ -330,4 +383,5 @@ Write-Host "  4. Metals invoice stays unchanged; Mini invoice keeps using Partsb
 Write-Host ""
 Write-Host "Master folder:   $masterFolder"
 Write-Host "Customer folder: $customerFolder"
+Write-Host "Manual sync:     $manualSyncButton"
 Write-Host "Log file:        $InstallPath\daily-sync.log"

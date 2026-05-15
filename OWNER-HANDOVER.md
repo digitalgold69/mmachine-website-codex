@@ -13,6 +13,9 @@ M-Machine Master Files
 Save the file and close Excel. The daily sync refreshes the website, catalogue
 files, and downloadable PDFs.
 
+There is also a desktop button named `Run M-Machine Sync Now.bat` for running
+the same update immediately.
+
 The invoice templates stay original. They are not redesigned. The only invoice
 link the sync touches is the Mini invoice's existing Partsbook link, so code
 entry keeps pulling prices from the current Mini master file.

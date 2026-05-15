@@ -18,6 +18,10 @@ The goal is deliberately simple:
 - Desktop folder: `M-Machine Customer Files`
   - Points to `C:\mmachine\final-deliverables`
   - The owner opens refreshed catalogue files here
+- Desktop button: `Run M-Machine Sync Now.bat`
+  - Lets Guy or the owner run the update immediately without PowerShell
+- Desktop note: `M-Machine Instructions.txt`
+  - A short reminder of which folder and files to use
 - Scheduled task: `M-Machine Daily Sync`
   - Runs daily at noon local UK time by default
   - Refreshes website data, catalogue Excel files, and PDFs
