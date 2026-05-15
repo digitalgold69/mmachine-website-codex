@@ -53,7 +53,7 @@ Open PowerShell as Administrator, then run:
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
 cd C:\Users\Owner\Downloads
-.\Setup-Owner-Machine.ps1 -RepoUrl "https://github.com/digitalgold69/mmachine-website.git" -GitHubToken "YOUR_NEW_TOKEN"
+.\Setup-Owner-Machine.ps1 -RepoUrl "https://github.com/digitalgold69/mmachine-website-codex.git" -GitHubToken "YOUR_NEW_TOKEN"
 ```
 
 Use a fresh GitHub token. If an old token was pasted into chat or logs, revoke
