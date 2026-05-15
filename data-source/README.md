@@ -31,9 +31,11 @@ These two files may also be placed here:
 | `Metals Invoice.xlsm` | Original metals invoice template |
 | `Mini Invoice Template.xlsm` | Original Mini invoice template |
 
-The sync does not rewire or edit the invoice templates. If they are present,
-it copies them unchanged into `final-deliverables/` so the owner sees them in
-the "M-Machine Customer Files" folder.
+The metals invoice is copied unchanged into `final-deliverables/`.
+
+The Mini invoice keeps its original layout, macros, and formulas. The sync only
+updates its existing external workbook link so code-entry prices come from the
+current `PartsbookBenji2014.xlsx` in this source folder.
 
 ## Manual refresh
 

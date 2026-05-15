@@ -14,7 +14,7 @@
 # Daily sync behaviour:
 #   - Website data updates from Metals.xlsx and PartsbookBenji2014.xlsx.
 #   - Customer catalogue files are rebuilt with fresh prices.
-#   - Invoice templates are copied through unchanged.
+#   - Invoice templates keep the owner's normal workflow.
 #   - Catalogue PDFs are exported and pushed to GitHub for Vercel.
 #
 # Important:
@@ -326,7 +326,7 @@ Write-Host "Daily routine:"
 Write-Host "  1. Owner edits Metals.xlsx or PartsbookBenji2014.xlsx."
 Write-Host "  2. Owner saves and closes Excel."
 Write-Host "  3. Daily sync refreshes website data, catalogue files, and PDFs."
-Write-Host "  4. Invoice templates stay original and are copied unchanged."
+Write-Host "  4. Metals invoice stays unchanged; Mini invoice keeps using Partsbook prices."
 Write-Host ""
 Write-Host "Master folder:   $masterFolder"
 Write-Host "Customer folder: $customerFolder"

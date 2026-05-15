@@ -14,10 +14,11 @@ npm run sync-excel
 | `Metals catalogue 2023.xlsx` | Rebuilt from the original catalogue template, with fresh prices from `data-source/Metals.xlsx` |
 | `Mini Catalogue Self Updating.xlsm` | Rebuilt from the original Mini catalogue template, with fresh prices from `data-source/PartsbookBenji2014.xlsx` |
 | `Metals Invoice.xlsm` | Copied unchanged from `data-source/Metals Invoice.xlsm`, if present |
-| `Mini Invoice Template.xlsm` | Copied unchanged from `data-source/Mini Invoice Template.xlsm`, if present |
+| `Mini Invoice Template.xlsm` | Copied from the original template, with its existing Partsbook link pointed at `data-source/PartsbookBenji2014.xlsx` |
 
-The invoice templates are intentionally not modified. This keeps the owner's
-existing invoice workflow intact.
+The Mini invoice layout, macros, and formulas are intentionally left as the
+owner already uses them. Only the workbook link path is refreshed so part-code
+price fill uses the latest Mini master.
 
 These Excel files are gitignored. The live website only receives the generated
 TypeScript data files and PDFs.

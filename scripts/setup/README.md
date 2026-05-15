@@ -6,7 +6,8 @@ The goal is deliberately simple:
 
 1. The owner edits the master Excel files she already knows.
 2. A daily sync refreshes the website and catalogue files.
-3. The invoice templates stay original.
+3. The invoice templates stay original; the Mini invoice keeps using the Mini
+   master file for part-code prices.
 
 ## What the setup script creates
 
@@ -36,8 +37,10 @@ Optional but recommended:
 - `Metals Invoice.xlsm`
 - `Mini Invoice Template.xlsm`
 
-The invoice files are copied unchanged into "M-Machine Customer Files".
-They are not rewired.
+The metals invoice is copied unchanged into "M-Machine Customer Files".
+
+The Mini invoice keeps its original layout and macros, but the sync points its
+existing Partsbook link at `C:\mmachine\data-source\PartsbookBenji2014.xlsx`.
 
 ## Run the setup script
 

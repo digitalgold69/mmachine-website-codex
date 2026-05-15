@@ -13,8 +13,9 @@ M-Machine Master Files
 Save the file and close Excel. The daily sync refreshes the website, catalogue
 files, and downloadable PDFs.
 
-The invoice templates stay original. They are not redesigned, rewired, or
-changed by the sync.
+The invoice templates stay original. They are not redesigned. The only invoice
+link the sync touches is the Mini invoice's existing Partsbook link, so code
+entry keeps pulling prices from the current Mini master file.
 
 ## Desktop folders
 
@@ -43,7 +44,7 @@ It contains:
 - refreshed `Metals catalogue 2023.xlsx`
 - refreshed `Mini Catalogue Self Updating.xlsm`
 - unchanged copy of `Metals Invoice.xlsm`, if present in Master Files
-- unchanged copy of `Mini Invoice Template.xlsm`, if present in Master Files
+- original `Mini Invoice Template.xlsm`, linked to the current `PartsbookBenji2014.xlsx`, if present in Master Files
 
 ## Daily price workflow
 
@@ -70,6 +71,7 @@ npm run daily-sync
 - online metals catalogue prices
 - refreshed customer catalogue Excel files
 - downloadable catalogue PDFs
+- Mini invoice code-entry prices, through its existing link to `PartsbookBenji2014.xlsx`
 
 ## What does not change
 
@@ -78,7 +80,9 @@ npm run daily-sync
 - The invoice macros
 - The owner's familiar invoice workflow
 
-The invoice files are only copied unchanged from Master Files to Customer Files.
+The metals invoice is copied unchanged from Master Files to Customer Files. The
+Mini invoice is copied with the same layout, macros, and formulas, but its
+existing Partsbook link is pointed at the current master file.
 
 ## If something looks wrong
 
