@@ -31,8 +31,11 @@ param(
     # Where to clone the repo on the owner's machine
     [string]$InstallPath = "C:\mmachine",
 
-    # Time to run the daily sync (24-hour format, owner's local time)
-    [string]$DailyRunTime = "06:00",
+    # Time to run the daily sync (24-hour format, owner's local time — so
+    # 12:00 means noon UK time year-round, automatically following the
+    # GMT/BST switch because Windows stores Scheduled Tasks in local time
+    # and shifts them with the system clock during daylight saving).
+    [string]$DailyRunTime = "12:00",
 
     # GitHub Personal Access Token — needed for `git push` to work non-interactively.
     # Get one at github.com → Settings → Developer settings → Personal access tokens.
@@ -183,6 +186,11 @@ echo ============================================== >> "%LOG%"
 echo [%date% %time%] Starting daily sync >> "%LOG%"
 echo ============================================== >> "%LOG%"
 
+REM Step 0: pull any remote changes first. The owner edits Featured Work
+REM via the website's in-browser editor, which commits to GitHub directly.
+REM Without a pull, those edits would block the daily push.
+git pull --rebase --autostash >> "%LOG%" 2>&1
+
 REM Step 1-3: regenerate website data, customer files, PDFs
 call npm run daily-sync >> "%LOG%" 2>&1
 if errorlevel 1 (
@@ -190,8 +198,10 @@ if errorlevel 1 (
     exit /b %errorlevel%
 )
 
-REM Step 4: stage the auto-generated files
-git add lib outgoing-to-owner public/catalogue >> "%LOG%" 2>&1
+REM Step 4: stage the auto-generated files. We deliberately do NOT stage
+REM lib/featured-data.ts or data-source/featured-work.json — those are
+REM owned by the in-browser editor and updated directly via GitHub.
+git add lib/mini-data.ts lib/metals-data.ts public/catalogue >> "%LOG%" 2>&1
 
 REM Step 5: only commit if something actually changed
 git diff --cached --quiet
@@ -227,9 +237,46 @@ Register-ScheduledTask `
     -Trigger $Trigger `
     -Principal $Principal `
     -Settings $Settings `
-    -Description "Daily 6 AM: regenerates website data from Metals.xlsx + PartsbookBenji, regenerates customer-facing catalogue & invoice files, exports PDFs, pushes to GitHub for auto-deploy."
+    -Description "Daily noon: regenerates website data from Metals.xlsx + PartsbookBenji, regenerates customer-facing catalogue & invoice files, exports PDFs, pushes to GitHub for auto-deploy. Runs in local time so it follows GMT/BST automatically."
 
 Write-Host "  ✓ Scheduled task registered: '$TaskName' at $DailyRunTime daily" -ForegroundColor Green
+
+# ------------------------------------------------------------------------------
+# Step 4.5 — create the friendly desktop folder
+# ------------------------------------------------------------------------------
+
+Write-Step "Step 4.5 of 5 — Put a 'M-Machine Master Files' folder on the desktop"
+
+# Two desktop folders — each one a transparent symbolic link into the
+# right internal folder. The owner never has to navigate the C:\mmachine
+# tree; she just opens the right desktop folder for the task at hand.
+$desktopPath = [Environment]::GetFolderPath("Desktop")
+
+# Folder 1: master files (where she DROPS her edited masters)
+$masterFolder = Join-Path $desktopPath "M-Machine Master Files"
+$dataSourcePath = Join-Path $InstallPath "data-source"
+
+# Folder 2: customer files (where she OPENS wired catalogue + invoice)
+$customerFolder = Join-Path $desktopPath "M-Machine Customer Files"
+$finalPath = Join-Path $InstallPath "final-deliverables"
+
+function Create-Symlink {
+    param([string]$LinkPath, [string]$TargetPath, [string]$Purpose)
+    if (Test-Path $LinkPath) {
+        Write-Host "  '$($LinkPath | Split-Path -Leaf)' already exists — skipping" -ForegroundColor Gray
+        return
+    }
+    $result = cmd /c mklink /D `"$LinkPath`" `"$TargetPath`" 2>&1
+    if (Test-Path $LinkPath) {
+        Write-Host "  ✓ Created: $($LinkPath | Split-Path -Leaf) — $Purpose" -ForegroundColor Green
+    } else {
+        Write-Host "  ! Couldn't create the symbolic link: $result" -ForegroundColor Yellow
+        Write-Host "    The system will still work; the owner just navigates to $TargetPath manually."
+    }
+}
+
+Create-Symlink -LinkPath $masterFolder  -TargetPath $dataSourcePath -Purpose "edit prices here"
+Create-Symlink -LinkPath $customerFolder -TargetPath $finalPath -Purpose "open invoice + catalogue here"
 
 # ------------------------------------------------------------------------------
 # Step 5 — first test run
@@ -268,11 +315,12 @@ Write-Host "  Setup complete." -ForegroundColor Green
 Write-Host "==============================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "What happens now:"
-Write-Host "  • Every day at $DailyRunTime, the daily sync runs automatically"
-Write-Host "  • Owner edits files in $InstallPath\data-source\"
-Write-Host "  • The next morning the website reflects her changes"
-Write-Host "  • Fresh catalogue/invoice files appear in $InstallPath\outgoing-to-owner\"
-Write-Host "  • Catalogue PDFs go to $InstallPath\public\catalogue\ and the website"
+Write-Host "  • Every day at $DailyRunTime UK local time, the daily sync runs"
+Write-Host "    automatically (follows GMT/BST automatically)"
+Write-Host "  • Owner edits files in the 'M-Machine Master Files' folder on her desktop"
+Write-Host "  • Same day after $DailyRunTime, the customer-facing files in the"
+Write-Host "    'M-Machine Customer Files' desktop folder reflect her changes"
+Write-Host "  • Catalogue PDFs go to $InstallPath\public\catalogue\ and onto the live website"
 Write-Host ""
 Write-Host "To run the sync manually any time:"
 Write-Host "  cd $InstallPath"

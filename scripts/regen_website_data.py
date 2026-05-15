@@ -671,10 +671,12 @@ def main():
 
     mini = build_mini_products()
     metals_list = build_metals_products()
-    featured = build_featured_work()
     write_mini_data_file(mini)
     write_metals_data_file(metals_list)
-    write_featured_data_file(featured)
+    # Featured Work is NOT touched here — the in-browser editor commits both
+    # data-source/featured-work.json AND lib/featured-data.ts directly via
+    # the GitHub API. The local sync should leave both files alone to avoid
+    # racing with the editor.
     print("\n✓ Done. Refresh your browser to see the changes.\n")
 
 
