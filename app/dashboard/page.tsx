@@ -40,6 +40,17 @@ export default async function DashboardHomePage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        <Link href="/dashboard/orders" className="card bg-white group block">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-xl text-racing">Quote requests</h2>
+            <span className="text-xs font-mono text-gold">NEW</span>
+          </div>
+          <p className="text-sm text-ink-muted mb-3">
+            Review website carts, adjust carriage or notes, and email the quote to the buyer.
+          </p>
+          <span className="text-sm font-medium text-racing group-hover:text-gold">Open quote requests →</span>
+        </Link>
+
         <Link href="/dashboard/products" className="card bg-white group block">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-xl text-racing">Manage products</h2>

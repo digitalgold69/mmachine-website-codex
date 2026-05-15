@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { OrderButton } from "@/components/QuoteCart";
 import { metals, metalCategories, type MetalProduct } from "@/lib/metals-data";
 
 const formatPrice = (value: number | null) =>
-  value === null ? "POA" : `£${value.toFixed(2)}`;
+  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
 
 const categoryLabel = (key: string) =>
   metalCategories.find((category) => category.key === key)?.label ?? key;
@@ -106,15 +107,16 @@ export default function MetalsCataloguePage() {
 
       <div className="bg-white rounded-xl border border-racing/10 overflow-hidden">
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full min-w-[1040px] table-fixed">
+          <table className="w-full min-w-[1120px] table-fixed">
             <colgroup>
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
-              <col className="w-[11%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
               <col />
-              <col className="w-[11%]" />
-              <col className="w-[13%]" />
-              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[92px]" />
             </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
@@ -122,9 +124,10 @@ export default function MetalsCataloguePage() {
                 <th className="text-left px-4 py-3">Metal</th>
                 <th className="text-left px-4 py-3">Spec.</th>
                 <th className="text-left px-4 py-3">Size</th>
-                <th className="text-right px-4 py-3">£ ex VAT</th>
+                <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-left px-4 py-3">Unit</th>
-                <th className="text-right px-4 py-3">£ Inc VAT</th>
+                <th className="text-right px-4 py-3">&pound; Inc VAT</th>
+                <th className="text-right px-4 py-3">Order</th>
               </tr>
             </thead>
             <tbody>
@@ -154,11 +157,29 @@ export default function MetalsCataloguePage() {
                   <td className="px-4 py-3 text-right text-sm font-semibold text-racing whitespace-nowrap align-top">
                     {formatPrice(p.priceIncVat)}
                   </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <OrderButton
+                      item={{
+                        key: `metals-${p.id}`,
+                        catalogue: "metals",
+                        productId: p.id,
+                        code: p.code,
+                        description: [p.form, p.metal, p.spec, p.size].filter(Boolean).join(" - "),
+                        shape: p.form,
+                        metal: p.metal,
+                        spec: p.spec,
+                        size: p.size,
+                        unit: p.unit,
+                        unitPriceExVat: p.priceExVat,
+                        unitPriceIncVat: p.priceIncVat,
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-ink-muted">
+                  <td colSpan={8} className="text-center py-12 text-ink-muted">
                     No catalogue lines match that search.
                   </td>
                 </tr>
@@ -196,7 +217,7 @@ export default function MetalsCataloguePage() {
                   <div className="text-ink">{p.unit || "-"}</div>
                 </div>
                 <div>
-                  <div className="uppercase tracking-wider text-ink-muted">£ Inc VAT</div>
+                  <div className="uppercase tracking-wider text-ink-muted">&pound; Inc VAT</div>
                   <div className="font-semibold text-racing">
                     {formatPrice(p.priceIncVat)}
                   </div>
@@ -205,6 +226,25 @@ export default function MetalsCataloguePage() {
                   <div className="uppercase tracking-wider text-ink-muted">Source</div>
                   <div className="text-ink">{categoryLabel(p.category)}</div>
                 </div>
+              </div>
+              <div className="mt-3">
+                <OrderButton
+                  item={{
+                    key: `metals-${p.id}`,
+                    catalogue: "metals",
+                    productId: p.id,
+                    code: p.code,
+                    description: [p.form, p.metal, p.spec, p.size].filter(Boolean).join(" - "),
+                    shape: p.form,
+                    metal: p.metal,
+                    spec: p.spec,
+                    size: p.size,
+                    unit: p.unit,
+                    unitPriceExVat: p.priceExVat,
+                    unitPriceIncVat: p.priceIncVat,
+                  }}
+                  className="w-full"
+                />
               </div>
             </div>
           ))}

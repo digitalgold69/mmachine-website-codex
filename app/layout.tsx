@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import QuoteCartProvider from "@/components/QuoteCart";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://m-machine-metals.co.uk"),
@@ -51,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body>
-        {children}
+        <QuoteCartProvider>{children}</QuoteCartProvider>
       </body>
     </html>
   );

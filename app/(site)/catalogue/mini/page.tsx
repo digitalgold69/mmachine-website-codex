@@ -3,10 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Mini3DViewer from "@/components/Mini3DViewer";
+import { OrderButton } from "@/components/QuoteCart";
 import { products, sections, getSection } from "@/lib/mini-data";
 
 const BODY_TYPES = ["All", "Saloon", "Traveller", "Van", "Pick-Up", "Cooper", "Elf/Hornet", "Clubman", "Clubman Estate"];
 const MARKS = ["All marks", "Mark I", "Mark II", "Mark III", "Mark IV", "Mark V", "Hydrolastic Mk I"];
+
+const money = (value: number | null) =>
+  value === null ? "POA" : `£${value.toFixed(2)}`;
 
 export default function MiniCataloguePage() {
   const [section, setSection] = useState("all");
@@ -14,7 +18,6 @@ export default function MiniCataloguePage() {
   const [bodyFilter, setBodyFilter] = useState("All");
   const [markFilter, setMarkFilter] = useState("All marks");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showVat, setShowVat] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
 
   const filtered = useMemo(() => {
@@ -40,21 +43,20 @@ export default function MiniCataloguePage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-8">
-        <Link href="/" className="text-sm text-ink-muted hover:text-racing">← Home</Link>
+        <Link href="/" className="text-sm text-ink-muted hover:text-racing">
+          &larr; Home
+        </Link>
         <h1 className="font-display text-4xl text-racing mt-2 mb-2">
           Classic Mini panels catalogue
         </h1>
         <p className="text-ink-muted">
-          {products.length} parts across {sections.length} sections — organised exactly like the PDF catalogue.
-          Click a panel on the Mini, or pick a section below.
+          {products.length} parts across {sections.length} sections, organised in the same down-the-list order as the printed catalogue.
         </p>
       </div>
 
       <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
 
-      {/* FILTER BAR — compact, single strip */}
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
-        {/* Row 1: search + toggles */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[220px]">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -65,23 +67,18 @@ export default function MiniCataloguePage() {
               type="search"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setDisplayLimit(50); }}
-              placeholder="Search parts — code, name, or fits"
+              placeholder="Search parts by code or description"
               className="input w-full pl-9"
             />
           </div>
-          <label className="flex items-center gap-2 text-xs text-ink-muted whitespace-nowrap px-2">
-            <input type="checkbox" checked={showVat} onChange={(e) => setShowVat(e.target.checked)} />
-            inc. VAT
-          </label>
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-xs text-racing hover:text-gold underline whitespace-nowrap px-2"
           >
-            {showAdvanced ? "− Hide" : "+ More"} filters
+            {showAdvanced ? "- Hide" : "+ More"} filters
           </button>
         </div>
 
-        {/* Row 2: advanced filters (collapsible) */}
         {showAdvanced && (
           <div className="flex flex-wrap items-end gap-3 pt-1 pb-2 border-t border-racing/5">
             <div className="min-w-[140px]">
@@ -107,7 +104,6 @@ export default function MiniCataloguePage() {
           </div>
         )}
 
-        {/* Row 3: section chips — all on one strip, grouped by subtle inline labels */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-racing/5">
           <button
             onClick={() => { setSection("all"); setDisplayLimit(50); }}
@@ -148,7 +144,6 @@ export default function MiniCataloguePage() {
         </div>
       </div>
 
-      {/* Selected section banner */}
       {currentSection && (
         <div className="bg-cream-dark rounded-lg p-4 mt-6 border-l-4 border-gold">
           <div className="flex items-center gap-3 mb-1">
@@ -161,7 +156,6 @@ export default function MiniCataloguePage() {
         </div>
       )}
 
-      {/* Results count */}
       <div className="mt-6 flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-ink-muted">
           Showing <strong className="text-racing">{shown.length}</strong> of{" "}
@@ -170,30 +164,23 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      {/* Results — desktop table, mobile cards. Both versions share the same data
-          and filters; only the visual presentation changes at the md breakpoint. */}
       <div className="bg-white rounded-xl border border-racing/10 overflow-hidden mt-3">
-
-        {/* DESKTOP TABLE — md and up. Explicit column widths via colgroup so
-            the Part column doesn't push everything else into the right margin. */}
         <div className="hidden md:block">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[14%]" />
+              <col className="w-[16%]" />
               <col />
-              <col className="w-[14%]" />
-              <col className="w-[7%]" />
-              <col className="w-[10%]" />
-              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[96px]" />
             </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-3">Code</th>
-                <th className="text-left px-4 py-3">Part</th>
-                <th className="text-left px-4 py-3">Fits</th>
-                <th className="text-left px-4 py-3">Section</th>
-                <th className="text-left px-4 py-3">Stock</th>
-                <th className="text-right px-4 py-3">Price</th>
+                <th className="text-left px-4 py-3">Description</th>
+                <th className="text-right px-4 py-3">£ ex VAT</th>
+                <th className="text-right px-4 py-3">£ Inc VAT</th>
+                <th className="text-right px-4 py-3">Order</th>
               </tr>
             </thead>
             <tbody>
@@ -203,29 +190,31 @@ export default function MiniCataloguePage() {
                   <td className="px-4 py-3 align-top">
                     <div className="font-medium text-racing leading-snug">{p.name}</div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink-muted align-top truncate" title={p.fits}>{p.fits}</td>
-                  <td className="px-4 py-3 align-top">
-                    <span className="font-mono text-xs bg-cream-dark text-racing px-2 py-0.5 rounded">
-                      {p.section}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap align-top">
-                    <span className={`stock-badge stock-${p.stock}`}>
-                      {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
-                    </span>
+                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
+                    {money(p.priceExVat)}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
-                    {p.priceExVat !== null ? (
-                      `£${(showVat ? p.priceIncVat : p.priceExVat)?.toFixed(2) ?? p.priceExVat.toFixed(2)}`
-                    ) : (
-                      <span className="text-xs text-ink-muted italic">POA</span>
-                    )}
+                    {money(p.priceIncVat)}
+                  </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <OrderButton
+                      item={{
+                        key: `mini-${p.id}`,
+                        catalogue: "mini",
+                        productId: p.id,
+                        code: p.code,
+                        description: p.name,
+                        unit: "each",
+                        unitPriceExVat: p.priceExVat,
+                        unitPriceIncVat: p.priceIncVat,
+                      }}
+                    />
                   </td>
                 </tr>
               ))}
               {shown.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-ink-muted">
+                  <td colSpan={5} className="text-center py-12 text-ink-muted">
                     No parts match. Try a different section, clear filters, or call us on 01325 381300.
                   </td>
                 </tr>
@@ -234,29 +223,36 @@ export default function MiniCataloguePage() {
           </table>
         </div>
 
-        {/* MOBILE CARDS — under md. No horizontal scroll. */}
         <div className="md:hidden divide-y divide-racing/5">
           {shown.map((p) => (
             <div key={p.id} className="p-4 hover:bg-cream-dark/50 transition-colors">
               <div className="flex items-start justify-between gap-3 mb-1">
-                <div className="font-medium text-racing leading-snug">{p.name}</div>
+                <div>
+                  <div className="font-medium text-racing leading-snug">{p.name}</div>
+                  <div className="font-mono text-xs text-ink-muted mt-1">{p.code}</div>
+                </div>
                 <div className="font-semibold text-racing whitespace-nowrap text-right">
-                  {p.priceExVat !== null ? (
-                    `£${(showVat ? p.priceIncVat : p.priceExVat)?.toFixed(2) ?? p.priceExVat.toFixed(2)}`
-                  ) : (
-                    <span className="text-xs text-ink-muted italic">POA</span>
-                  )}
+                  {money(p.priceExVat)}
+                  <div className="text-xs font-normal text-ink-muted">ex VAT</div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                <span className="font-mono text-ink-muted">{p.code}</span>
-                <span className="text-ink-muted">{p.fits}</span>
-                <span className="font-mono bg-cream-dark text-racing px-1.5 py-0.5 rounded">
-                  {p.section}
-                </span>
-                <span className={`stock-badge stock-${p.stock} ml-auto`}>
-                  {p.stock === "in" ? "In stock" : p.stock === "low" ? "Low" : "Out"}
-                </span>
+              <div className="mt-2 text-xs text-ink-muted">
+                Inc VAT: <strong className="text-racing">{money(p.priceIncVat)}</strong>
+              </div>
+              <div className="mt-3">
+                <OrderButton
+                  item={{
+                    key: `mini-${p.id}`,
+                    catalogue: "mini",
+                    productId: p.id,
+                    code: p.code,
+                    description: p.name,
+                    unit: "each",
+                    unitPriceExVat: p.priceExVat,
+                    unitPriceIncVat: p.priceIncVat,
+                  }}
+                  className="w-full"
+                />
               </div>
             </div>
           ))}
@@ -278,7 +274,7 @@ export default function MiniCataloguePage() {
 
       <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
         <Link href="/contact" className="btn-primary">
-          Enquire about parts →
+          Enquire about parts
         </Link>
         <a
           href="/catalogue/mini-catalogue.pdf"
@@ -290,7 +286,7 @@ export default function MiniCataloguePage() {
         </a>
       </div>
       <p className="text-xs text-ink-muted text-center mt-3">
-        All prices exclude VAT unless toggled. Prices shown are current as of catalogue date. Phone 01325 381300 to place an order.
+        Prices shown are current as of catalogue date. Phone 01325 381300 to place an order.
       </p>
     </div>
   );

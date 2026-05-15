@@ -28,6 +28,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/products" className="px-4 py-2 rounded-md text-sm font-medium text-racing hover:bg-cream-dark">
             Products
           </Link>
+          <Link href="/dashboard/orders" className="px-4 py-2 rounded-md text-sm font-medium text-racing hover:bg-cream-dark">
+            Quote requests
+          </Link>
           <Link href="/dashboard/featured" className="px-4 py-2 rounded-md text-sm font-medium text-racing hover:bg-cream-dark">
             Featured work
           </Link>

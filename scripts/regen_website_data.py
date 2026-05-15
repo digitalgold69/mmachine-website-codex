@@ -220,8 +220,11 @@ def read_mini_catalogue_codes():
             # 120B-style positions so we don't silently drop a sheet
             col_pairs = [(2, 3), (8, 9)]
 
-        for r in range(2, ws.max_row + 1):
-            for code_col, desc_col in col_pairs:
+        # Catalogue pages are visually two lists side-by-side. Read each list
+        # downwards before moving to the next list so the website order matches
+        # how the customer reads the printed catalogue.
+        for code_col, desc_col in col_pairs:
+            for r in range(2, ws.max_row + 1):
                 code = strip_str(ws.cell(r, code_col).value)
                 desc = strip_str(ws.cell(r, desc_col).value)
                 if code and desc and _looks_like_part_code(code):
@@ -235,13 +238,12 @@ def read_mini_catalogue_codes():
         col_pairs = _find_code_desc_columns(header)
         if not col_pairs:
             col_pairs = [(2, 3), (8, 9), (1, 2), (5, 6)]
-        for r in range(2, ws.max_row + 1):
-            for code_col, desc_col in col_pairs:
+        for code_col, desc_col in col_pairs:
+            for r in range(2, ws.max_row + 1):
                 code = strip_str(ws.cell(r, code_col).value)
                 desc = strip_str(ws.cell(r, desc_col).value)
                 if code and desc and _looks_like_part_code(code):
                     out.append((code, desc, section))
-                    break  # one product per row max
 
     return out
 
