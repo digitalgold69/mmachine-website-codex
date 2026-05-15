@@ -119,11 +119,14 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     );
     setCameraFromSpherical(camera, DEFAULT_VIEW);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     mount.appendChild(renderer.domElement);
@@ -133,15 +136,6 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
     const key = new THREE.DirectionalLight(0xffffff, 2.0);
     key.position.set(4, 7, 5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.camera.near = 0.5;
-    key.shadow.camera.far = 30;
-    key.shadow.camera.left = -5;
-    key.shadow.camera.right = 5;
-    key.shadow.camera.top = 5;
-    key.shadow.camera.bottom = -5;
-    key.shadow.bias = -0.0004;
     scene.add(key);
 
     const fill = new THREE.DirectionalLight(0xfff3d8, 0.7);
@@ -154,20 +148,18 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
     // --- Ground -------------------------------------------------------------
     const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(12, 64),
+      new THREE.CircleGeometry(12, 32),
       new THREE.ShadowMaterial({ opacity: 0.3 })
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
     scene.add(ground);
 
     const pad = new THREE.Mesh(
-      new THREE.CircleGeometry(5.5, 64),
+      new THREE.CircleGeometry(5.5, 32),
       new THREE.MeshStandardMaterial({ color: 0xe8dfca, roughness: 1, metalness: 0 })
     );
     pad.rotation.x = -Math.PI / 2;
     pad.position.y = -0.002;
-    pad.receiveShadow = true;
     scene.add(pad);
 
     // --- Controls -----------------------------------------------------------
@@ -185,6 +177,9 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     renderer.domElement.style.touchAction = "pan-y";
     controls.update();
     controlsRef.current = controls;
+    controls.addEventListener("start", () => wakeRender(900));
+    controls.addEventListener("change", () => wakeRender(450));
+    controls.addEventListener("end", () => wakeRender(650));
 
     // --- Car container ------------------------------------------------------
     const carGroup = new THREE.Group();
@@ -336,8 +331,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     const interiorMeshes: THREE.Mesh[] = [];
     const addInterior = (code: string, label: string, mesh: THREE.Mesh, mat: THREE.Material) => {
       mesh.material = mat;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       mesh.userData = { sectionCode: code, label, kind: "interior", originalMat: mat };
       interiorGroup.add(mesh);
       interiorMeshes.push(mesh);
@@ -437,6 +432,37 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     let loadedModel: THREE.Object3D | null = null;
     const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const fadeState = { current: 1.0, target: 1.0 };
+    let rafId = 0;
+    let isVisible = true;
+    let activeUntil = 0;
+
+    function requestRender() {
+      if (!isVisible || rafId) return;
+      rafId = requestAnimationFrame(renderFrame);
+    }
+
+    function wakeRender(durationMs = 650) {
+      activeUntil = performance.now() + durationMs;
+      requestRender();
+    }
+
+    function renderFrame() {
+      rafId = 0;
+      if (!isVisible) return;
+
+      const fadeActive = Math.abs(fadeState.current - fadeState.target) > 0.005;
+      if (fadeActive) {
+        fadeState.current = THREE.MathUtils.lerp(fadeState.current, fadeState.target, 0.12);
+        applyFadeToMaterials();
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      if (fadeActive || performance.now() < activeUntil) {
+        requestRender();
+      }
+    }
 
     // --- Loader -------------------------------------------------------------
     const loader = new GLTFLoader();
@@ -474,8 +500,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           model.traverse((obj) => {
             if ((obj as THREE.Mesh).isMesh) {
               const m = obj as THREE.Mesh;
-              m.castShadow = true;
-              m.receiveShadow = true;
+              m.castShadow = false;
+              m.receiveShadow = false;
               if (Array.isArray(m.material)) {
                 m.material = m.material.map((x) => x.clone());
                 (m.material as THREE.Material[]).forEach((mat) => injectHighlightShader(mat));
@@ -492,26 +518,24 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           carGroup.add(model);
           applyModeRef.current?.(modeRef.current);
           setModelStatus("loaded");
+          requestRender();
         },
         undefined,
         (err) => {
           console.warn("GLB load failed:", err);
           setModelStatus("placeholder");
+          requestRender();
         }
       );
     };
 
-    fetch("/models/mini.glb", { method: "HEAD" })
-      .then((r) => {
-        if (r.ok) loadFromUrl("/models/mini.glb");
-        else setModelStatus("placeholder");
-      })
-      .catch(() => setModelStatus("placeholder"));
+    loadFromUrl("/models/mini.glb");
 
     // --- Mode change: animate body opacity + toggle overlay ----------------
     const applyMode = (m: Mode) => {
       fadeState.target = m === "interior" ? 0.22 : 1.0;
       interiorGroup.visible = m === "interior";
+      wakeRender(1000);
     };
     applyModeRef.current = applyMode;
 
@@ -520,16 +544,13 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         for (const material of mats) {
           const std = material as THREE.MeshStandardMaterial;
-          if (fadeState.current < 0.99) {
-            std.transparent = true;
-            std.opacity = fadeState.current;
-            std.depthWrite = false;
-          } else {
-            std.transparent = false;
-            std.opacity = 1.0;
-            std.depthWrite = true;
+          const translucent = fadeState.current < 0.99;
+          if (std.transparent !== translucent) {
+            std.transparent = translucent;
+            std.depthWrite = !translucent;
+            std.needsUpdate = true;
           }
-          std.needsUpdate = true;
+          std.opacity = translucent ? fadeState.current : 1.0;
         }
       }
     };
@@ -559,6 +580,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
         const orig = (m.userData.originalMat as THREE.Material | undefined);
         if (orig) m.material = orig;
       }
+      requestRender();
     };
 
     // --- Raycasting (click + hover) -----------------------------------------
@@ -582,6 +604,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           }
         }
       }
+      requestRender();
     };
 
     // Shared raycast: clientX/clientY -> section code+label or null
@@ -657,30 +680,33 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       const r = raycastAt(e.clientX, e.clientY);
       if (r) onSelect(r.code);
       else onSelect("all");
+      requestRender();
     };
+
+    const onPointerCancel = () => { touchStart = null; };
 
     renderer.domElement.addEventListener("pointermove", onPointerMove);
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
-    renderer.domElement.addEventListener("pointercancel", () => { touchStart = null; });
+    renderer.domElement.addEventListener("pointercancel", onPointerCancel);
     renderer.domElement.addEventListener("click", onClick);
     renderer.domElement.style.cursor = "grab";
     // Skip 300ms tap-delay and double-tap zoom inside the canvas; OrbitControls
     // still gets pan/zoom from the pan-x pan-y allowance.
     renderer.domElement.style.touchAction = "pan-x pan-y";
 
-    // --- Animation loop -----------------------------------------------------
-    let rafId = 0;
-    const animate = () => {
-      rafId = requestAnimationFrame(animate);
-      if (Math.abs(fadeState.current - fadeState.target) > 0.005) {
-        fadeState.current = THREE.MathUtils.lerp(fadeState.current, fadeState.target, 0.12);
-        applyFadeToMaterials();
-      }
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
+    // --- Render scheduling --------------------------------------------------
+    const observer = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver(
+          ([entry]) => {
+            isVisible = entry.isIntersecting;
+            if (isVisible) requestRender();
+          },
+          { threshold: 0.05 }
+        )
+      : null;
+    observer?.observe(mount);
+    requestRender();
 
     // --- Resize -------------------------------------------------------------
     const onResize = () => {
@@ -688,6 +714,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
+      requestRender();
     };
     window.addEventListener("resize", onResize);
 
@@ -698,7 +725,9 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
+      renderer.domElement.removeEventListener("pointercancel", onPointerCancel);
       renderer.domElement.removeEventListener("click", onClick);
+      observer?.disconnect();
       controls.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) {
