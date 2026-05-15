@@ -5,8 +5,8 @@
 //
 // Env vars (set in Vercel project settings, NOT committed):
 //   OWNER_PASSWORD  the password the owner types into the login form
-//   AUTH_SECRET     32+ random characters used to sign cookies. If you ever
-//                   want to invalidate all existing sessions, rotate this.
+//   AUTH_SECRET     optional signing secret. If absent, sessions are signed
+//                   using OWNER_PASSWORD so a single env var is enough.
 
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
@@ -15,7 +15,10 @@ const COOKIE_NAME = "mmachine_admin";
 const SESSION_DAYS = 14;
 
 function getSecret(): string {
-  const s = process.env.AUTH_SECRET;
+  const s = process.env.AUTH_SECRET?.trim();
+  const ownerPassword = process.env.OWNER_PASSWORD?.trim();
+  if (s && s.length >= 16) return s;
+  if (ownerPassword) return `mmachine-owner-session:${ownerPassword}`;
   if (!s || s.length < 16) {
     throw new Error(
       "AUTH_SECRET env var is missing or too short (min 16 chars). " +
@@ -44,7 +47,12 @@ export function verifySessionToken(token: string | undefined): boolean {
   const parts = token.split(".");
   if (parts.length !== 2) return false;
   const [payload, signature] = parts;
-  const expected = sign(payload);
+  let expected = "";
+  try {
+    expected = sign(payload);
+  } catch {
+    return false;
+  }
   if (signature !== expected) return false;
   const issuedAt = parseInt(payload, 10);
   if (!Number.isFinite(issuedAt)) return false;

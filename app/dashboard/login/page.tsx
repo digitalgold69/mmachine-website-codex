@@ -20,18 +20,26 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/auth", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { error?: string } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
       if (res.ok) {
-        router.push("/dashboard");
+        router.replace("/dashboard");
+        router.refresh();
       } else {
-        setError(data.error || "Sign in failed");
+        setError(data.error || `Sign in failed (${res.status})`);
         setLoading(false);
       }
-    } catch {
-      setError("Couldn't reach the server. Try again in a moment.");
+    } catch (err) {
+      setError((err as Error).message || "Couldn't reach the server. Try again in a moment.");
       setLoading(false);
     }
   };
@@ -46,7 +54,7 @@ export default function LoginPage() {
 
         <div className="bg-white rounded-2xl border border-racing/10 p-8">
           <h1 className="font-display text-2xl text-racing mb-2">Sign in</h1>
-          <p className="text-sm text-ink-muted mb-6">Enter the owner password to manage featured workshop jobs.</p>
+          <p className="text-sm text-ink-muted mb-6">Enter the owner password to manage orders and website content.</p>
 
           <form onSubmit={handleSubmit}>
             <div className="mb-6">
@@ -65,10 +73,6 @@ export default function LoginPage() {
               {loading ? "Signing in…" : "Sign in →"}
             </button>
           </form>
-
-          <p className="text-xs text-ink-muted text-center mt-6">
-            Forgotten the password? Ask Guy.
-          </p>
         </div>
       </div>
     </div>

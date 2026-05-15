@@ -4,6 +4,8 @@
 import { NextResponse } from "next/server";
 import { makeSessionToken, AUTH_COOKIE_NAME, AUTH_SESSION_MAX_AGE_SECONDS } from "@/lib/auth";
 
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   let body: { password?: string } = {};
   try {
@@ -25,7 +27,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Wrong password" }, { status: 401 });
   }
 
-  const token = makeSessionToken();
+  let token = "";
+  try {
+    token = makeSessionToken();
+  } catch (err) {
+    return NextResponse.json(
+      { error: (err as Error).message || "Server login configuration is incomplete." },
+      { status: 500 }
+    );
+  }
   const res = NextResponse.json({ ok: true });
   res.cookies.set({
     name: AUTH_COOKIE_NAME,
