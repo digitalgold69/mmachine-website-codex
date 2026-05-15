@@ -414,6 +414,7 @@ def build_metals_products():
                 "code": code,
                 "name": name,
                 "category": cat,
+                "metal": metal,
                 "form": shape,
                 "stock": stock,
                 "priceExVat": price_ex,
@@ -639,6 +640,7 @@ export type MetalProduct = {{
   code: string;
   name: string;
   category: string;
+  metal: string;
   form: string;
   stock: "in" | "low" | "out";
   priceExVat: number | null;
