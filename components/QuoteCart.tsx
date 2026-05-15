@@ -168,7 +168,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
           onClick={() => setDrawerOpen(true)}
           className="fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-racing px-5 text-sm font-semibold text-cream shadow-lg transition hover:bg-[#155040]"
         >
-          Checkout
+          Order Now
           <span className="rounded-full bg-gold px-2 py-0.5 text-xs text-racing-dark">
             {count}
           </span>
