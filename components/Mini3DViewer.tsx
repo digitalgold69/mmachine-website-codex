@@ -173,6 +173,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     // --- Controls -----------------------------------------------------------
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.enableZoom = false;
+    controls.enablePan = false;
     controls.dampingFactor = 0.08;
     controls.minDistance = 3.0;
     controls.maxDistance = 12.0;
@@ -180,6 +182,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     controls.maxPolarAngle = Math.PI * 0.495;
     controls.target.set(0, 0.6, 0);
     controls.autoRotate = false;
+    renderer.domElement.style.touchAction = "pan-y";
     controls.update();
     controlsRef.current = controls;
 

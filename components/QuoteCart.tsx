@@ -320,7 +320,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                     <strong className="text-racing">{"\u00a3"}{subtotal.toFixed(2)}</strong>
                   </div>
                   <button type="submit" disabled={submitting || items.length === 0} className="btn-primary">
-                    {submitting ? "Sending..." : "Send quote request"}
+                    {submitting ? "Sending..." : "Submit Order"}
                   </button>
                 </div>
                 {message && (

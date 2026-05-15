@@ -27,7 +27,6 @@ export default function MiniCataloguePage() {
   const [bodyFilter, setBodyFilter] = useState("All");
   const [markFilter, setMarkFilter] = useState("All marks");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showViewer, setShowViewer] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
 
   const filtered = useMemo(() => {
@@ -64,32 +63,17 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      <div className="mt-4">
-        <button
-          type="button"
-          onClick={() => setShowViewer((value) => !value)}
-          className="btn-secondary text-sm"
-        >
-          {showViewer ? "Hide panel selector" : "Open panel selector"}
-        </button>
-        {showViewer && (
-          <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
-        )}
-      </div>
+      <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
 
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[220px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
+          <div className="flex-1 min-w-[220px]">
             <input
               type="search"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setDisplayLimit(50); }}
               placeholder="Search parts by code or description"
-              className="input w-full pl-9"
+              className="input w-full"
             />
           </div>
           <button
