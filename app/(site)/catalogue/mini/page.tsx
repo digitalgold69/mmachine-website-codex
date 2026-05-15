@@ -2,15 +2,24 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import Mini3DViewer from "@/components/Mini3DViewer";
+import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
 import { products, sections, getSection } from "@/lib/mini-data";
+
+const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="mt-4 rounded-lg border border-racing/10 bg-white p-4 text-sm text-ink-muted">
+      Loading panel selector...
+    </div>
+  ),
+});
 
 const BODY_TYPES = ["All", "Saloon", "Traveller", "Van", "Pick-Up", "Cooper", "Elf/Hornet", "Clubman", "Clubman Estate"];
 const MARKS = ["All marks", "Mark I", "Mark II", "Mark III", "Mark IV", "Mark V", "Hydrolastic Mk I"];
 
 const money = (value: number | null) =>
-  value === null ? "POA" : `£${value.toFixed(2)}`;
+  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
 
 export default function MiniCataloguePage() {
   const [section, setSection] = useState("all");
@@ -18,6 +27,7 @@ export default function MiniCataloguePage() {
   const [bodyFilter, setBodyFilter] = useState("All");
   const [markFilter, setMarkFilter] = useState("All marks");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
 
   const filtered = useMemo(() => {
@@ -54,7 +64,18 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setShowViewer((value) => !value)}
+          className="btn-secondary text-sm"
+        >
+          {showViewer ? "Hide panel selector" : "Open panel selector"}
+        </button>
+        {showViewer && (
+          <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
+        )}
+      </div>
 
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -172,31 +193,31 @@ export default function MiniCataloguePage() {
               <col />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
-              <col className="w-[96px]" />
+              <col className="w-[84px]" />
             </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-3">Code</th>
                 <th className="text-left px-4 py-3">Description</th>
-                <th className="text-right px-4 py-3">£ ex VAT</th>
-                <th className="text-right px-4 py-3">£ Inc VAT</th>
-                <th className="text-right px-4 py-3">Order</th>
+                <th className="text-right px-4 py-3">&pound; ex VAT</th>
+                <th className="text-right px-4 py-3">&pound; Inc VAT</th>
+                <th className="text-center px-3 py-3">Order</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((p) => (
                 <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-ink-muted whitespace-nowrap align-top">{p.code}</td>
-                  <td className="px-4 py-3 align-top">
+                  <td className="px-4 py-2 font-mono text-xs text-ink-muted whitespace-nowrap align-middle">{p.code}</td>
+                  <td className="px-4 py-2 align-middle">
                     <div className="font-medium text-racing leading-snug">{p.name}</div>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
+                  <td className="px-4 py-2 text-right font-semibold text-racing whitespace-nowrap align-middle">
                     {money(p.priceExVat)}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap align-top">
+                  <td className="px-4 py-2 text-right font-semibold text-racing whitespace-nowrap align-middle">
                     {money(p.priceIncVat)}
                   </td>
-                  <td className="px-4 py-3 text-right align-top">
+                  <td className="px-3 py-2 text-center align-middle">
                     <OrderButton
                       item={{
                         key: `mini-${p.id}`,

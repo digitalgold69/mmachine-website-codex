@@ -28,6 +28,7 @@ const searchableText = (product: MetalProduct) =>
 export default function MetalsCataloguePage() {
   const [cat, setCat] = useState("all");
   const [search, setSearch] = useState("");
+  const [displayLimit, setDisplayLimit] = useState(120);
 
   const filtered = useMemo(() => {
     let list = metals;
@@ -38,6 +39,8 @@ export default function MetalsCataloguePage() {
     }
     return list;
   }, [cat, search]);
+
+  const shown = filtered.slice(0, displayLimit);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -57,7 +60,7 @@ export default function MetalsCataloguePage() {
       <div className="mb-6">
         <div className="flex flex-wrap gap-2 mb-4">
           <button
-            onClick={() => setCat("all")}
+            onClick={() => { setCat("all"); setDisplayLimit(120); }}
             className={`chip transition-colors ${
               cat === "all" ? "!bg-racing !text-cream" : "hover:!bg-gold/20"
             }`}
@@ -69,7 +72,7 @@ export default function MetalsCataloguePage() {
             return (
               <button
                 key={c.key}
-                onClick={() => setCat(c.key)}
+                onClick={() => { setCat(c.key); setDisplayLimit(120); }}
                 className={`chip transition-colors ${
                   cat === c.key ? "!bg-racing !text-cream" : "hover:!bg-gold/20"
                 }`}
@@ -82,7 +85,7 @@ export default function MetalsCataloguePage() {
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setDisplayLimit(120); }}
           placeholder="Search by shape, metal, spec, size, or unit"
           className="input max-w-2xl"
         />
@@ -90,9 +93,10 @@ export default function MetalsCataloguePage() {
 
       <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-ink-muted">
-          Showing <strong className="text-racing">{filtered.length}</strong> of{" "}
-          <strong className="text-racing">{metals.length}</strong> catalogue
+          Showing <strong className="text-racing">{shown.length}</strong> of{" "}
+          <strong className="text-racing">{filtered.length}</strong> matching
           lines
+          {filtered.length !== metals.length && ` (filtered from ${metals.length})`}
           {cat !== "all" && ` in ${categoryLabel(cat)}`}
         </p>
         <a
@@ -116,7 +120,7 @@ export default function MetalsCataloguePage() {
               <col className="w-[10%]" />
               <col className="w-[12%]" />
               <col className="w-[10%]" />
-              <col className="w-[92px]" />
+              <col className="w-[84px]" />
             </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
@@ -127,37 +131,37 @@ export default function MetalsCataloguePage() {
                 <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-left px-4 py-3">Unit</th>
                 <th className="text-right px-4 py-3">&pound; Inc VAT</th>
-                <th className="text-right px-4 py-3">Order</th>
+                <th className="text-center px-3 py-3">Order</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
+              {shown.map((p) => (
                 <tr
                   key={p.id}
                   className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors"
                 >
-                  <td className="px-4 py-3 text-sm text-racing font-medium align-top">
+                  <td className="px-4 py-2 text-sm text-racing font-medium align-middle">
                     {p.form || "-"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink align-top">
+                  <td className="px-4 py-2 text-sm text-ink align-middle">
                     {p.metal || "-"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink-muted align-top">
+                  <td className="px-4 py-2 text-sm text-ink-muted align-middle">
                     {p.spec || "-"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink align-top">
+                  <td className="px-4 py-2 text-sm text-ink align-middle">
                     {p.size || "-"}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-racing whitespace-nowrap align-top">
+                  <td className="px-4 py-2 text-right text-sm font-semibold text-racing whitespace-nowrap align-middle">
                     {formatPrice(p.priceExVat)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-ink-muted whitespace-nowrap align-top">
+                  <td className="px-4 py-2 text-sm text-ink-muted whitespace-nowrap align-middle">
                     {p.unit || "-"}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-racing whitespace-nowrap align-top">
+                  <td className="px-4 py-2 text-right text-sm font-semibold text-racing whitespace-nowrap align-middle">
                     {formatPrice(p.priceIncVat)}
                   </td>
-                  <td className="px-4 py-3 text-right align-top">
+                  <td className="px-3 py-2 text-center align-middle">
                     <OrderButton
                       item={{
                         key: `metals-${p.id}`,
@@ -177,7 +181,7 @@ export default function MetalsCataloguePage() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-ink-muted">
                     No catalogue lines match that search.
@@ -189,7 +193,7 @@ export default function MetalsCataloguePage() {
         </div>
 
         <div className="lg:hidden divide-y divide-racing/5">
-          {filtered.map((p) => (
+          {shown.map((p) => (
             <div key={p.id} className="p-4 hover:bg-cream-dark/50 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -248,12 +252,24 @@ export default function MetalsCataloguePage() {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && (
+          {shown.length === 0 && (
             <div className="text-center py-12 text-ink-muted px-4">
               No catalogue lines match that search.
             </div>
           )}
         </div>
+
+        {shown.length < filtered.length && (
+          <div className="bg-cream-dark border-t border-racing/10 p-4 text-center">
+            <button
+              type="button"
+              onClick={() => setDisplayLimit(displayLimit + 120)}
+              className="btn-secondary text-sm"
+            >
+              Show more ({filtered.length - shown.length} remaining)
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 bg-cream-dark rounded-xl p-6 border-l-4 border-gold">

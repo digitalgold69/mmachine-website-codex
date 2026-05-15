@@ -49,7 +49,7 @@ export function OrderButton({
     <button
       type="button"
       onClick={() => beginAdd(item)}
-      className={`inline-flex h-9 min-w-[76px] items-center justify-center rounded-md bg-gold px-3 text-sm font-semibold text-racing-dark transition hover:bg-[#D4A028] ${className}`}
+      className={`inline-flex h-8 min-w-[68px] items-center justify-center rounded-md bg-gold px-2.5 text-sm font-semibold leading-none text-racing-dark transition hover:bg-[#D4A028] ${className}`}
     >
       Order
     </button>
