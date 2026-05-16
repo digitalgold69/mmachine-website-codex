@@ -141,10 +141,8 @@ export default function OrdersClient({
 }) {
   const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
-  const [selectedId, setSelectedId] = useState(initialQuotes[0]?.id ?? "");
-  const [draft, setDraft] = useState<QuoteRequest | null>(
-    initialQuotes[0] ? cloneQuote(initialQuotes[0]) : null
-  );
+  const [selectedId, setSelectedId] = useState("");
+  const [draft, setDraft] = useState<QuoteRequest | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
@@ -261,6 +259,7 @@ export default function OrdersClient({
 
       const updated = data.quote as QuoteRequest;
       updateQuote(updated);
+      router.refresh();
       setMessage(
         options.markPaid
           ? "Order marked as paid."
@@ -304,7 +303,7 @@ export default function OrdersClient({
         </div>
       )}
 
-      <div className="grid min-w-0 xl:grid-cols-[430px_minmax(0,1fr)] gap-5">
+      <div className="space-y-5">
         <div className="min-w-0 bg-white rounded-xl border border-racing/10 overflow-hidden">
           <div className="border-b border-racing/10 p-4">
             <label className="label" htmlFor="order-search">Search order history</label>
@@ -436,11 +435,7 @@ export default function OrdersClient({
           </div>
         </div>
 
-        {!draft || !selected ? (
-          <div className="bg-white rounded-xl border border-racing/10 p-8 text-center text-ink-muted">
-            Select an order to review it.
-          </div>
-        ) : (
+        {draft && selected && (
           <div className="min-w-0 bg-white rounded-xl border border-racing/10 p-5">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
@@ -456,18 +451,30 @@ export default function OrdersClient({
                   <div className="text-sm text-ink-muted">{draft.customer.company}</div>
                 )}
               </div>
-              <div className="min-w-[180px]">
-                <label className="label" htmlFor="status">Status</label>
-                <select
-                  id="status"
-                  value={draft.status}
-                  onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
-                  className="input"
+              <div className="flex min-w-[180px] flex-col gap-3">
+                <div>
+                  <label className="label" htmlFor="status">Status</label>
+                  <select
+                    id="status"
+                    value={draft.status}
+                    onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
+                    className="input"
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedId("");
+                    setDraft(null);
+                  }}
+                  className="btn-secondary justify-center py-2"
                 >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                  Close invoice
+                </button>
               </div>
             </div>
 

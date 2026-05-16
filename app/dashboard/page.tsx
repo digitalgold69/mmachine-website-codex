@@ -120,7 +120,7 @@ export default async function DashboardHomePage() {
           )}
         </Panel>
 
-        <Panel title="Daily order value">
+        <Panel title="Daily sales">
           <div className="space-y-3">
             {analytics.dailyTrend.map((day) => (
               <div key={day.key}>
@@ -202,7 +202,7 @@ export default async function DashboardHomePage() {
         <div className="card bg-cream-dark">
           <h2 className="font-display text-xl text-racing mb-2">Data note</h2>
           <p className="text-sm text-ink-muted leading-relaxed">
-            These figures track submitted website orders, invoice-sent value, and manually marked payments. It is a live sales dashboard rather than audited accounts.
+            Sales figures are based on orders marked paid in the owner dashboard. New requests and unpaid invoices are shown separately.
           </p>
         </div>
       </section>
@@ -215,9 +215,6 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const todayKey = ukDateKey(now);
   const monthKey = todayKey.slice(0, 7);
 
-  const totalValue = quotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
-  const todayQuotes = quotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
-  const monthQuotes = quotes.filter((quote) => ukDateKey(quote.submittedAt).startsWith(monthKey));
   const newRequestQuotes = quotes.filter((quote) => quote.status === "new");
   const newRequests = newRequestQuotes.slice(0, 6);
   const newTodayQuotes = newRequestQuotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
@@ -226,15 +223,20 @@ function buildAnalytics(quotes: QuoteRequest[]) {
     ukDateKey(quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt).startsWith(monthKey)
   );
   const paidQuotes = quotes.filter((quote) => quote.status === "paid");
+  const paidTodayQuotes = paidQuotes.filter((quote) => ukDateKey(quote.paidAt || quote.updatedAt) === todayKey);
   const paidMonthQuotes = paidQuotes.filter((quote) =>
     ukDateKey(quote.paidAt || quote.updatedAt).startsWith(monthKey)
   );
+  const unpaidInvoiceQuotes = invoiceSentQuotes.filter((quote) => !quote.paidAt);
+  const unpaidInvoiceValue = unpaidInvoiceQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
+  const paidMonthValue = paidMonthQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
+  const paidTodayValue = paidTodayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
 
   const bestMonth = bestMonthFrom(quotes);
-  const topItems = topItemsFrom(quotes);
-  const topCustomers = topCustomersFrom(quotes);
+  const topItems = topItemsFrom(paidQuotes);
+  const topCustomers = topCustomersFrom(paidQuotes);
   const dailyTrend = lastDays(7).map((day) => {
-    const dayQuotes = quotes.filter((quote) => ukDateKey(quote.submittedAt) === day.key);
+    const dayQuotes = paidQuotes.filter((quote) => ukDateKey(quote.paidAt || quote.updatedAt) === day.key);
     return {
       ...day,
       count: dayQuotes.length,
@@ -249,29 +251,29 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       detail: `${newTodayQuotes.length} new today; ${newRequestQuotes.length} awaiting review now`,
     },
     {
-      label: "Today",
-      value: money(todayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0)),
-      detail: "submitted today, ex VAT",
+      label: "Sales today",
+      value: money(paidTodayValue),
+      detail: `${paidTodayQuotes.length} paid today, ex VAT`,
     },
     {
-      label: "This month",
-      value: money(monthQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0)),
-      detail: `${monthQuotes.length} submitted in ${formatMonth(monthKey)}, ex VAT`,
+      label: "Sales this month",
+      value: money(paidMonthValue),
+      detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}, ex VAT`,
     },
     {
       label: "Best month",
       value: bestMonth ? money(bestMonth.value) : `${GBP}0.00`,
-      detail: bestMonth ? `${formatMonth(bestMonth.key)} submitted value` : "No submitted orders yet",
+      detail: bestMonth ? `${formatMonth(bestMonth.key)} paid sales, ex VAT` : "No paid orders yet",
     },
     {
-      label: "All-time pipeline",
-      value: money(totalValue),
-      detail: `${quotes.length} submitted since tracking began`,
+      label: "Awaiting payment",
+      value: money(unpaidInvoiceValue),
+      detail: `${unpaidInvoiceQuotes.length} invoices sent but not paid`,
     },
     {
-      label: "Average request",
-      value: money(quotes.length ? totalValue / quotes.length : 0),
-      detail: `all-time mean across ${quotes.length} ${quotes.length === 1 ? "request" : "requests"}`,
+      label: "Average paid order",
+      value: money(paidQuotes.length ? paidQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0) / paidQuotes.length : 0),
+      detail: `${paidQuotes.length} paid ${paidQuotes.length === 1 ? "order" : "orders"} all time`,
     },
     {
       label: "Invoices sent",
@@ -311,7 +313,7 @@ function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
       map.set(label, current);
     }
   }
-  return [...map.values()].sort((a, b) => b.value - a.value || b.qty - a.qty).slice(0, 8);
+  return [...map.values()].sort((a, b) => b.qty - a.qty || b.value - a.value).slice(0, 8);
 }
 
 function topCustomersFrom(quotes: QuoteRequest[]): RankedCustomer[] {
@@ -333,8 +335,8 @@ function topCustomersFrom(quotes: QuoteRequest[]): RankedCustomer[] {
 
 function bestMonthFrom(quotes: QuoteRequest[]) {
   const months = new Map<string, number>();
-  for (const quote of quotes) {
-    const key = ukDateKey(quote.submittedAt).slice(0, 7);
+  for (const quote of quotes.filter((q) => q.status === "paid")) {
+    const key = ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7);
     months.set(key, (months.get(key) || 0) + quoteTotals(quote).totalExVat);
   }
   return [...months.entries()]

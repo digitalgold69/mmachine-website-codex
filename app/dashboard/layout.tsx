@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countNewQuoteRequests } from "@/lib/quotes";
+import { listQuoteRequests } from "@/lib/quotes";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let newRequestCount = 0;
 
   try {
-    newRequestCount = await countNewQuoteRequests();
+    const quotes = await listQuoteRequests();
+    newRequestCount = quotes.filter((quote) => quote.status === "new").length;
   } catch {
     newRequestCount = 0;
   }
