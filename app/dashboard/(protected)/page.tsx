@@ -215,9 +215,9 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const todayKey = ukDateKey(now);
   const monthKey = todayKey.slice(0, 7);
 
+  const todayRequests = quotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
   const newRequestQuotes = quotes.filter((quote) => quote.status === "new");
   const newRequests = newRequestQuotes.slice(0, 6);
-  const newTodayQuotes = newRequestQuotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
   const invoiceSentQuotes = quotes.filter((quote) => quote.status === "invoice_sent");
   const invoiceSentMonthQuotes = invoiceSentQuotes.filter((quote) =>
     ukDateKey(quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt).startsWith(monthKey)
@@ -246,9 +246,9 @@ function buildAnalytics(quotes: QuoteRequest[]) {
 
   const metrics: Metric[] = [
     {
-      label: "New requests",
-      value: String(newRequestQuotes.length),
-      detail: `${newTodayQuotes.length} new today; ${newRequestQuotes.length} awaiting review now`,
+      label: "Requests today",
+      value: String(todayRequests.length),
+      detail: `${newRequestQuotes.length} still awaiting review`,
     },
     {
       label: "Sales today",
@@ -261,7 +261,7 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}, ex VAT`,
     },
     {
-      label: "Best month",
+      label: "Best paid month",
       value: bestMonth ? money(bestMonth.value) : `${GBP}0.00`,
       detail: bestMonth ? `${formatMonth(bestMonth.key)} paid sales, ex VAT` : "No paid orders yet",
     },
@@ -276,12 +276,12 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       detail: `${paidQuotes.length} paid ${paidQuotes.length === 1 ? "order" : "orders"} all time`,
     },
     {
-      label: "Invoices sent",
+      label: "Invoices sent all time",
       value: String(invoiceSentQuotes.length),
       detail: `${invoiceSentMonthQuotes.length} sent in ${formatMonth(monthKey)}`,
     },
     {
-      label: "Paid",
+      label: "Paid orders all time",
       value: String(paidQuotes.length),
       detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}`,
     },
@@ -414,7 +414,7 @@ function MetricCard({ metric }: { metric: Metric }) {
   return (
     <div className="bg-white rounded-xl p-5 border border-racing/10">
       <div className="text-xs text-ink-muted uppercase tracking-wider mb-1">{metric.label}</div>
-      <div className="font-display text-3xl text-racing">{metric.value}</div>
+      <div className="font-sans text-3xl font-semibold tracking-normal text-racing tabular-nums">{metric.value}</div>
       <div className="text-xs text-ink-muted mt-2">{metric.detail}</div>
     </div>
   );
