@@ -272,7 +272,7 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       label: "Best paid month",
       value: bestMonth ? money(bestMonth.value) : `${GBP}0.00`,
       detail: bestMonth ? `${formatMonth(bestMonth.key)} paid sales, ex VAT` : "No paid orders yet",
-      actionHref: bestMonth ? `/dashboard/orders?month=${bestMonth.key}` : undefined,
+      actionHref: bestMonth ? `/dashboard/orders?month=${bestMonth.key}#order-month-${bestMonth.key}` : undefined,
       actionLabel: bestMonth ? "View month" : undefined,
     },
     {

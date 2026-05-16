@@ -314,6 +314,7 @@ export default function OrdersClient({
   const [page, setPage] = useState(1);
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
+  const historyRef = useRef<HTMLDivElement | null>(null);
   const invoiceRef = useRef<HTMLDivElement | null>(null);
 
   const sortedQuotes = useMemo(
@@ -410,6 +411,17 @@ export default function OrdersClient({
   useEffect(() => {
     if (draft) invoiceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [draft?.id]);
+
+  useEffect(() => {
+    if (!monthFilter) return;
+
+    const timeout = window.setTimeout(() => {
+      const target = document.getElementById(`order-month-${monthFilter}`) || historyRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [monthFilter, pageGroups.length]);
 
   function selectQuote(id: string) {
     const quote = quotes.find((q) => q.id === id);
@@ -544,7 +556,7 @@ export default function OrdersClient({
           dateForQuote={(quote) => quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt}
         />
 
-        <div className="pt-2">
+        <div ref={historyRef} id="paid-order-history" className="scroll-mt-6 pt-2">
           <h2 className="font-display text-2xl text-racing mb-1">Order history</h2>
           <p className="text-sm text-ink-muted">
             Paid orders only. Unpaid quote requests stay above until they are marked paid.
@@ -604,7 +616,7 @@ export default function OrdersClient({
               </div>
             )}
             {pageGroups.map((group) => (
-              <section key={group.key}>
+              <section key={group.key} id={`order-month-${group.key}`} className="scroll-mt-6">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-racing/10 pb-2">
                   <h2 className="font-display text-xl text-racing">{group.label}</h2>
                   <div className="text-xs font-semibold text-ink-muted">
