@@ -288,12 +288,12 @@ function buildAnalytics(quotes: QuoteRequest[]) {
     {
       label: "Invoices sent",
       value: String(invoiceSent7DayQuotes.length),
-      detail: `${invoiceSentMonthQuotes.length} sent in ${formatMonth(monthKey)}`,
+      detail: `Past 7 days; ${invoiceSentMonthQuotes.length} sent in ${formatMonth(monthKey)}`,
     },
     {
       label: "Paid orders",
       value: String(paid7DayQuotes.length),
-      detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}`,
+      detail: `Past 7 days; ${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}`,
     },
   ];
 
@@ -437,14 +437,16 @@ function money(value: number) {
 function MetricCard({ metric }: { metric: Metric }) {
   return (
     <div className="bg-white rounded-xl p-5 border border-racing/10">
-      <div className="text-xs text-ink-muted uppercase tracking-wider mb-1">{metric.label}</div>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <div className="text-xs text-ink-muted uppercase tracking-wider">{metric.label}</div>
+        {metric.actionHref && metric.actionLabel && (
+          <Link href={metric.actionHref} className="shrink-0 text-xs font-semibold text-racing hover:text-gold">
+            {metric.actionLabel}
+          </Link>
+        )}
+      </div>
       <div className="font-sans text-3xl font-semibold tracking-normal text-racing tabular-nums">{metric.value}</div>
       <div className="text-xs text-ink-muted mt-2">{metric.detail}</div>
-      {metric.actionHref && metric.actionLabel && (
-        <Link href={metric.actionHref} className="mt-3 inline-flex text-xs font-semibold text-racing hover:text-gold">
-          {metric.actionLabel}
-        </Link>
-      )}
     </div>
   );
 }

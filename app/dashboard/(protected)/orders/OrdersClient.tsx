@@ -7,7 +7,6 @@ const GBP = "\u00a3";
 const PAGE_SIZE = 8;
 const TZ = "Europe/London";
 
-type StatusFilter = "all" | QuoteStatus;
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
@@ -83,7 +82,7 @@ function ukDateKey(value: string | Date) {
 }
 
 function historyDate(quote: QuoteRequest) {
-  return quote.status === "paid" ? quote.paidAt || quote.updatedAt : quote.submittedAt;
+  return isPaidQuote(quote) ? quote.paidAt || quote.updatedAt : quote.submittedAt;
 }
 
 function historyMonthKey(quote: QuoteRequest) {
@@ -112,6 +111,18 @@ function isInTimeFilter(quote: QuoteRequest, filter: TimeFilter) {
 
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
   return Date.now() - relevantDate.getTime() <= sevenDays;
+}
+
+function isPaidQuote(quote: QuoteRequest) {
+  return quote.status === "paid" || Boolean(quote.paidAt);
+}
+
+function isPendingPaymentQuote(quote: QuoteRequest) {
+  return !isPaidQuote(quote) && (quote.status === "invoice_sent" || Boolean(quote.invoiceSentAt || quote.customerEmailSentAt));
+}
+
+function isOpenRequestQuote(quote: QuoteRequest) {
+  return !isPaidQuote(quote) && !isPendingPaymentQuote(quote) && quote.status !== "closed";
 }
 
 function quoteSearchText(quote: QuoteRequest) {
@@ -148,6 +159,143 @@ function StatusPill({ status }: { status: QuoteStatus }) {
   );
 }
 
+function OrderCardSection({
+  title,
+  quotes,
+  empty,
+  selectedId,
+  savingAction,
+  isSaving,
+  onSelect,
+  onMarkPaid,
+  dateForQuote,
+  dateLabel,
+}: {
+  title: string;
+  quotes: QuoteRequest[];
+  empty: string;
+  selectedId: string;
+  savingAction: string;
+  isSaving: boolean;
+  onSelect: (id: string) => void;
+  onMarkPaid: (quote: QuoteRequest) => void;
+  dateForQuote: (quote: QuoteRequest) => string | null | undefined;
+  dateLabel: string;
+}) {
+  return (
+    <section className="rounded-xl border border-racing/10 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-display text-xl text-racing">{title}</h2>
+        <span className="rounded-full bg-cream-dark px-3 py-1 text-xs font-semibold text-racing">
+          {quotes.length}
+        </span>
+      </div>
+      {quotes.length === 0 ? (
+        <div className="rounded-lg bg-cream-dark p-4 text-sm text-ink-muted">{empty}</div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {quotes.map((quote) => (
+            <OrderCard
+              key={quote.id}
+              quote={quote}
+              selectedId={selectedId}
+              savingAction={savingAction}
+              isSaving={isSaving}
+              onSelect={onSelect}
+              onMarkPaid={onMarkPaid}
+              dateLabel={dateLabel}
+              dateValue={dateForQuote(quote)}
+              showMarkPaid={!isPaidQuote(quote)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OrderCard({
+  quote,
+  selectedId,
+  savingAction,
+  isSaving,
+  onSelect,
+  onMarkPaid,
+  dateLabel,
+  dateValue,
+  showMarkPaid,
+}: {
+  quote: QuoteRequest;
+  selectedId: string;
+  savingAction: string;
+  isSaving: boolean;
+  onSelect: (id: string) => void;
+  onMarkPaid: (quote: QuoteRequest) => void;
+  dateLabel: string;
+  dateValue: string | null | undefined;
+  showMarkPaid: boolean;
+}) {
+  const quoteTotals = totals(quote);
+  const cardSaving = savingAction.startsWith(`${quote.id}:`);
+
+  return (
+    <article
+      className={`rounded-lg border p-4 transition ${
+        selectedId === quote.id
+          ? "border-gold bg-cream-dark shadow-sm"
+          : "border-racing/10 bg-white hover:border-gold/60"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(quote.id)}
+        className="block w-full text-left"
+        aria-current={selectedId === quote.id ? "true" : undefined}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-racing">{quote.id}</div>
+            <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
+          </div>
+          <StatusPill status={quote.status} />
+        </div>
+        <div className="mt-3 text-xs text-ink-muted">
+          {dateLabel}: {formatDateTime(dateValue)}
+        </div>
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div className="text-xs text-ink-muted">
+            {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
+          </div>
+          <div className="text-right">
+            <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
+            <div className="text-xs text-ink-muted">ex VAT</div>
+          </div>
+        </div>
+      </button>
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
+        <div className="min-w-0 text-xs text-ink-muted">
+          {quote.paidAt
+            ? `Paid ${formatDateTime(quote.paidAt)}`
+            : quote.invoiceSentAt
+              ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
+              : "Not invoiced"}
+        </div>
+        {showMarkPaid && (
+          <button
+            type="button"
+            onClick={() => onMarkPaid(quote)}
+            disabled={isSaving}
+            aria-label={`Mark order ${quote.id} as paid`}
+            className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export default function OrdersClient({
   initialQuotes,
   initialError,
@@ -161,7 +309,6 @@ export default function OrdersClient({
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<QuoteRequest | null>(null);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [monthFilter, setMonthFilter] = useState(initialMonth);
   const [page, setPage] = useState(1);
@@ -174,10 +321,24 @@ export default function OrdersClient({
     [quotes]
   );
 
-  const filteredQuotes = useMemo(() => {
+  const openRequestQuotes = useMemo(
+    () => sortedQuotes.filter(isOpenRequestQuote),
+    [sortedQuotes]
+  );
+
+  const pendingPaymentQuotes = useMemo(
+    () => sortedQuotes.filter(isPendingPaymentQuote),
+    [sortedQuotes]
+  );
+
+  const historyQuotes = useMemo(
+    () => sortedQuotes.filter(isPaidQuote),
+    [sortedQuotes]
+  );
+
+  const filteredHistoryQuotes = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return sortedQuotes.filter((quote) => {
-      if (statusFilter !== "all" && quote.status !== statusFilter) return false;
+    return historyQuotes.filter((quote) => {
       if (monthFilter) {
         if (historyMonthKey(quote) !== monthFilter) return false;
       } else if (!isInTimeFilter(quote, timeFilter)) {
@@ -186,28 +347,20 @@ export default function OrdersClient({
       if (needle && !quoteSearchText(quote).includes(needle)) return false;
       return true;
     });
-  }, [monthFilter, query, sortedQuotes, statusFilter, timeFilter]);
+  }, [historyQuotes, monthFilter, query, timeFilter]);
 
   const selected = useMemo(
     () => quotes.find((quote) => quote.id === selectedId) ?? null,
     [quotes, selectedId]
   );
 
-  const statusCounts = useMemo(() => {
-    const counts = new Map<StatusFilter, number>([["all", quotes.length]]);
-    for (const option of STATUS_OPTIONS) counts.set(option.value, 0);
-    for (const quote of quotes) counts.set(quote.status, (counts.get(quote.status) || 0) + 1);
-    return counts;
-  }, [quotes]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredQuotes.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredHistoryQuotes.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageQuotes = filteredQuotes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageQuotes = filteredHistoryQuotes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const monthStats = useMemo(() => {
     const stats = new Map<string, { salesValue: number; salesCount: number }>();
 
-    for (const quote of filteredQuotes) {
-      if (quote.status !== "paid") continue;
+    for (const quote of filteredHistoryQuotes) {
       const key = historyMonthKey(quote);
       const current = stats.get(key) || { salesValue: 0, salesCount: 0 };
       current.salesCount += 1;
@@ -216,7 +369,7 @@ export default function OrdersClient({
     }
 
     return stats;
-  }, [filteredQuotes]);
+  }, [filteredHistoryQuotes]);
 
   const pageGroups = useMemo(() => {
     const groups = new Map<string, { key: string; label: string; quotes: QuoteRequest[]; salesValue: number; salesCount: number }>();
@@ -241,7 +394,7 @@ export default function OrdersClient({
 
   useEffect(() => {
     setPage(1);
-  }, [monthFilter, query, statusFilter, timeFilter]);
+  }, [monthFilter, query, timeFilter]);
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
@@ -346,15 +499,15 @@ export default function OrdersClient({
 
   const draftTotals = draft ? totals(draft) : null;
   const isSaving = Boolean(savingAction);
-  const showingFrom = filteredQuotes.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const showingTo = Math.min(currentPage * PAGE_SIZE, filteredQuotes.length);
+  const showingFrom = filteredHistoryQuotes.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const showingTo = Math.min(currentPage * PAGE_SIZE, filteredHistoryQuotes.length);
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-3xl text-racing mb-1">Order history</h1>
+        <h1 className="font-display text-3xl text-racing mb-1">Quote requests</h1>
         <p className="text-ink-muted text-sm">
-          Search every website order, review the invoice, email it to the buyer, then manually mark it paid when money arrives.
+          Review new website orders, email the invoice to the buyer, then manually mark it paid when money arrives.
         </p>
       </div>
 
@@ -365,9 +518,42 @@ export default function OrdersClient({
       )}
 
       <div className="space-y-5">
+        <OrderCardSection
+          title="New order requests"
+          quotes={openRequestQuotes}
+          empty="No new order requests waiting."
+          selectedId={selectedId}
+          savingAction={savingAction}
+          isSaving={isSaving}
+          onSelect={selectQuote}
+          onMarkPaid={markPaid}
+          dateLabel="Submitted"
+          dateForQuote={(quote) => quote.submittedAt}
+        />
+
+        <OrderCardSection
+          title="Pending payment"
+          quotes={pendingPaymentQuotes}
+          empty="No sent invoices are awaiting payment."
+          selectedId={selectedId}
+          savingAction={savingAction}
+          isSaving={isSaving}
+          onSelect={selectQuote}
+          onMarkPaid={markPaid}
+          dateLabel="Invoice sent"
+          dateForQuote={(quote) => quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt}
+        />
+
+        <div className="pt-2">
+          <h2 className="font-display text-2xl text-racing mb-1">Order history</h2>
+          <p className="text-sm text-ink-muted">
+            Paid orders only. Unpaid quote requests stay above until they are marked paid.
+          </p>
+        </div>
+
         <div className="min-w-0 bg-white rounded-xl border border-racing/10 overflow-hidden">
           <div className="border-b border-racing/10 p-4">
-            <label className="label" htmlFor="order-search">Search order history</label>
+            <label className="label" htmlFor="order-search">Search paid order history</label>
             <input
               id="order-search"
               value={query}
@@ -375,26 +561,6 @@ export default function OrdersClient({
               className="input"
               placeholder="Name, email, order ref, item, part code..."
             />
-
-            <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter by order status">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("all")}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusFilter === "all" ? "bg-racing text-cream" : "bg-cream-dark text-racing"}`}
-              >
-                All ({statusCounts.get("all") || 0})
-              </button>
-              {STATUS_OPTIONS.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  onClick={() => setStatusFilter(option.value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusFilter === option.value ? "bg-racing text-cream" : "bg-cream-dark text-racing"}`}
-                >
-                  {option.label} ({statusCounts.get(option.value) || 0})
-                </button>
-              ))}
-            </div>
 
             <div className="mt-4 grid grid-cols-[1fr_auto] gap-3 items-end">
               <div>
@@ -414,7 +580,7 @@ export default function OrdersClient({
                 </select>
               </div>
               <div className="pb-2 text-right text-xs text-ink-muted">
-                {showingFrom}-{showingTo} of {filteredQuotes.length}
+                {showingFrom}-{showingTo} of {filteredHistoryQuotes.length}
               </div>
             </div>
             {monthFilter && (
@@ -446,68 +612,20 @@ export default function OrdersClient({
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {group.quotes.map((quote) => {
-                    const quoteTotals = totals(quote);
-                    const paid = quote.status === "paid";
-                    const cardSaving = savingAction.startsWith(`${quote.id}:`);
-                    return (
-                      <article
-                        key={quote.id}
-                        className={`rounded-lg border p-4 transition ${
-                          selectedId === quote.id
-                            ? "border-gold bg-cream-dark shadow-sm"
-                            : "border-racing/10 bg-white hover:border-gold/60"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => selectQuote(quote.id)}
-                          className="block w-full text-left"
-                          aria-current={selectedId === quote.id ? "true" : undefined}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate font-semibold text-racing">{quote.id}</div>
-                              <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
-                            </div>
-                            <StatusPill status={quote.status} />
-                          </div>
-                          <div className="mt-3 text-xs text-ink-muted">
-                            {formatDateTime(historyDate(quote))}
-                          </div>
-                          <div className="mt-4 flex items-end justify-between gap-3">
-                            <div className="text-xs text-ink-muted">
-                              {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
-                            </div>
-                            <div className="text-right">
-                              <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
-                              <div className="text-xs text-ink-muted">ex VAT</div>
-                            </div>
-                          </div>
-                        </button>
-                        <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
-                          <div className="min-w-0 text-xs text-ink-muted">
-                            {quote.paidAt
-                              ? `Paid ${formatDateTime(quote.paidAt)}`
-                              : quote.invoiceSentAt
-                                ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
-                                : "Not invoiced"}
-                          </div>
-                          {!paid && (
-                            <button
-                              type="button"
-                              onClick={() => markPaid(quote)}
-                              disabled={isSaving}
-                              aria-label={`Mark order ${quote.id} as paid`}
-                              className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    );
-                  })}
+                  {group.quotes.map((quote) => (
+                    <OrderCard
+                      key={quote.id}
+                      quote={quote}
+                      selectedId={selectedId}
+                      savingAction={savingAction}
+                      isSaving={isSaving}
+                      onSelect={selectQuote}
+                      onMarkPaid={markPaid}
+                      dateLabel="Paid"
+                      dateValue={quote.paidAt || quote.updatedAt}
+                      showMarkPaid={false}
+                    />
+                  ))}
                 </div>
               </section>
             ))}
