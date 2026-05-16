@@ -51,7 +51,7 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            <Link href="/dashboard" className="text-xs text-cream/70 hover:text-gold">
+            <Link href="/dashboard/login" className="text-xs text-cream/70 hover:text-gold">
               Owner login
             </Link>
           </div>
@@ -79,7 +79,7 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link href="/dashboard" onClick={() => setOpen(false)} className="block px-3 py-2 text-xs text-cream/70">
+            <Link href="/dashboard/login" onClick={() => setOpen(false)} className="block px-3 py-2 text-xs text-cream/70">
               Owner login
             </Link>
           </div>

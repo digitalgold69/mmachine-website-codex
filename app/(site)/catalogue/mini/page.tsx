@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
@@ -28,6 +28,15 @@ export default function MiniCataloguePage() {
   const [markFilter, setMarkFilter] = useState("All marks");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
+  const [showPanelSelector, setShowPanelSelector] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => setShowPanelSelector(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = products;
@@ -63,7 +72,9 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
+      {showPanelSelector && (
+        <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
+      )}
 
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -109,40 +120,41 @@ export default function MiniCataloguePage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-racing/5">
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-racing/5 sm:grid-cols-3 lg:grid-cols-5">
           <button
             onClick={() => { setSection("all"); setDisplayLimit(50); }}
-            className={`chip transition-colors ${section === "all" ? "!bg-racing !text-cream" : "hover:!bg-gold/20"}`}
+            className={`min-h-[112px] rounded-lg border p-3 text-center transition-colors ${
+              section === "all"
+                ? "border-racing bg-racing text-cream"
+                : "border-racing/10 bg-cream-dark text-racing hover:border-gold"
+            }`}
           >
-            All ({products.length})
+            <span className="block font-mono text-2xl font-bold leading-none">All</span>
+            <span className="mt-3 block text-sm font-semibold leading-tight">All sections</span>
+            <span className={`mt-1 block text-xs ${section === "all" ? "text-cream/75" : "text-ink-muted"}`}>
+              {products.length} parts
+            </span>
           </button>
 
-          <span className="text-[10px] tracking-widest text-ink-muted/70 font-semibold ml-2 mr-1">EXT</span>
-          {sections.filter((s) => s.mode === "exterior").map((s) => {
+          {sections.map((s) => {
             const count = products.filter((p) => p.section === s.code).length;
+            const active = section === s.code;
             return (
               <button
                 key={s.code}
                 onClick={() => { setSection(s.code); setDisplayLimit(50); }}
-                className={`chip transition-colors ${section === s.code ? "!bg-racing !text-cream" : "hover:!bg-gold/20"}`}
+                className={`min-h-[112px] rounded-lg border p-3 text-center transition-colors ${
+                  active
+                    ? "border-racing bg-racing text-cream"
+                    : "border-racing/10 bg-cream-dark text-racing hover:border-gold"
+                }`}
                 title={s.subtitle}
               >
-                <span className="font-mono opacity-60 mr-1">{s.code}</span>{s.label} ({count})
-              </button>
-            );
-          })}
-
-          <span className="text-[10px] tracking-widest text-ink-muted/70 font-semibold ml-2 mr-1">INT</span>
-          {sections.filter((s) => s.mode === "interior").map((s) => {
-            const count = products.filter((p) => p.section === s.code).length;
-            return (
-              <button
-                key={s.code}
-                onClick={() => { setSection(s.code); setDisplayLimit(50); }}
-                className={`chip transition-colors ${section === s.code ? "!bg-racing !text-cream" : "hover:!bg-gold/20"}`}
-                title={s.subtitle}
-              >
-                <span className="font-mono opacity-60 mr-1">{s.code}</span>{s.label} ({count})
+                <span className="block font-mono text-2xl font-bold leading-none">{s.code}</span>
+                <span className="mt-3 block text-sm font-semibold leading-tight">{s.label}</span>
+                <span className={`mt-1 block text-xs ${active ? "text-cream/75" : "text-ink-muted"}`}>
+                  {count} parts
+                </span>
               </button>
             );
           })}

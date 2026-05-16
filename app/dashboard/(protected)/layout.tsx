@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { listQuoteRequests } from "@/lib/quotes";
+import { redirect } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
+import { countNewQuoteRequests } from "@/lib/quotes";
 import DashboardNav from "./DashboardNav";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  if (!(await isLoggedIn())) redirect("/dashboard/login");
+
   let newRequestCount = 0;
 
   try {
-    const quotes = await listQuoteRequests();
-    newRequestCount = quotes.filter((quote) => quote.status === "new").length;
+    newRequestCount = await countNewQuoteRequests();
   } catch {
     newRequestCount = 0;
   }
