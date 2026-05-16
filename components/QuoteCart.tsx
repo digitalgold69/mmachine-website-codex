@@ -129,7 +129,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
     setSubmitting(true);
     setMessage("");
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
 
     try {
       const res = await fetch("/api/quote-requests", {
@@ -148,9 +149,9 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Quote request failed");
+      formEl.reset();
       setItems([]);
-      setMessage(`Quote request sent. Reference: ${data.quoteId}`);
-      event.currentTarget.reset();
+      setMessage(`Order submitted. Reference: ${data.quoteId}`);
     } catch (err) {
       setMessage((err as Error).message || "Quote request failed");
     } finally {
