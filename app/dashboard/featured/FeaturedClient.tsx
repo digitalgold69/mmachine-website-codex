@@ -28,6 +28,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Show a banner that fades after a few seconds
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
 
   async function handleSave(draft: Draft) {
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/featured", {
         method: "POST",
@@ -94,7 +96,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       setEditing(null);
       setFlash(`Saved "${saved.title}". The public site updates within a minute.`);
     } catch (e) {
-      alert((e as Error).message);
+      setError((e as Error).message || "Save failed");
     } finally {
       setBusy(false);
     }
@@ -103,6 +105,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   async function handleDelete(it: Entry) {
     if (!confirm(`Delete "${it.title}"? This can't be undone.`)) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/featured", {
         method: "DELETE",
@@ -114,7 +117,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       setItems((prev) => prev.filter((x) => x.id !== it.id));
       setFlash(`Deleted "${it.title}".`);
     } catch (e) {
-      alert((e as Error).message);
+      setError((e as Error).message || "Delete failed");
     } finally {
       setBusy(false);
     }
@@ -125,8 +128,9 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       <EditForm
         initial={editing}
         onSave={handleSave}
-        onCancel={() => setEditing(null)}
+        onCancel={() => { setEditing(null); setError(null); }}
         busy={busy}
+        error={error}
       />
     );
   }
@@ -147,6 +151,12 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       {flash && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg p-3 text-sm mb-5">
           {flash}
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm mb-5">
+          {error}
         </div>
       )}
 
@@ -197,11 +207,13 @@ function EditForm({
   onSave,
   onCancel,
   busy,
+  error,
 }: {
   initial: Draft;
   onSave: (d: Draft) => void;
   onCancel: () => void;
   busy: boolean;
+  error: string | null;
 }) {
   const [form, setForm] = useState<Draft>(initial);
   const [imagePreview, setImagePreview] = useState<string | null>(
@@ -233,6 +245,12 @@ function EditForm({
         ← Back to featured work
       </button>
       <h1 className="font-display text-3xl text-racing mb-6">{isNew ? "Add new featured job" : "Edit featured job"}</h1>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm mb-5 max-w-3xl">
+          {error}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {

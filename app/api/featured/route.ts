@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { requireLogin } from "@/lib/auth";
-import { readJsonFile, writeTextFile, writeBinaryFile } from "@/lib/github";
+import { assertRepoAccess, readJsonFile, writeTextFile, writeBinaryFile } from "@/lib/github";
 
 // Source-of-truth JSON (still kept in data-source/ so it's auditable in git)
 const FEATURED_PATH = "data-source/featured-work.json";
@@ -98,6 +98,7 @@ export async function GET() {
   const auth = await requireLogin();
   if (auth) return auth;
   try {
+    await assertRepoAccess();
     const entries = await loadEntries();
     return NextResponse.json({ entries });
   } catch (e) {
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    await assertRepoAccess();
     const entries = await loadEntries();
 
     // Determine the id we'll save under
@@ -219,6 +221,7 @@ export async function DELETE(req: Request) {
   const id = safeId(body.id);
 
   try {
+    await assertRepoAccess();
     const entries = await loadEntries();
     const next = entries.filter((x) => x.id !== id);
     if (next.length === entries.length) {

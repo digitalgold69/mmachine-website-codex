@@ -47,12 +47,31 @@ function headers() {
 
 type FileMeta = { sha: string; content: string };
 
+function helpfulGitHubError(action: string, path: string, status: number, body: string): Error {
+  if (status === 404) {
+    return new Error(
+      `${action} failed because GitHub could not access ${repo()} on branch ${branch()}. ` +
+        "In Vercel, check GITHUB_REPO is digitalgold69/mmachine-website-codex, " +
+        "GITHUB_BRANCH is main, and GITHUB_TOKEN has Contents: Read and write for that repo."
+    );
+  }
+  return new Error(`${action} ${path} failed: ${status} ${body}`);
+}
+
+export async function assertRepoAccess(): Promise<void> {
+  const url = `${API}/repos/${repo()}/branches/${encodeURIComponent(branch())}`;
+  const res = await fetch(url, { headers: headers(), cache: "no-store" });
+  if (!res.ok) {
+    throw helpfulGitHubError("GitHub repo access check", branch(), res.status, await res.text());
+  }
+}
+
 /** Read a file's current content + SHA from the repo. Returns null if not found. */
 export async function readFile(path: string): Promise<FileMeta | null> {
   const url = `${API}/repos/${repo()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${branch()}`;
   const res = await fetch(url, { headers: headers(), cache: "no-store" });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub readFile ${path} failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw helpfulGitHubError("GitHub readFile", path, res.status, await res.text());
   const j = await res.json();
   return { sha: j.sha, content: typeof j.content === "string" ? j.content : "" };
 }
@@ -78,7 +97,7 @@ export async function writeTextFile(opts: {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`GitHub writeTextFile ${opts.path} failed: ${res.status} ${await res.text()}`);
+    throw helpfulGitHubError("GitHub writeTextFile", opts.path, res.status, await res.text());
   }
 }
 
@@ -103,7 +122,7 @@ export async function writeBinaryFile(opts: {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`GitHub writeBinaryFile ${opts.path} failed: ${res.status} ${await res.text()}`);
+    throw helpfulGitHubError("GitHub writeBinaryFile", opts.path, res.status, await res.text());
   }
 }
 
