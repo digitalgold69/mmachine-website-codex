@@ -52,14 +52,14 @@ const EXTERIOR_ZONES: ZoneDef[] = [
   // Roof — faces up
   { code: "160", label: "Roof",              box: [-0.85, 1.18, -0.52,  0.55, 1.42,  0.52], normal: [ 0, 1, 0], normalTol: 0.40 },
   // Front wing L/R
-  { code: "130", label: "Front wing (L)",    box: [ 0.42, 0.15, -0.80,  1.30, 0.95, -0.40], normal: [ 0, 0, 1], normalTol: 0.20 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.42, 0.15,  0.40,  1.30, 0.95,  0.80], normal: [ 0, 0, 1], normalTol: 0.20 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.48, 0.20, -0.82,  1.28, 0.84, -0.46], normal: [ 0, 0, 1], normalTol: 0.42 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.48, 0.20,  0.46,  1.28, 0.84,  0.82], normal: [ 0, 0, 1], normalTol: 0.42 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.45, 0.30, -0.80,  0.42, 1.00, -0.42], normal: [ 0, 0, 1], normalTol: 0.20 },
-  { code: "150", label: "Door (R)",          box: [-0.45, 0.30,  0.42,  0.42, 1.00,  0.80], normal: [ 0, 0, 1], normalTol: 0.20 },
+  { code: "150", label: "Door (L)",          box: [-0.43, 0.22, -0.82,  0.39, 0.82, -0.46], normal: [ 0, 0, 1], normalTol: 0.45 },
+  { code: "150", label: "Door (R)",          box: [-0.43, 0.22,  0.46,  0.39, 0.82,  0.82], normal: [ 0, 0, 1], normalTol: 0.45 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.20, -0.80, -0.45, 1.05, -0.40], normal: [ 0, 0, 1], normalTol: 0.20 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.20,  0.40, -0.45, 1.05,  0.80], normal: [ 0, 0, 1], normalTol: 0.20 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.26, 0.24, -0.82, -0.48, 0.82, -0.46], normal: [ 0, 0, 1], normalTol: 0.45 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.26, 0.24,  0.46, -0.48, 0.82,  0.82], normal: [ 0, 0, 1], normalTol: 0.45 },
   // Rear panel — faces backward
   { code: "120", label: "Rear panel",        box: [-1.52, 0.30, -0.58, -1.30, 0.85,  0.58], normal: [ 1, 0, 0], normalTol: 0.20 },
 ];
