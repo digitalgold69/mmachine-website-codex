@@ -82,19 +82,36 @@ function ukDateKey(value: string | Date) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+function historyDate(quote: QuoteRequest) {
+  return quote.status === "paid" ? quote.paidAt || quote.updatedAt : quote.submittedAt;
+}
+
+function historyMonthKey(quote: QuoteRequest) {
+  return ukDateKey(historyDate(quote)).slice(0, 7);
+}
+
+function formatMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+}
+
 function isInTimeFilter(quote: QuoteRequest, filter: TimeFilter) {
   if (filter === "all") return true;
 
-  const submitted = new Date(quote.submittedAt);
+  const relevantDate = new Date(historyDate(quote));
   const todayKey = ukDateKey(new Date());
-  const quoteKey = ukDateKey(submitted);
+  const quoteKey = ukDateKey(relevantDate);
 
   if (filter === "today") return quoteKey === todayKey;
   if (filter === "month") return quoteKey.slice(0, 7) === todayKey.slice(0, 7);
   if (filter === "year") return quoteKey.slice(0, 4) === todayKey.slice(0, 4);
 
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  return Date.now() - submitted.getTime() <= sevenDays;
+  return Date.now() - relevantDate.getTime() <= sevenDays;
 }
 
 function quoteSearchText(quote: QuoteRequest) {
@@ -134,9 +151,11 @@ function StatusPill({ status }: { status: QuoteStatus }) {
 export default function OrdersClient({
   initialQuotes,
   initialError,
+  initialMonth = "",
 }: {
   initialQuotes: QuoteRequest[];
   initialError: string;
+  initialMonth?: string;
 }) {
   const [quotes, setQuotes] = useState(initialQuotes);
   const [selectedId, setSelectedId] = useState("");
@@ -144,13 +163,14 @@ export default function OrdersClient({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [monthFilter, setMonthFilter] = useState(initialMonth);
   const [page, setPage] = useState(1);
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
   const invoiceRef = useRef<HTMLDivElement | null>(null);
 
   const sortedQuotes = useMemo(
-    () => [...quotes].sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt)),
+    () => [...quotes].sort((a, b) => Date.parse(historyDate(b)) - Date.parse(historyDate(a))),
     [quotes]
   );
 
@@ -158,11 +178,15 @@ export default function OrdersClient({
     const needle = query.trim().toLowerCase();
     return sortedQuotes.filter((quote) => {
       if (statusFilter !== "all" && quote.status !== statusFilter) return false;
-      if (!isInTimeFilter(quote, timeFilter)) return false;
+      if (monthFilter) {
+        if (historyMonthKey(quote) !== monthFilter) return false;
+      } else if (!isInTimeFilter(quote, timeFilter)) {
+        return false;
+      }
       if (needle && !quoteSearchText(quote).includes(needle)) return false;
       return true;
     });
-  }, [query, sortedQuotes, statusFilter, timeFilter]);
+  }, [monthFilter, query, sortedQuotes, statusFilter, timeFilter]);
 
   const selected = useMemo(
     () => quotes.find((quote) => quote.id === selectedId) ?? null,
@@ -179,10 +203,45 @@ export default function OrdersClient({
   const pageCount = Math.max(1, Math.ceil(filteredQuotes.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageQuotes = filteredQuotes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const monthStats = useMemo(() => {
+    const stats = new Map<string, { salesValue: number; salesCount: number }>();
+
+    for (const quote of filteredQuotes) {
+      if (quote.status !== "paid") continue;
+      const key = historyMonthKey(quote);
+      const current = stats.get(key) || { salesValue: 0, salesCount: 0 };
+      current.salesCount += 1;
+      current.salesValue += totals(quote).totalEx;
+      stats.set(key, current);
+    }
+
+    return stats;
+  }, [filteredQuotes]);
+
+  const pageGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; quotes: QuoteRequest[]; salesValue: number; salesCount: number }>();
+
+    for (const quote of pageQuotes) {
+      const key = historyMonthKey(quote);
+      const stats = monthStats.get(key) || { salesValue: 0, salesCount: 0 };
+      const group = groups.get(key) || {
+        key,
+        label: formatMonth(key),
+        quotes: [],
+        salesValue: stats.salesValue,
+        salesCount: stats.salesCount,
+      };
+
+      group.quotes.push(quote);
+      groups.set(key, group);
+    }
+
+    return [...groups.values()];
+  }, [monthStats, pageQuotes]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, statusFilter, timeFilter]);
+  }, [monthFilter, query, statusFilter, timeFilter]);
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
@@ -343,7 +402,10 @@ export default function OrdersClient({
                 <select
                   id="time-filter"
                   value={timeFilter}
-                  onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                  onChange={(e) => {
+                    setTimeFilter(e.target.value as TimeFilter);
+                    setMonthFilter("");
+                  }}
                   className="input"
                 >
                   {TIME_FILTERS.map((filter) => (
@@ -355,76 +417,100 @@ export default function OrdersClient({
                 {showingFrom}-{showingTo} of {filteredQuotes.length}
               </div>
             </div>
+            {monthFilter && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-dark px-3 py-2 text-sm text-racing">
+                <span>Showing {formatMonth(monthFilter)}</span>
+                <button
+                  type="button"
+                  onClick={() => setMonthFilter("")}
+                  className="text-xs font-semibold underline hover:text-gold"
+                >
+                  Clear month
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-5 p-4">
             {pageQuotes.length === 0 && (
-              <div className="rounded-lg bg-cream-dark p-5 text-sm text-ink-muted sm:col-span-2 xl:col-span-4">
+              <div className="rounded-lg bg-cream-dark p-5 text-sm text-ink-muted">
                 No orders match that search.
               </div>
             )}
-            {pageQuotes.map((quote) => {
-              const quoteTotals = totals(quote);
-              const paid = quote.status === "paid";
-              const cardSaving = savingAction.startsWith(`${quote.id}:`);
-              return (
-                <article
-                  key={quote.id}
-                  className={`rounded-lg border p-4 transition ${
-                    selectedId === quote.id
-                      ? "border-gold bg-cream-dark shadow-sm"
-                      : "border-racing/10 bg-white hover:border-gold/60"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => selectQuote(quote.id)}
-                    className="block w-full text-left"
-                    aria-current={selectedId === quote.id ? "true" : undefined}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-racing">{quote.id}</div>
-                        <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
-                      </div>
-                      <StatusPill status={quote.status} />
-                    </div>
-                    <div className="mt-3 text-xs text-ink-muted">
-                      {formatDateTime(quote.submittedAt)}
-                    </div>
-                    <div className="mt-4 flex items-end justify-between gap-3">
-                      <div className="text-xs text-ink-muted">
-                        {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
-                        <div className="text-xs text-ink-muted">ex VAT</div>
-                      </div>
-                    </div>
-                  </button>
-                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
-                    <div className="min-w-0 text-xs text-ink-muted">
-                      {quote.paidAt
-                        ? `Paid ${formatDateTime(quote.paidAt)}`
-                        : quote.invoiceSentAt
-                          ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
-                          : "Not invoiced"}
-                    </div>
-                    {!paid && (
-                      <button
-                        type="button"
-                        onClick={() => markPaid(quote)}
-                        disabled={isSaving}
-                        aria-label={`Mark order ${quote.id} as paid`}
-                        className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
-                      </button>
-                    )}
+            {pageGroups.map((group) => (
+              <section key={group.key}>
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-racing/10 pb-2">
+                  <h2 className="font-display text-xl text-racing">{group.label}</h2>
+                  <div className="text-xs font-semibold text-ink-muted">
+                    Sales {money(group.salesValue)} / {group.salesCount} {group.salesCount === 1 ? "sale" : "sales"}
                   </div>
-                </article>
-              );
-            })}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {group.quotes.map((quote) => {
+                    const quoteTotals = totals(quote);
+                    const paid = quote.status === "paid";
+                    const cardSaving = savingAction.startsWith(`${quote.id}:`);
+                    return (
+                      <article
+                        key={quote.id}
+                        className={`rounded-lg border p-4 transition ${
+                          selectedId === quote.id
+                            ? "border-gold bg-cream-dark shadow-sm"
+                            : "border-racing/10 bg-white hover:border-gold/60"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => selectQuote(quote.id)}
+                          className="block w-full text-left"
+                          aria-current={selectedId === quote.id ? "true" : undefined}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-racing">{quote.id}</div>
+                              <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
+                            </div>
+                            <StatusPill status={quote.status} />
+                          </div>
+                          <div className="mt-3 text-xs text-ink-muted">
+                            {formatDateTime(historyDate(quote))}
+                          </div>
+                          <div className="mt-4 flex items-end justify-between gap-3">
+                            <div className="text-xs text-ink-muted">
+                              {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
+                              <div className="text-xs text-ink-muted">ex VAT</div>
+                            </div>
+                          </div>
+                        </button>
+                        <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
+                          <div className="min-w-0 text-xs text-ink-muted">
+                            {quote.paidAt
+                              ? `Paid ${formatDateTime(quote.paidAt)}`
+                              : quote.invoiceSentAt
+                                ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
+                                : "Not invoiced"}
+                          </div>
+                          {!paid && (
+                            <button
+                              type="button"
+                              onClick={() => markPaid(quote)}
+                              disabled={isSaving}
+                              aria-label={`Mark order ${quote.id} as paid`}
+                              className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-racing/10 p-4">

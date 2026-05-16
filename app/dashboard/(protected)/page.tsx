@@ -17,6 +17,8 @@ type Metric = {
   label: string;
   value: string;
   detail: string;
+  actionHref?: string;
+  actionLabel?: string;
 };
 
 type RankedItem = {
@@ -214,23 +216,29 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const now = new Date();
   const todayKey = ukDateKey(now);
   const monthKey = todayKey.slice(0, 7);
+  const sevenDaysAgo = daysAgo(now, 7);
+  const ninetyDaysAgo = daysAgo(now, 90);
 
   const todayRequests = quotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
   const newRequestQuotes = quotes.filter((quote) => quote.status === "new");
   const newRequests = newRequestQuotes.slice(0, 6);
-  const invoiceSentQuotes = quotes.filter((quote) => quote.status === "invoice_sent");
+  const invoiceSentQuotes = quotes.filter((quote) => quote.invoiceSentAt || quote.customerEmailSentAt || quote.status === "invoice_sent");
   const invoiceSentMonthQuotes = invoiceSentQuotes.filter((quote) =>
-    ukDateKey(quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt).startsWith(monthKey)
+    ukDateKey(invoiceDate(quote)).startsWith(monthKey)
   );
+  const invoiceSent7DayQuotes = invoiceSentQuotes.filter((quote) => isOnOrAfter(invoiceDate(quote), sevenDaysAgo));
   const paidQuotes = quotes.filter((quote) => quote.status === "paid");
   const paidTodayQuotes = paidQuotes.filter((quote) => ukDateKey(quote.paidAt || quote.updatedAt) === todayKey);
   const paidMonthQuotes = paidQuotes.filter((quote) =>
     ukDateKey(quote.paidAt || quote.updatedAt).startsWith(monthKey)
   );
+  const paid7DayQuotes = paidQuotes.filter((quote) => isOnOrAfter(quote.paidAt || quote.updatedAt, sevenDaysAgo));
+  const paid90DayQuotes = paidQuotes.filter((quote) => isOnOrAfter(quote.paidAt || quote.updatedAt, ninetyDaysAgo));
   const unpaidInvoiceQuotes = invoiceSentQuotes.filter((quote) => !quote.paidAt);
   const unpaidInvoiceValue = unpaidInvoiceQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
   const paidMonthValue = paidMonthQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
   const paidTodayValue = paidTodayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
+  const paid90DayValue = paid90DayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
 
   const bestMonth = bestMonthFrom(quotes);
   const topItems = topItemsFrom(paidQuotes);
@@ -264,6 +272,8 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       label: "Best paid month",
       value: bestMonth ? money(bestMonth.value) : `${GBP}0.00`,
       detail: bestMonth ? `${formatMonth(bestMonth.key)} paid sales, ex VAT` : "No paid orders yet",
+      actionHref: bestMonth ? `/dashboard/orders?month=${bestMonth.key}` : undefined,
+      actionLabel: bestMonth ? "View month" : undefined,
     },
     {
       label: "Awaiting payment",
@@ -272,17 +282,17 @@ function buildAnalytics(quotes: QuoteRequest[]) {
     },
     {
       label: "Average paid order",
-      value: money(paidQuotes.length ? paidQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0) / paidQuotes.length : 0),
-      detail: `${paidQuotes.length} paid ${paidQuotes.length === 1 ? "order" : "orders"} all time`,
+      value: money(paid90DayQuotes.length ? paid90DayValue / paid90DayQuotes.length : 0),
+      detail: `${paid90DayQuotes.length} paid ${paid90DayQuotes.length === 1 ? "order" : "orders"} in the past 90 days`,
     },
     {
-      label: "Invoices sent all time",
-      value: String(invoiceSentQuotes.length),
+      label: "Invoices sent",
+      value: String(invoiceSent7DayQuotes.length),
       detail: `${invoiceSentMonthQuotes.length} sent in ${formatMonth(monthKey)}`,
     },
     {
-      label: "Paid orders all time",
-      value: String(paidQuotes.length),
+      label: "Paid orders",
+      value: String(paid7DayQuotes.length),
       detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}`,
     },
   ];
@@ -342,6 +352,20 @@ function bestMonthFrom(quotes: QuoteRequest[]) {
   return [...months.entries()]
     .map(([key, value]) => ({ key, value }))
     .sort((a, b) => b.value - a.value)[0];
+}
+
+function daysAgo(from: Date, count: number) {
+  const date = new Date(from);
+  date.setDate(date.getDate() - count);
+  return date;
+}
+
+function isOnOrAfter(value: string | Date, date: Date) {
+  return new Date(value).getTime() >= date.getTime();
+}
+
+function invoiceDate(quote: QuoteRequest) {
+  return quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt;
 }
 
 function lastDays(count: number): Omit<DayPoint, "count" | "value">[] {
@@ -416,6 +440,11 @@ function MetricCard({ metric }: { metric: Metric }) {
       <div className="text-xs text-ink-muted uppercase tracking-wider mb-1">{metric.label}</div>
       <div className="font-sans text-3xl font-semibold tracking-normal text-racing tabular-nums">{metric.value}</div>
       <div className="text-xs text-ink-muted mt-2">{metric.detail}</div>
+      {metric.actionHref && metric.actionLabel && (
+        <Link href={metric.actionHref} className="mt-3 inline-flex text-xs font-semibold text-racing hover:text-gold">
+          {metric.actionLabel}
+        </Link>
+      )}
     </div>
   );
 }

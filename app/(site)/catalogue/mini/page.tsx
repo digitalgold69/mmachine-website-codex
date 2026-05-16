@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
@@ -29,6 +29,7 @@ export default function MiniCataloguePage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [showPanelSelector, setShowPanelSelector] = useState(false);
+  const partsListRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
@@ -58,6 +59,14 @@ export default function MiniCataloguePage() {
   const shown = filtered.slice(0, displayLimit);
   const currentSection = getSection(section);
 
+  function chooseSection(nextSection: string) {
+    setSection(nextSection);
+    setDisplayLimit(50);
+    window.setTimeout(() => {
+      partsListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-8">
@@ -73,7 +82,7 @@ export default function MiniCataloguePage() {
       </div>
 
       {showPanelSelector && (
-        <Mini3DViewer selectedSection={section} onSelect={(s) => { setSection(s); setDisplayLimit(50); }} />
+        <Mini3DViewer selectedSection={section} onSelect={chooseSection} />
       )}
 
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
@@ -120,19 +129,20 @@ export default function MiniCataloguePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-racing/5 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="overflow-x-auto pt-2 border-t border-racing/5">
+          <div className="flex w-max gap-2 pb-1">
           <button
-            onClick={() => { setSection("all"); setDisplayLimit(50); }}
-            className={`min-h-[112px] rounded-lg border p-3 text-center transition-colors ${
+            onClick={() => chooseSection("all")}
+            className={`min-h-[58px] w-[112px] shrink-0 rounded-md border px-2 py-2 text-center transition-colors ${
               section === "all"
                 ? "border-racing bg-racing text-cream"
                 : "border-racing/10 bg-cream-dark text-racing hover:border-gold"
             }`}
           >
-            <span className="block font-mono text-2xl font-bold leading-none">All</span>
-            <span className="mt-3 block text-sm font-semibold leading-tight">All sections</span>
-            <span className={`mt-1 block text-xs ${section === "all" ? "text-cream/75" : "text-ink-muted"}`}>
-              {products.length} parts
+            <span className="block font-mono text-lg font-bold leading-none">All</span>
+            <span className="mt-1 block truncate text-[11px] font-semibold leading-tight">All sections</span>
+            <span className={`block text-[10px] ${section === "all" ? "text-cream/75" : "text-ink-muted"}`}>
+              {products.length}
             </span>
           </button>
 
@@ -142,25 +152,27 @@ export default function MiniCataloguePage() {
             return (
               <button
                 key={s.code}
-                onClick={() => { setSection(s.code); setDisplayLimit(50); }}
-                className={`min-h-[112px] rounded-lg border p-3 text-center transition-colors ${
+                onClick={() => chooseSection(s.code)}
+                className={`min-h-[58px] w-[112px] shrink-0 rounded-md border px-2 py-2 text-center transition-colors ${
                   active
                     ? "border-racing bg-racing text-cream"
                     : "border-racing/10 bg-cream-dark text-racing hover:border-gold"
                 }`}
                 title={s.subtitle}
               >
-                <span className="block font-mono text-2xl font-bold leading-none">{s.code}</span>
-                <span className="mt-3 block text-sm font-semibold leading-tight">{s.label}</span>
-                <span className={`mt-1 block text-xs ${active ? "text-cream/75" : "text-ink-muted"}`}>
-                  {count} parts
+                <span className="block font-mono text-lg font-bold leading-none">{s.code}</span>
+                <span className="mt-1 block truncate text-[11px] font-semibold leading-tight">{s.label}</span>
+                <span className={`block text-[10px] ${active ? "text-cream/75" : "text-ink-muted"}`}>
+                  {count}
                 </span>
               </button>
             );
           })}
+          </div>
         </div>
       </div>
 
+      <div ref={partsListRef} className="scroll-mt-4" />
       {currentSection && (
         <div className="bg-cream-dark rounded-lg p-4 mt-6 border-l-4 border-gold">
           <div className="flex items-center gap-3 mb-1">

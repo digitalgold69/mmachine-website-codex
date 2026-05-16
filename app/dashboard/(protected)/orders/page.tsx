@@ -6,11 +6,18 @@ import OrdersClient from "./OrdersClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrdersPage() {
+type OrdersPageProps = {
+  searchParams?: Promise<{ month?: string | string[] }>;
+};
+
+export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   if (!(await isLoggedIn())) redirect("/dashboard/login");
 
   let quotes: QuoteRequest[] = [];
   let error = "";
+  const params = searchParams ? await searchParams : {};
+  const monthParam = Array.isArray(params.month) ? params.month[0] : params.month;
+  const initialMonth = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : "";
 
   try {
     quotes = await listQuoteRequests();
@@ -18,5 +25,5 @@ export default async function OrdersPage() {
     error = (err as Error).message;
   }
 
-  return <OrdersClient initialQuotes={quotes} initialError={error} />;
+  return <OrdersClient initialQuotes={quotes} initialError={error} initialMonth={initialMonth} />;
 }
