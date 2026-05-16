@@ -278,8 +278,8 @@ export default function OrdersClient({
         </div>
       )}
 
-      <div className="grid xl:grid-cols-[430px_1fr] gap-5">
-        <div className="bg-white rounded-xl border border-racing/10 overflow-hidden">
+      <div className="grid min-w-0 xl:grid-cols-[430px_minmax(0,1fr)] gap-5">
+        <div className="min-w-0 bg-white rounded-xl border border-racing/10 overflow-hidden">
           <div className="border-b border-racing/10 p-4">
             <label className="label" htmlFor="order-search">Search order history</label>
             <input
@@ -417,7 +417,7 @@ export default function OrdersClient({
             Select an order to review it.
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-racing/10 p-5">
+          <div className="min-w-0 bg-white rounded-xl border border-racing/10 p-5">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
                 <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice editor</div>

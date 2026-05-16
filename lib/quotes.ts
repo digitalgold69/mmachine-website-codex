@@ -90,6 +90,17 @@ export async function listQuoteRequests(): Promise<QuoteRequest[]> {
   return (data || []).map((row) => rowToQuote(row as QuoteRow));
 }
 
+export async function countNewQuoteRequests(): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("quote_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+
+  if (error) throw new Error(`Supabase quote_requests count failed: ${error.message}`);
+  return count || 0;
+}
+
 export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase

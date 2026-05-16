@@ -67,9 +67,6 @@ export default async function DashboardHomePage() {
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-3xl text-racing mb-1">Business dashboard</h1>
-          <p className="text-ink-muted">
-            Live order-request analytics using UK dates. A new day starts at midnight in London.
-          </p>
         </div>
         <Link href="/dashboard/orders" className="btn-primary">
           View all order history
@@ -221,7 +218,17 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const totalValue = quotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
   const todayQuotes = quotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
   const monthQuotes = quotes.filter((quote) => ukDateKey(quote.submittedAt).startsWith(monthKey));
-  const newRequests = quotes.filter((quote) => quote.status === "new").slice(0, 6);
+  const newRequestQuotes = quotes.filter((quote) => quote.status === "new");
+  const newRequests = newRequestQuotes.slice(0, 6);
+  const newTodayQuotes = newRequestQuotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
+  const invoiceSentQuotes = quotes.filter((quote) => quote.status === "invoice_sent");
+  const invoiceSentMonthQuotes = invoiceSentQuotes.filter((quote) =>
+    ukDateKey(quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt).startsWith(monthKey)
+  );
+  const paidQuotes = quotes.filter((quote) => quote.status === "paid");
+  const paidMonthQuotes = paidQuotes.filter((quote) =>
+    ukDateKey(quote.paidAt || quote.updatedAt).startsWith(monthKey)
+  );
 
   const bestMonth = bestMonthFrom(quotes);
   const topItems = topItemsFrom(quotes);
@@ -238,48 +245,43 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const metrics: Metric[] = [
     {
       label: "New requests",
-      value: String(quotes.filter((quote) => quote.status === "new").length),
-      detail: `${todayQuotes.length} submitted today`,
+      value: String(newRequestQuotes.length),
+      detail: `${newTodayQuotes.length} new today; ${newRequestQuotes.length} awaiting review now`,
     },
     {
       label: "Today",
       value: money(todayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0)),
-      detail: "order-request value ex VAT",
+      detail: "submitted today, ex VAT",
     },
     {
       label: "This month",
       value: money(monthQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0)),
-      detail: `${monthQuotes.length} requests in ${formatMonth(monthKey)}`,
+      detail: `${monthQuotes.length} submitted in ${formatMonth(monthKey)}, ex VAT`,
     },
     {
       label: "Best month",
       value: bestMonth ? money(bestMonth.value) : `${GBP}0.00`,
-      detail: bestMonth ? formatMonth(bestMonth.key) : "No history yet",
+      detail: bestMonth ? `${formatMonth(bestMonth.key)} submitted value` : "No submitted orders yet",
     },
     {
       label: "All-time pipeline",
       value: money(totalValue),
-      detail: `${quotes.length} total requests`,
+      detail: `${quotes.length} submitted since tracking began`,
     },
     {
       label: "Average request",
       value: money(quotes.length ? totalValue / quotes.length : 0),
-      detail: "mean order-request value",
+      detail: `all-time mean across ${quotes.length} ${quotes.length === 1 ? "request" : "requests"}`,
     },
     {
-      label: "Invoice sent",
-      value: String(quotes.filter((quote) => quote.status === "invoice_sent").length),
-      detail: "completed invoices emailed",
+      label: "Invoices sent",
+      value: String(invoiceSentQuotes.length),
+      detail: `${invoiceSentMonthQuotes.length} sent in ${formatMonth(monthKey)}`,
     },
     {
       label: "Paid",
-      value: String(quotes.filter((quote) => quote.status === "paid").length),
-      detail: "manually confirmed payments",
-    },
-    {
-      label: "Closed",
-      value: String(quotes.filter((quote) => quote.status === "closed").length),
-      detail: "finished or archived",
+      value: String(paidQuotes.length),
+      detail: `${paidMonthQuotes.length} paid in ${formatMonth(monthKey)}`,
     },
   ];
 
