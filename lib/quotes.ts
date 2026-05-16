@@ -53,12 +53,12 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
   };
 }
 
-function quoteToRow(quote: QuoteRequest) {
+function quoteToRow(quote: QuoteRequest, legacy = false) {
   return {
     id: quote.id,
     submitted_at: quote.submittedAt,
     updated_at: quote.updatedAt,
-    status: quote.status,
+    status: legacy && quote.status === "invoice_sent" ? "quoted" : quote.status,
     customer: quote.customer,
     items: quote.items,
     owner_notes: quote.ownerNotes || "",
@@ -66,11 +66,17 @@ function quoteToRow(quote: QuoteRequest) {
     carriage_ex_vat: quote.carriageExVat ?? null,
     extra_charges_ex_vat: quote.extraChargesExVat ?? null,
     quoted_at: quote.quotedAt ?? null,
-    invoice_sent_at: quote.invoiceSentAt ?? null,
-    paid_at: quote.paidAt ?? null,
+    ...(legacy ? {} : { invoice_sent_at: quote.invoiceSentAt ?? null }),
+    ...(legacy ? {} : { paid_at: quote.paidAt ?? null }),
     customer_email_sent_at: quote.customerEmailSentAt ?? null,
     owner_email_sent_at: quote.ownerEmailSentAt ?? null,
   };
+}
+
+function isMissingInvoiceColumns(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("invoice_sent_at") || error?.message?.includes("paid_at")
+  );
 }
 
 export async function listQuoteRequests(): Promise<QuoteRequest[]> {
@@ -103,6 +109,25 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
     .upsert(quoteToRow(quote), { onConflict: "id" })
     .select("*")
     .single();
+
+  if (error && isMissingInvoiceColumns(error)) {
+    if (quote.status === "paid" || quote.paidAt) {
+      throw new Error(
+        "Supabase quote_requests needs the invoice/paid migration before paid orders can be saved."
+      );
+    }
+
+    const legacy = await supabase
+      .from("quote_requests")
+      .upsert(quoteToRow(quote, true), { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (legacy.error) {
+      throw new Error(`Supabase quote_requests save failed: ${legacy.error.message}`);
+    }
+    return rowToQuote(legacy.data as QuoteRow);
+  }
 
   if (error) throw new Error(`Supabase quote_requests save failed: ${error.message}`);
   return rowToQuote(data as QuoteRow);
