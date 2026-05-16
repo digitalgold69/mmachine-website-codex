@@ -103,7 +103,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
     <div style="margin:0;background:#fbf8f1;padding:28px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
       <div style="max-width:780px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:14px;overflow:hidden">
         <div style="background:#0f3d2e;color:#fbf8f1;padding:24px 28px">
-          <div style="font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:#d6b257">M-Machine</div>
+          <div style="font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:#DF1718">M-Machine</div>
           <h1 style="margin:6px 0 0;font-family:Georgia,serif;font-size:32px;font-weight:600">Order invoice</h1>
           <div style="margin-top:8px;color:#d8e7df">Invoice ${escapeHtml(quote.id)} / ${escapeHtml(formatDate(new Date().toISOString()))}</div>
         </div>

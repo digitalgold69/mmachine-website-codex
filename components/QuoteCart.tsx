@@ -49,7 +49,7 @@ export function OrderButton({
     <button
       type="button"
       onClick={() => beginAdd(item)}
-      className={`inline-flex h-8 min-w-[68px] items-center justify-center rounded-md bg-gold px-2.5 text-sm font-semibold leading-none text-racing-dark transition hover:bg-[#D4A028] ${className}`}
+      className={`inline-flex h-8 min-w-[68px] items-center justify-center rounded-md bg-gold px-2.5 text-sm font-semibold leading-none text-cream transition hover:bg-gold-light ${className}`}
     >
       Order
     </button>
@@ -170,7 +170,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
           className="fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-racing px-5 text-sm font-semibold text-cream shadow-lg transition hover:bg-[#155040]"
         >
           Order Now
-          <span className="rounded-full bg-gold px-2 py-0.5 text-xs text-racing-dark">
+          <span className="rounded-full bg-gold px-2 py-0.5 text-xs text-cream">
             {count}
           </span>
         </button>

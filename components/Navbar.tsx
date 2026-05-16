@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import BrandMark from "@/components/BrandMark";
 
 const links = [
   { href: "/", label: "Home" },
@@ -22,9 +23,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gold flex items-center justify-center text-racing-dark font-bold text-sm">
-              M
-            </div>
+            <BrandMark priority className="h-11 w-11" />
             <div className="leading-tight">
               <div className="font-display text-lg">M-Machine</div>
               <div className="text-xs opacity-70 -mt-1">Est. 1980</div>
@@ -40,7 +39,7 @@ export default function Navbar() {
                   href={link.href}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     active
-                      ? "bg-gold text-racing-dark"
+                      ? "bg-gold text-cream"
                       : "text-cream hover:bg-racing-light"
                   }`}
                 >

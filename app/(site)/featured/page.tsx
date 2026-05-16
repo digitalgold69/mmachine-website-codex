@@ -62,7 +62,7 @@ export default async function FeaturedPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
               ) : (
-                <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
                   <path d="M10 40 L30 15 L50 40 Z" />
                   <circle cx="30" cy="32" r="3" />
                 </svg>

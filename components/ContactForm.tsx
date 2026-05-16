@@ -40,7 +40,7 @@ export default function ContactForm() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
         <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-6">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="2">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DF1718" strokeWidth="2">
             <path d="M5 13l4 4L19 7" />
           </svg>
         </div>

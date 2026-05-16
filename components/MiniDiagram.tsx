@@ -28,8 +28,8 @@ export default function MiniDiagram({ selectedSection, onSelect }: Props) {
   const hov = hovered;
 
   const zoneFill = (section: string, baseFill: string) => {
-    if (sel === section) return "#B8860B";
-    if (hov === section) return "#D4A028";
+    if (sel === section) return "#DF1718";
+    if (hov === section) return "#F0443A";
     return baseFill;
   };
 
@@ -40,8 +40,8 @@ export default function MiniDiagram({ selectedSection, onSelect }: Props) {
   };
 
   const zoneStroke = (section: string) => {
-    if (sel === section) return "#8C6408";
-    if (hov === section) return "#8C6408";
+    if (sel === section) return "#A30E13";
+    if (hov === section) return "#A30E13";
     return "#08241C";
   };
 

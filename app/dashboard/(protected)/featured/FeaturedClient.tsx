@@ -176,7 +176,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={imageSrc(job.image) || ""} alt={job.title} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               ) : (
-                <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
                   <path d="M10 40 L30 15 L50 40 Z" />
                   <circle cx="30" cy="32" r="3" />
                 </svg>
@@ -337,7 +337,7 @@ function EditForm({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={imagePreview} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 ) : (
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="1.5">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DF1718" strokeWidth="1.5">
                     <rect x="3" y="5" width="18" height="14" rx="1" />
                     <circle cx="8.5" cy="10.5" r="1.5" />
                     <path d="M21 16l-5-5L5 19" />

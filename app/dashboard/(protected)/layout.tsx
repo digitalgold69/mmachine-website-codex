@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { countNewQuoteRequests } from "@/lib/quotes";
 import DashboardNav from "./DashboardNav";
+import BrandMark from "@/components/BrandMark";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="bg-racing text-cream border-b border-racing-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gold flex items-center justify-center text-racing-dark font-bold text-sm">
-              M
-            </div>
+            <BrandMark className="h-10 w-10" />
             <div className="min-w-0">
               <div className="font-display text-lg leading-none">Owner dashboard</div>
               <div className="text-xs opacity-70 mt-1">M-Machine admin</div>

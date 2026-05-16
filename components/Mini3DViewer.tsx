@@ -9,7 +9,7 @@
  * EXTERIOR click zones are invisible AABB volumes used only for raycaster
  * hit detection — the highlight itself is painted by a shader injection on
  * the body material so only the actual car surface within the zone goes
- * gold. Four circular cut-outs carve wheel arches out of the highlight.
+ * the brand accent colour. Four circular cut-outs carve wheel arches out of the highlight.
  *
  * INTERIOR / chassis sections use a visible overlay group (subframes,
  * bulkheads, floor pans, inner wings, toeboard). Mode toggle fades the
@@ -279,9 +279,9 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
                    && abs(dot(n, uZoneNormal1)) > uZoneTol1) inZone = 1.0;
                if (inZone > 0.5 && inAnyArch(vCarPos) > 0.5) inZone = 0.0;
                if (inZone > 0.5) {
-                 vec3 gold = vec3(0.86, 0.55, 0.07);
-                 gl_FragColor.rgb = mix(gl_FragColor.rgb, gold, 0.60);
-                 gl_FragColor.rgb += vec3(0.18, 0.11, 0.0);
+                 vec3 accent = vec3(0.87, 0.09, 0.09);
+                 gl_FragColor.rgb = mix(gl_FragColor.rgb, accent, 0.60);
+                 gl_FragColor.rgb += vec3(0.12, 0.02, 0.02);
                }
              }`
           );

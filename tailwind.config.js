@@ -13,9 +13,9 @@ module.exports = {
           light: "#155040",
         },
         gold: {
-          DEFAULT: "#B8860B",
-          dark: "#8C6408",
-          light: "#D4A028",
+          DEFAULT: "#DF1718",
+          dark: "#A30E13",
+          light: "#F0443A",
         },
         cream: {
           DEFAULT: "#FBF8F1",

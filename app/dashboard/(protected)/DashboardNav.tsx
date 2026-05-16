@@ -28,7 +28,7 @@ export default function DashboardNav({ initialNewRequestCount }: { initialNewReq
         {newRequestCount > 0 && (
           <span
             aria-label={`${newRequestCount} new quote requests`}
-            className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold leading-none text-racing-dark"
+            className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold leading-none text-cream"
           >
             {newRequestCount > 99 ? "99+" : newRequestCount}
           </span>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
 
 export default function Footer() {
   return (
@@ -7,7 +8,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-full bg-gold flex items-center justify-center text-racing-dark font-bold">M</div>
+              <BrandMark className="h-11 w-11" />
               <div>
                 <div className="font-display text-lg">M-Machine</div>
                 <div className="text-xs opacity-70 -mt-1">Est. 1980</div>

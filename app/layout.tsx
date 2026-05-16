@@ -37,6 +37,10 @@ export const metadata: Metadata = {
     description:
       "Classic Mini panels, tool steels, stainless and bespoke fabrication. Est. 1980.",
   },
+  icons: {
+    icon: [{ url: "/brand/m-machine-butterfly.png", type: "image/png" }],
+    apple: [{ url: "/brand/m-machine-butterfly.png" }],
+  },
   robots: {
     index: true,
     follow: true,

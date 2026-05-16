@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import BrandMark from "@/components/BrandMark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-cream flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center gap-3 justify-center mb-8">
-          <div className="w-10 h-10 rounded-full bg-racing flex items-center justify-center text-cream font-bold">M</div>
+          <BrandMark priority className="h-12 w-12" />
           <span className="font-display text-xl text-racing">M-Machine owner dashboard</span>
         </Link>
 
