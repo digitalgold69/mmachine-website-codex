@@ -522,7 +522,7 @@ export default function OrdersClient({
             <div className="overflow-x-auto border border-racing/10 rounded-lg">
               <table className="w-full min-w-[930px] table-fixed">
                 <colgroup>
-                  <col className="w-[70px]" />
+                  <col className="w-[90px]" />
                   <col className="w-[150px]" />
                   <col />
                   <col className="w-[120px]" />
@@ -544,11 +544,15 @@ export default function OrdersClient({
                     <tr key={item.key} className="border-t border-racing/5">
                       <td className="px-3 py-2 align-top">
                         <input
-                          type="number"
-                          min={1}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={item.qty}
-                          onChange={(e) => patchItem(index, { qty: Number(e.target.value) || 1 })}
-                          className="input h-9 text-center"
+                          onChange={(e) => {
+                            const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
+                            patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
+                          }}
+                          className="h-9 w-full rounded-md border border-racing/20 bg-white px-2 text-center font-semibold text-racing"
                         />
                       </td>
                       <td className="px-3 py-2 align-top">
