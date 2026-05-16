@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 const GBP = "\u00a3";
@@ -138,6 +139,7 @@ export default function OrdersClient({
   initialQuotes: QuoteRequest[];
   initialError: string;
 }) {
+  const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
   const [selectedId, setSelectedId] = useState(initialQuotes[0]?.id ?? "");
   const [draft, setDraft] = useState<QuoteRequest | null>(
@@ -189,6 +191,13 @@ export default function OrdersClient({
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
+  useEffect(() => {
+    const quote = quotes.find((q) => q.id === selectedId);
+    if (quote?.status === "new") {
+      void markViewed(quote);
+    }
+  }, [quotes, selectedId]);
+
   function selectQuote(id: string) {
     const quote = quotes.find((q) => q.id === id);
     setSelectedId(id);
@@ -211,7 +220,24 @@ export default function OrdersClient({
 
   function updateQuote(updated: QuoteRequest) {
     setQuotes((current) => current.map((quote) => (quote.id === updated.id ? updated : quote)));
-    if (selectedId === updated.id) setDraft(cloneQuote(updated));
+    setDraft((current) => (current?.id === updated.id ? cloneQuote(updated) : current));
+  }
+
+  async function markViewed(quote: QuoteRequest) {
+    try {
+      const res = await fetch("/api/quote-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...quote, status: "reviewing" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not mark viewed");
+
+      updateQuote(data.quote as QuoteRequest);
+      router.refresh();
+    } catch (err) {
+      setMessage((err as Error).message || "Could not mark viewed");
+    }
   }
 
   async function patchQuote(
@@ -370,19 +396,17 @@ export default function OrdersClient({
                       {quote.invoiceSentAt ? ` / invoice sent ${formatDateTime(quote.invoiceSentAt)}` : ""}
                       {quote.paidAt ? ` / paid ${formatDateTime(quote.paidAt)}` : ""}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => markPaid(quote)}
-                      disabled={isSaving || paid}
-                      aria-label={`Mark order ${quote.id} as paid`}
-                      className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${
-                        paid
-                          ? "border-green-200 bg-green-50 text-green-800"
-                          : "border-racing text-racing hover:bg-racing hover:text-cream"
-                      } disabled:cursor-not-allowed disabled:opacity-70`}
-                    >
-                      {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : paid ? "Paid" : "Mark Paid"}
-                    </button>
+                    {!paid && (
+                      <button
+                        type="button"
+                        onClick={() => markPaid(quote)}
+                        disabled={isSaving}
+                        aria-label={`Mark order ${quote.id} as paid`}
+                        className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
+                      </button>
+                    )}
                   </div>
                 </article>
               );
@@ -598,14 +622,16 @@ export default function OrdersClient({
             </div>
 
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-5">
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => markPaid(draft)}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingAction === `${draft.id}:paid` ? "Saving..." : draft.status === "paid" ? "Paid" : "Mark Paid"}
-              </button>
+              {draft.status !== "paid" && (
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => markPaid(draft)}
+                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingAction === `${draft.id}:paid` ? "Saving..." : "Mark Paid"}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={isSaving}
