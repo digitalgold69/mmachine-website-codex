@@ -637,59 +637,53 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       }
     };
 
-    // For touch: track the start of the tap so a small finger movement still
-    // counts as a tap. OrbitControls handles real drags on its own.
-    let touchStart: { x: number; y: number; time: number } | null = null;
+    // Track pointer movement ourselves so an OrbitControls drag never becomes
+    // a catalogue jump just because the cursor finishes over a clickable zone.
+    let pointerStart: { id: number; x: number; y: number; time: number; type: string } | null = null;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType !== "touch") return;
-      touchStart = { x: e.clientX, y: e.clientY, time: Date.now() };
+      pointerStart = {
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        time: Date.now(),
+        type: e.pointerType,
+      };
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      if (e.pointerType !== "touch" || !touchStart) {
-        touchStart = null;
+      if (!pointerStart || pointerStart.id !== e.pointerId) {
+        pointerStart = null;
         return;
       }
-      const dx = Math.abs(e.clientX - touchStart.x);
-      const dy = Math.abs(e.clientY - touchStart.y);
-      const dt = Date.now() - touchStart.time;
-      touchStart = null;
-      // Tap = barely moved AND short press. 14px tolerance handles imprecise
-      // finger placement on small zones.
-      if (dx < 14 && dy < 14 && dt < 600) {
+
+      const dx = e.clientX - pointerStart.x;
+      const dy = e.clientY - pointerStart.y;
+      const moved = Math.hypot(dx, dy);
+      const dt = Date.now() - pointerStart.time;
+      const tolerance = pointerStart.type === "touch" ? 14 : 5;
+      pointerStart = null;
+
+      if (moved <= tolerance && dt < 700) {
         const r = raycastAt(e.clientX, e.clientY);
         if (r) {
           highlightForCode(r.code);
           setHovered({ code: r.code, label: r.label, x: r.localX, y: r.localY });
           onSelect(r.code);
-          // Auto-clear the tooltip after a moment so attention shifts to the
-          // parts list naturally
           setTimeout(() => { setHovered(null); }, 1200);
         } else {
           clearHighlight();
           setHovered(null);
-          onSelect("all");
         }
       }
     };
 
-    const onClick = (e: MouseEvent) => {
-      // Touch is handled in onPointerUp above
-      if ((e as PointerEvent).pointerType === "touch") return;
-      const r = raycastAt(e.clientX, e.clientY);
-      if (r) onSelect(r.code);
-      else onSelect("all");
-      requestRender();
-    };
-
-    const onPointerCancel = () => { touchStart = null; };
+    const onPointerCancel = () => { pointerStart = null; };
 
     renderer.domElement.addEventListener("pointermove", onPointerMove);
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointercancel", onPointerCancel);
-    renderer.domElement.addEventListener("click", onClick);
     renderer.domElement.style.cursor = "grab";
     // Skip 300ms tap-delay and double-tap zoom inside the canvas; OrbitControls
     // still gets pan/zoom from the pan-x pan-y allowance.
@@ -726,7 +720,6 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       renderer.domElement.removeEventListener("pointercancel", onPointerCancel);
-      renderer.domElement.removeEventListener("click", onClick);
       observer?.disconnect();
       controls.dispose();
       renderer.dispose();
