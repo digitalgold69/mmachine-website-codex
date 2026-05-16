@@ -1,9 +1,19 @@
 import Link from "next/link";
 import { products, sections } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
-import { featuredWork } from "@/lib/featured-data";
+import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
+import { listFeaturedWork } from "@/lib/featured";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  let featuredWork = fallbackFeaturedWork;
+  try {
+    featuredWork = await listFeaturedWork();
+  } catch {
+    featuredWork = fallbackFeaturedWork;
+  }
+
   const latestFeatured = featuredWork.slice(0, 3);
   const miniCount = products.length;
   const metalsCount = metals.length;

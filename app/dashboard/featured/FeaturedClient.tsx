@@ -22,6 +22,14 @@ type Draft = Entry & {
   imageDataUrl?: string;
 };
 
+function imageSrc(image: string): string | null {
+  if (!image) return null;
+  if (image.startsWith("http://") || image.startsWith("https://") || image.startsWith("/")) {
+    return image;
+  }
+  return `/featured/${image}`;
+}
+
 export default function FeaturedClient({ initialEntries }: { initialEntries: Entry[] }) {
   const router = useRouter();
   const [items, setItems] = useState<Entry[]>(initialEntries);
@@ -165,10 +173,8 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
           <div key={job.id} className="card bg-white">
             <div className="aspect-video bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
               {job.image ? (
-                // Images live at public/featured/<filename>. The `image` field
-                // is the filename itself (e.g. "f003.jpg") set by the API.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/featured/${job.image}`} alt={job.title} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                <img src={imageSrc(job.image) || ""} alt={job.title} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               ) : (
                 <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" strokeWidth="1.5">
                   <path d="M10 40 L30 15 L50 40 Z" />
@@ -217,7 +223,7 @@ function EditForm({
 }) {
   const [form, setForm] = useState<Draft>(initial);
   const [imagePreview, setImagePreview] = useState<string | null>(
-    initial.image ? `/featured/${initial.image}` : null
+    imageSrc(initial.image)
   );
   const isNew = !initial.id;
 

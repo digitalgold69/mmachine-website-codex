@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { featuredWork } from "@/lib/featured-data";
+import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
+import { listFeaturedWork } from "@/lib/featured";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -7,7 +8,16 @@ export const metadata: Metadata = {
   description: "Showcase of bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
 };
 
-export default function FeaturedPage() {
+export const dynamic = "force-dynamic";
+
+export default async function FeaturedPage() {
+  let featuredWork = fallbackFeaturedWork;
+  try {
+    featuredWork = await listFeaturedWork();
+  } catch {
+    featuredWork = fallbackFeaturedWork;
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-10">
