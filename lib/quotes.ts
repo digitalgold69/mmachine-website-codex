@@ -1,0 +1,90 @@
+import { getSupabaseAdmin } from "@/lib/supabase";
+import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+
+type QuoteRow = {
+  id: string;
+  submitted_at: string;
+  updated_at: string;
+  status: QuoteStatus;
+  customer: QuoteRequest["customer"];
+  items: QuoteItem[];
+  owner_notes: string | null;
+  customer_message: string | null;
+  carriage_ex_vat: number | null;
+  extra_charges_ex_vat: number | null;
+  quoted_at: string | null;
+  customer_email_sent_at: string | null;
+  owner_email_sent_at: string | null;
+};
+
+function rowToQuote(row: QuoteRow): QuoteRequest {
+  return {
+    id: row.id,
+    submittedAt: row.submitted_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    customer: row.customer,
+    items: row.items,
+    ownerNotes: row.owner_notes || "",
+    customerMessage: row.customer_message || "",
+    carriageExVat: row.carriage_ex_vat,
+    extraChargesExVat: row.extra_charges_ex_vat,
+    quotedAt: row.quoted_at,
+    customerEmailSentAt: row.customer_email_sent_at,
+    ownerEmailSentAt: row.owner_email_sent_at,
+  };
+}
+
+function quoteToRow(quote: QuoteRequest) {
+  return {
+    id: quote.id,
+    submitted_at: quote.submittedAt,
+    updated_at: quote.updatedAt,
+    status: quote.status,
+    customer: quote.customer,
+    items: quote.items,
+    owner_notes: quote.ownerNotes || "",
+    customer_message: quote.customerMessage || "",
+    carriage_ex_vat: quote.carriageExVat ?? null,
+    extra_charges_ex_vat: quote.extraChargesExVat ?? null,
+    quoted_at: quote.quotedAt ?? null,
+    customer_email_sent_at: quote.customerEmailSentAt ?? null,
+    owner_email_sent_at: quote.ownerEmailSentAt ?? null,
+  };
+}
+
+export async function listQuoteRequests(): Promise<QuoteRequest[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("quote_requests")
+    .select("*")
+    .order("submitted_at", { ascending: false });
+
+  if (error) throw new Error(`Supabase quote_requests read failed: ${error.message}`);
+  return (data || []).map((row) => rowToQuote(row as QuoteRow));
+}
+
+export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("quote_requests")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(`Supabase quote_requests read failed: ${error.message}`);
+  return data ? rowToQuote(data as QuoteRow) : null;
+}
+
+export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteRequest> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("quote_requests")
+    .upsert(quoteToRow(quote), { onConflict: "id" })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Supabase quote_requests save failed: ${error.message}`);
+  return rowToQuote(data as QuoteRow);
+}
+

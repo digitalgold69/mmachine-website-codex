@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireLogin } from "@/lib/auth";
-import { readJsonFile, writeTextFile } from "@/lib/github";
 import {
   buildCustomerQuoteEmail,
   buildOwnerQuoteEmail,
   sendQuoteEmail,
 } from "@/lib/quote-email";
+import { getQuoteRequest, listQuoteRequests, saveQuoteRequest } from "@/lib/quotes";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
-const QUOTES_PATH = "data-source/quote-requests.json";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function asString(value: unknown, max = 500) {
   return String(value ?? "").trim().slice(0, max);
@@ -18,12 +19,6 @@ function asNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function loadQuotes() {
-  return readJsonFile<QuoteRequest[]>(QUOTES_PATH).then((data) =>
-    Array.isArray(data) ? data : []
-  );
 }
 
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
@@ -53,20 +48,12 @@ function safeStatus(value: unknown): QuoteStatus {
   return value === "reviewing" || value === "quoted" || value === "closed" ? value : "new";
 }
 
-async function saveQuotes(quotes: QuoteRequest[], message: string) {
-  await writeTextFile({
-    path: QUOTES_PATH,
-    content: JSON.stringify(quotes, null, 2) + "\n",
-    message,
-  });
-}
-
 export async function GET() {
   const auth = await requireLogin();
   if (auth) return auth;
 
   try {
-    const quotes = await loadQuotes();
+    const quotes = await listQuoteRequests();
     return NextResponse.json({ quotes });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
@@ -127,9 +114,6 @@ export async function POST(req: Request) {
       ownerEmailSentAt: null,
     };
 
-    const quotes = await loadQuotes();
-    quotes.unshift(quote);
-
     const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
     const email = await sendQuoteEmail({
       to: ownerEmail,
@@ -139,8 +123,8 @@ export async function POST(req: Request) {
     });
     if (email.ok) quote.ownerEmailSentAt = new Date().toISOString();
 
-    await saveQuotes(quotes, `Quote request: ${quote.id}`);
-    return NextResponse.json({ ok: true, quoteId: quote.id, ownerEmailSent: email.ok });
+    const saved = await saveQuoteRequest(quote);
+    return NextResponse.json({ ok: true, quoteId: saved.id, ownerEmailSent: email.ok });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
@@ -170,11 +154,9 @@ export async function PATCH(req: Request) {
   if (!body.id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
 
   try {
-    const quotes = await loadQuotes();
-    const idx = quotes.findIndex((quote) => quote.id === body.id);
-    if (idx < 0) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+    const current = await getQuoteRequest(body.id);
+    if (!current) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
 
-    const current = quotes[idx];
     const next: QuoteRequest = {
       ...current,
       status: body.status ? safeStatus(body.status) : current.status,
@@ -209,9 +191,8 @@ export async function PATCH(req: Request) {
       customerEmailSent = true;
     }
 
-    quotes[idx] = next;
-    await saveQuotes(quotes, `Quote request: update ${next.id}`);
-    return NextResponse.json({ ok: true, quote: next, customerEmailSent });
+    const saved = await saveQuoteRequest(next);
+    return NextResponse.json({ ok: true, quote: saved, customerEmailSent });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
-import { readJsonFile } from "@/lib/github";
+import { listQuoteRequests } from "@/lib/quotes";
 import type { QuoteRequest } from "@/lib/quote-types";
 import OrdersClient from "./OrdersClient";
 
-const QUOTES_PATH = "data-source/quote-requests.json";
+export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
   if (!(await isLoggedIn())) redirect("/dashboard/login");
@@ -13,8 +13,7 @@ export default async function OrdersPage() {
   let error = "";
 
   try {
-    const data = await readJsonFile<QuoteRequest[]>(QUOTES_PATH);
-    quotes = Array.isArray(data) ? data : [];
+    quotes = await listQuoteRequests();
   } catch (err) {
     error = (err as Error).message;
   }
