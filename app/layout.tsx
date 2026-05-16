@@ -4,7 +4,7 @@ import QuoteCartProvider from "@/components/QuoteCart";
 import { SITE_URL, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://m-machine-metals.co.uk"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "M-Machine | Classic Mini Panels & Engineering Metals | Est. 1980",
     template: "%s | M-Machine",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_GB",
-    url: "https://m-machine-metals.co.uk",
+    url: SITE_URL,
     siteName: "M-Machine",
     title: "M-Machine | Classic Mini Panels & Engineering Metals",
     description:
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-image-preview": "large" },
   },
-  alternates: { canonical: "https://m-machine-metals.co.uk" },
+  alternates: { canonical: SITE_URL },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

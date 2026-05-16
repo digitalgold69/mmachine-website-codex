@@ -1,7 +1,9 @@
 import { metalCategories, metals, type MetalProduct } from "@/lib/metals-data";
 import { products, sections, type Product, type Section } from "@/lib/mini-data";
 
-export const SITE_URL = "https://m-machine-metals.co.uk";
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk";
+
+export const SITE_URL = configuredSiteUrl.replace(/\/+$/, "");
 export const DEFAULT_OG_IMAGE = "/og-image.jpg";
 
 export type SeoProduct =
