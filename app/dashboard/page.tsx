@@ -205,7 +205,7 @@ export default async function DashboardHomePage() {
         <div className="card bg-cream-dark">
           <h2 className="font-display text-xl text-racing mb-2">Data note</h2>
           <p className="text-sm text-ink-muted leading-relaxed">
-            These figures track submitted website order requests and quoted values. Manual payments are not yet marked as paid, so this is a sales pipeline view rather than audited accounts.
+            These figures track submitted website orders, invoice-sent value, and manually marked payments. It is a live sales dashboard rather than audited accounts.
           </p>
         </div>
       </section>
@@ -267,9 +267,14 @@ function buildAnalytics(quotes: QuoteRequest[]) {
       detail: "mean order-request value",
     },
     {
-      label: "Quoted",
-      value: String(quotes.filter((quote) => quote.status === "quoted").length),
-      detail: "emailed to buyer",
+      label: "Invoice sent",
+      value: String(quotes.filter((quote) => quote.status === "invoice_sent").length),
+      detail: "completed invoices emailed",
+    },
+    {
+      label: "Paid",
+      value: String(quotes.filter((quote) => quote.status === "paid").length),
+      detail: "manually confirmed payments",
     },
     {
       label: "Closed",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireLogin } from "@/lib/auth";
 import {
-  buildCustomerQuoteEmail,
+  buildCustomerInvoiceEmail,
   buildOwnerQuoteEmail,
   sendQuoteEmail,
 } from "@/lib/quote-email";
@@ -45,7 +45,9 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
 }
 
 function safeStatus(value: unknown): QuoteStatus {
-  return value === "reviewing" || value === "quoted" || value === "closed" ? value : "new";
+  if (value === "quoted" || value === "invoice_sent") return "invoice_sent";
+  if (value === "reviewing" || value === "paid" || value === "closed") return value;
+  return "new";
 }
 
 export async function GET() {
@@ -110,6 +112,8 @@ export async function POST(req: Request) {
       carriageExVat: null,
       extraChargesExVat: null,
       quotedAt: null,
+      invoiceSentAt: null,
+      paidAt: null,
       customerEmailSentAt: null,
       ownerEmailSentAt: null,
     };
@@ -143,6 +147,7 @@ export async function PATCH(req: Request) {
     carriageExVat?: number | string | null;
     extraChargesExVat?: number | string | null;
     emailCustomer?: boolean;
+    markPaid?: boolean;
   } = {};
 
   try {
@@ -171,12 +176,20 @@ export async function PATCH(req: Request) {
       next.items = body.items.map(safeItem);
     }
 
+    if (next.status === "invoice_sent" && !next.invoiceSentAt) {
+      next.invoiceSentAt = next.customerEmailSentAt || next.quotedAt || new Date().toISOString();
+    }
+
+    if (next.status === "paid" && !next.paidAt) {
+      next.paidAt = new Date().toISOString();
+    }
+
     let customerEmailSent = false;
     if (body.emailCustomer) {
       const email = await sendQuoteEmail({
         to: next.customer.email,
-        subject: `M-Machine quote ${next.id}`,
-        html: buildCustomerQuoteEmail(next),
+        subject: `M-Machine invoice ${next.id}`,
+        html: buildCustomerInvoiceEmail(next),
         replyTo: process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk",
       });
       if (!email.ok) {
@@ -185,10 +198,18 @@ export async function PATCH(req: Request) {
           { status: 500 }
         );
       }
-      next.status = "quoted";
-      next.quotedAt = new Date().toISOString();
-      next.customerEmailSentAt = new Date().toISOString();
+      const sentAt = new Date().toISOString();
+      next.status = "invoice_sent";
+      next.quotedAt = next.quotedAt || sentAt;
+      next.invoiceSentAt = sentAt;
+      next.customerEmailSentAt = sentAt;
       customerEmailSent = true;
+    }
+
+    if (body.markPaid) {
+      const paidAt = new Date().toISOString();
+      next.status = "paid";
+      next.paidAt = paidAt;
     }
 
     const saved = await saveQuoteRequest(next);

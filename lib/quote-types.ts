@@ -24,7 +24,7 @@ export type QuoteCustomer = {
   message?: string;
 };
 
-export type QuoteStatus = "new" | "reviewing" | "quoted" | "closed";
+export type QuoteStatus = "new" | "reviewing" | "invoice_sent" | "paid" | "closed";
 
 export type QuoteRequest = {
   id: string;
@@ -38,6 +38,8 @@ export type QuoteRequest = {
   carriageExVat?: number | null;
   extraChargesExVat?: number | null;
   quotedAt?: string | null;
+  invoiceSentAt?: string | null;
+  paidAt?: string | null;
   customerEmailSentAt?: string | null;
   ownerEmailSentAt?: string | null;
 };

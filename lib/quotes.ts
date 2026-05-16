@@ -5,7 +5,7 @@ type QuoteRow = {
   id: string;
   submitted_at: string;
   updated_at: string;
-  status: QuoteStatus;
+  status: string;
   customer: QuoteRequest["customer"];
   items: QuoteItem[];
   owner_notes: string | null;
@@ -13,16 +13,32 @@ type QuoteRow = {
   carriage_ex_vat: number | null;
   extra_charges_ex_vat: number | null;
   quoted_at: string | null;
+  invoice_sent_at?: string | null;
+  paid_at?: string | null;
   customer_email_sent_at: string | null;
   owner_email_sent_at: string | null;
 };
+
+function normaliseStatus(status: string): QuoteStatus {
+  if (status === "quoted") return "invoice_sent";
+  if (
+    status === "new" ||
+    status === "reviewing" ||
+    status === "invoice_sent" ||
+    status === "paid" ||
+    status === "closed"
+  ) {
+    return status;
+  }
+  return "new";
+}
 
 function rowToQuote(row: QuoteRow): QuoteRequest {
   return {
     id: row.id,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
-    status: row.status,
+    status: normaliseStatus(row.status),
     customer: row.customer,
     items: row.items,
     ownerNotes: row.owner_notes || "",
@@ -30,6 +46,8 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     carriageExVat: row.carriage_ex_vat,
     extraChargesExVat: row.extra_charges_ex_vat,
     quotedAt: row.quoted_at,
+    invoiceSentAt: row.invoice_sent_at || row.customer_email_sent_at || row.quoted_at,
+    paidAt: row.paid_at,
     customerEmailSentAt: row.customer_email_sent_at,
     ownerEmailSentAt: row.owner_email_sent_at,
   };
@@ -48,6 +66,8 @@ function quoteToRow(quote: QuoteRequest) {
     carriage_ex_vat: quote.carriageExVat ?? null,
     extra_charges_ex_vat: quote.extraChargesExVat ?? null,
     quoted_at: quote.quotedAt ?? null,
+    invoice_sent_at: quote.invoiceSentAt ?? null,
+    paid_at: quote.paidAt ?? null,
     customer_email_sent_at: quote.customerEmailSentAt ?? null,
     owner_email_sent_at: quote.ownerEmailSentAt ?? null,
   };
@@ -87,4 +107,3 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
   if (error) throw new Error(`Supabase quote_requests save failed: ${error.message}`);
   return rowToQuote(data as QuoteRow);
 }
-

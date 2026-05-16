@@ -1,10 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
+const GBP = "\u00a3";
+const PAGE_SIZE = 8;
+const TZ = "Europe/London";
+
+type StatusFilter = "all" | QuoteStatus;
+type TimeFilter = "all" | "today" | "7d" | "month" | "year";
+
+const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
+  { value: "new", label: "New" },
+  { value: "reviewing", label: "Reviewing" },
+  { value: "invoice_sent", label: "Invoice sent" },
+  { value: "paid", label: "Paid" },
+  { value: "closed", label: "Closed" },
+];
+
+const TIME_FILTERS: { value: TimeFilter; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "today", label: "Today" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "month", label: "This month" },
+  { value: "year", label: "This year" },
+];
+
+const STATUS_STYLES: Record<QuoteStatus, string> = {
+  new: "bg-gold/15 text-gold",
+  reviewing: "bg-blue-50 text-blue-800",
+  invoice_sent: "bg-racing/10 text-racing",
+  paid: "bg-green-50 text-green-800",
+  closed: "bg-stone-100 text-stone-700",
+};
+
 const money = (value: number | null | undefined) =>
-  typeof value === "number" ? `£${value.toFixed(2)}` : "POA";
+  typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
 
 const lineExVat = (item: QuoteItem) =>
   typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : null;
@@ -14,7 +45,8 @@ const totals = (quote: QuoteRequest) => {
   const carriage = quote.carriageExVat ?? 0;
   const extra = quote.extraChargesExVat ?? 0;
   const totalEx = goods + carriage + extra;
-  return { goods, carriage, extra, totalEx, totalInc: totalEx * 1.2 };
+  const vat = totalEx * 0.2;
+  return { goods, carriage, extra, totalEx, vat, totalInc: totalEx + vat };
 };
 
 const itemName = (item: QuoteItem) =>
@@ -24,6 +56,79 @@ const itemName = (item: QuoteItem) =>
 
 function cloneQuote(quote: QuoteRequest): QuoteRequest {
   return JSON.parse(JSON.stringify(quote));
+}
+
+function statusLabel(status: QuoteStatus) {
+  return STATUS_OPTIONS.find((option) => option.value === status)?.label || status;
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function ukDateKey(value: string | Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function isInTimeFilter(quote: QuoteRequest, filter: TimeFilter) {
+  if (filter === "all") return true;
+
+  const submitted = new Date(quote.submittedAt);
+  const todayKey = ukDateKey(new Date());
+  const quoteKey = ukDateKey(submitted);
+
+  if (filter === "today") return quoteKey === todayKey;
+  if (filter === "month") return quoteKey.slice(0, 7) === todayKey.slice(0, 7);
+  if (filter === "year") return quoteKey.slice(0, 4) === todayKey.slice(0, 4);
+
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - submitted.getTime() <= sevenDays;
+}
+
+function quoteSearchText(quote: QuoteRequest) {
+  return [
+    quote.id,
+    statusLabel(quote.status),
+    quote.customer.name,
+    quote.customer.email,
+    quote.customer.phone,
+    quote.customer.company,
+    quote.customer.message,
+    quote.customerMessage,
+    quote.ownerNotes,
+    ...quote.items.flatMap((item) => [
+      item.code,
+      item.description,
+      item.shape,
+      item.metal,
+      item.spec,
+      item.size,
+      item.unit,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function StatusPill({ status }: { status: QuoteStatus }) {
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLES[status]}`}>
+      {statusLabel(status)}
+    </span>
+  );
 }
 
 export default function OrdersClient({
@@ -38,13 +143,51 @@ export default function OrdersClient({
   const [draft, setDraft] = useState<QuoteRequest | null>(
     initialQuotes[0] ? cloneQuote(initialQuotes[0]) : null
   );
-  const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [page, setPage] = useState(1);
+  const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
+
+  const sortedQuotes = useMemo(
+    () => [...quotes].sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt)),
+    [quotes]
+  );
+
+  const filteredQuotes = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return sortedQuotes.filter((quote) => {
+      if (statusFilter !== "all" && quote.status !== statusFilter) return false;
+      if (!isInTimeFilter(quote, timeFilter)) return false;
+      if (needle && !quoteSearchText(quote).includes(needle)) return false;
+      return true;
+    });
+  }, [query, sortedQuotes, statusFilter, timeFilter]);
 
   const selected = useMemo(
     () => quotes.find((quote) => quote.id === selectedId) ?? null,
     [quotes, selectedId]
   );
+
+  const statusCounts = useMemo(() => {
+    const counts = new Map<StatusFilter, number>([["all", quotes.length]]);
+    for (const option of STATUS_OPTIONS) counts.set(option.value, 0);
+    for (const quote of quotes) counts.set(quote.status, (counts.get(quote.status) || 0) + 1);
+    return counts;
+  }, [quotes]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredQuotes.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageQuotes = filteredQuotes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, timeFilter]);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   function selectQuote(id: string) {
     const quote = quotes.find((q) => q.id === id);
@@ -66,38 +209,66 @@ export default function OrdersClient({
     });
   }
 
-  async function save(emailCustomer = false) {
-    if (!draft) return;
-    setSaving(true);
+  function updateQuote(updated: QuoteRequest) {
+    setQuotes((current) => current.map((quote) => (quote.id === updated.id ? updated : quote)));
+    if (selectedId === updated.id) setDraft(cloneQuote(updated));
+  }
+
+  async function patchQuote(
+    quote: QuoteRequest,
+    options: { emailCustomer?: boolean; markPaid?: boolean; label: string }
+  ) {
+    setSavingAction(`${quote.id}:${options.label}`);
     setMessage("");
     try {
       const res = await fetch("/api/quote-requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...draft, emailCustomer }),
+        body: JSON.stringify({
+          ...quote,
+          emailCustomer: Boolean(options.emailCustomer),
+          markPaid: Boolean(options.markPaid),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
 
       const updated = data.quote as QuoteRequest;
-      setQuotes((current) =>
-        current.map((quote) => (quote.id === updated.id ? updated : quote))
+      updateQuote(updated);
+      setMessage(
+        options.markPaid
+          ? "Order marked as paid."
+          : options.emailCustomer
+            ? "Invoice emailed to customer and marked as invoice sent."
+            : "Order saved."
       );
-      setDraft(cloneQuote(updated));
-      setMessage(emailCustomer ? "Quote emailed to customer." : "Quote saved.");
     } catch (err) {
       setMessage((err as Error).message || "Save failed");
     } finally {
-      setSaving(false);
+      setSavingAction("");
     }
   }
+
+  async function saveDraft(emailCustomer = false) {
+    if (!draft) return;
+    await patchQuote(draft, { emailCustomer, label: emailCustomer ? "email" : "save" });
+  }
+
+  async function markPaid(quote: QuoteRequest) {
+    await patchQuote(quote, { markPaid: true, label: "paid" });
+  }
+
+  const draftTotals = draft ? totals(draft) : null;
+  const isSaving = Boolean(savingAction);
+  const showingFrom = filteredQuotes.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const showingTo = Math.min(currentPage * PAGE_SIZE, filteredQuotes.length);
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-3xl text-racing mb-1">Quote requests</h1>
+        <h1 className="font-display text-3xl text-racing mb-1">Order history</h1>
         <p className="text-ink-muted text-sm">
-          Review website quote carts, add carriage or notes, then email the buyer.
+          Search every website order, review the invoice, email it to the buyer, then manually mark it paid when money arrives.
         </p>
       </div>
 
@@ -107,49 +278,153 @@ export default function OrdersClient({
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-5">
+      <div className="grid xl:grid-cols-[430px_1fr] gap-5">
         <div className="bg-white rounded-xl border border-racing/10 overflow-hidden">
-          <div className="px-4 py-3 bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
-            Requests
-          </div>
-          <div className="divide-y divide-racing/5">
-            {quotes.length === 0 && (
-              <div className="p-4 text-sm text-ink-muted">No quote requests yet.</div>
-            )}
-            {quotes.map((quote) => (
+          <div className="border-b border-racing/10 p-4">
+            <label className="label" htmlFor="order-search">Search order history</label>
+            <input
+              id="order-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="input"
+              placeholder="Name, email, order ref, item, part code..."
+            />
+
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter by order status">
               <button
                 type="button"
-                key={quote.id}
-                onClick={() => selectQuote(quote.id)}
-                className={`block w-full text-left p-4 hover:bg-cream-dark/60 ${
-                  selectedId === quote.id ? "bg-cream-dark" : ""
-                }`}
+                onClick={() => setStatusFilter("all")}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusFilter === "all" ? "bg-racing text-cream" : "bg-cream-dark text-racing"}`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-semibold text-racing">{quote.id}</div>
-                  <span className="text-[11px] uppercase tracking-wider text-ink-muted">
-                    {quote.status}
-                  </span>
-                </div>
-                <div className="text-sm text-ink mt-1">{quote.customer.name}</div>
-                <div className="text-xs text-ink-muted mt-1">
-                  {new Date(quote.submittedAt).toLocaleString("en-GB")}
-                </div>
+                All ({statusCounts.get("all") || 0})
               </button>
-            ))}
+              {STATUS_OPTIONS.map((option) => (
+                <button
+                  type="button"
+                  key={option.value}
+                  onClick={() => setStatusFilter(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusFilter === option.value ? "bg-racing text-cream" : "bg-cream-dark text-racing"}`}
+                >
+                  {option.label} ({statusCounts.get(option.value) || 0})
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-[1fr_auto] gap-3 items-end">
+              <div>
+                <label className="label" htmlFor="time-filter">Time period</label>
+                <select
+                  id="time-filter"
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                  className="input"
+                >
+                  {TIME_FILTERS.map((filter) => (
+                    <option key={filter.value} value={filter.value}>{filter.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="pb-2 text-right text-xs text-ink-muted">
+                {showingFrom}-{showingTo} of {filteredQuotes.length}
+              </div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-racing/5">
+            {pageQuotes.length === 0 && (
+              <div className="p-5 text-sm text-ink-muted">No orders match that search.</div>
+            )}
+            {pageQuotes.map((quote) => {
+              const quoteTotals = totals(quote);
+              const paid = quote.status === "paid";
+              const cardSaving = savingAction.startsWith(`${quote.id}:`);
+              return (
+                <article
+                  key={quote.id}
+                  className={`p-4 ${selectedId === quote.id ? "bg-cream-dark" : "bg-white"}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => selectQuote(quote.id)}
+                    className="block w-full text-left"
+                    aria-current={selectedId === quote.id ? "true" : undefined}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-racing">{quote.id}</div>
+                        <div className="mt-1 text-sm text-ink">{quote.customer.name}</div>
+                        <div className="mt-1 text-xs text-ink-muted">
+                          {formatDateTime(quote.submittedAt)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <StatusPill status={quote.status} />
+                        <div className="mt-2 font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
+                        <div className="text-xs text-ink-muted">ex VAT</div>
+                      </div>
+                    </div>
+                  </button>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="text-xs text-ink-muted">
+                      {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
+                      {quote.invoiceSentAt ? ` / invoice sent ${formatDateTime(quote.invoiceSentAt)}` : ""}
+                      {quote.paidAt ? ` / paid ${formatDateTime(quote.paidAt)}` : ""}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => markPaid(quote)}
+                      disabled={isSaving || paid}
+                      aria-label={`Mark order ${quote.id} as paid`}
+                      className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                        paid
+                          ? "border-green-200 bg-green-50 text-green-800"
+                          : "border-racing text-racing hover:bg-racing hover:text-cream"
+                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                    >
+                      {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : paid ? "Paid" : "Mark Paid"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t border-racing/10 p-4">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-racing/20 px-3 py-2 text-sm text-racing disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <div className="text-sm text-ink-muted">
+              Page {currentPage} of {pageCount}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={currentPage === pageCount}
+              className="rounded-lg border border-racing/20 px-3 py-2 text-sm text-racing disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
           </div>
         </div>
 
         {!draft || !selected ? (
           <div className="bg-white rounded-xl border border-racing/10 p-8 text-center text-ink-muted">
-            Select a quote request.
+            Select an order to review it.
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-racing/10 p-5">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
-                <div className="text-xs uppercase tracking-wider text-ink-muted">Customer</div>
+                <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice editor</div>
                 <h2 className="font-display text-2xl text-racing">{draft.customer.name}</h2>
+                <div className="text-sm text-ink-muted">
+                  {draft.id} / submitted {formatDateTime(draft.submittedAt)}
+                </div>
                 <div className="text-sm text-ink-muted">
                   {draft.customer.email} / {draft.customer.phone}
                 </div>
@@ -157,16 +432,38 @@ export default function OrdersClient({
                   <div className="text-sm text-ink-muted">{draft.customer.company}</div>
                 )}
               </div>
-              <select
-                value={draft.status}
-                onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
-                className="input max-w-[160px]"
-              >
-                <option value="new">New</option>
-                <option value="reviewing">Reviewing</option>
-                <option value="quoted">Quoted</option>
-                <option value="closed">Closed</option>
-              </select>
+              <div className="min-w-[180px]">
+                <label className="label" htmlFor="status">Status</label>
+                <select
+                  id="status"
+                  value={draft.status}
+                  onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
+                  className="input"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mb-5 grid sm:grid-cols-3 gap-3">
+              <div className="rounded-lg bg-cream-dark p-3">
+                <div className="text-xs uppercase tracking-wider text-ink-muted">Current status</div>
+                <div className="mt-2"><StatusPill status={draft.status} /></div>
+              </div>
+              <div className="rounded-lg bg-cream-dark p-3">
+                <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice sent</div>
+                <div className="mt-1 text-sm font-semibold text-racing">
+                  {draft.invoiceSentAt ? formatDateTime(draft.invoiceSentAt) : "Not sent yet"}
+                </div>
+              </div>
+              <div className="rounded-lg bg-cream-dark p-3">
+                <div className="text-xs uppercase tracking-wider text-ink-muted">Payment</div>
+                <div className="mt-1 text-sm font-semibold text-racing">
+                  {draft.paidAt ? `Paid ${formatDateTime(draft.paidAt)}` : "Awaiting payment"}
+                </div>
+              </div>
             </div>
 
             {draft.customer.message && (
@@ -246,18 +543,20 @@ export default function OrdersClient({
 
             <div className="grid md:grid-cols-2 gap-4 mt-5">
               <div>
-                <label className="label">Message to customer</label>
+                <label className="label" htmlFor="customer-message">Message to customer</label>
                 <textarea
+                  id="customer-message"
                   value={draft.customerMessage || ""}
                   onChange={(e) => patchDraft({ customerMessage: e.target.value })}
                   rows={5}
                   className="input resize-none"
-                  placeholder="Add delivery timing, collection notes, payment instructions, etc."
+                  placeholder="Delivery timing, collection notes, payment instructions, etc."
                 />
               </div>
               <div>
-                <label className="label">Owner notes</label>
+                <label className="label" htmlFor="owner-notes">Owner notes</label>
                 <textarea
+                  id="owner-notes"
                   value={draft.ownerNotes || ""}
                   onChange={(e) => patchDraft({ ownerNotes: e.target.value })}
                   rows={5}
@@ -269,8 +568,9 @@ export default function OrdersClient({
 
             <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
               <div>
-                <label className="label">Carriage ex VAT</label>
+                <label className="label" htmlFor="carriage">Carriage ex VAT</label>
                 <input
+                  id="carriage"
                   type="number"
                   step="0.01"
                   value={draft.carriageExVat ?? ""}
@@ -279,8 +579,9 @@ export default function OrdersClient({
                 />
               </div>
               <div>
-                <label className="label">Extra charges ex VAT</label>
+                <label className="label" htmlFor="extra-charges">Extra charges ex VAT</label>
                 <input
+                  id="extra-charges"
                   type="number"
                   step="0.01"
                   value={draft.extraChargesExVat ?? ""}
@@ -289,18 +590,37 @@ export default function OrdersClient({
                 />
               </div>
               <div className="lg:col-span-3 bg-cream-dark rounded-lg p-3 text-sm">
-                <div className="flex justify-between"><span>Goods ex VAT</span><strong>{money(totals(draft).goods)}</strong></div>
-                <div className="flex justify-between"><span>Total ex VAT</span><strong>{money(totals(draft).totalEx)}</strong></div>
-                <div className="flex justify-between text-racing"><span>Total inc VAT</span><strong>{money(totals(draft).totalInc)}</strong></div>
+                <div className="flex justify-between"><span>Goods ex VAT</span><strong>{money(draftTotals?.goods)}</strong></div>
+                <div className="flex justify-between"><span>VAT</span><strong>{money(draftTotals?.vat)}</strong></div>
+                <div className="flex justify-between"><span>Total ex VAT</span><strong>{money(draftTotals?.totalEx)}</strong></div>
+                <div className="flex justify-between text-racing"><span>Total inc VAT</span><strong>{money(draftTotals?.totalInc)}</strong></div>
               </div>
             </div>
 
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-5">
-              <button type="button" disabled={saving} onClick={() => save(false)} className="btn-secondary">
-                {saving ? "Saving..." : "Save draft"}
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => markPaid(draft)}
+                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingAction === `${draft.id}:paid` ? "Saving..." : draft.status === "paid" ? "Paid" : "Mark Paid"}
               </button>
-              <button type="button" disabled={saving} onClick={() => save(true)} className="btn-primary">
-                {saving ? "Sending..." : "Email quote to buyer"}
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => saveDraft(false)}
+                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingAction === `${draft.id}:save` ? "Saving..." : "Save draft"}
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => saveDraft(true)}
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingAction === `${draft.id}:email` ? "Sending..." : "Email invoice to buyer"}
               </button>
             </div>
           </div>
