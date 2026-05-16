@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 const GBP = "\u00a3";
@@ -139,7 +138,6 @@ export default function OrdersClient({
   initialQuotes: QuoteRequest[];
   initialError: string;
 }) {
-  const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<QuoteRequest | null>(null);
@@ -149,6 +147,7 @@ export default function OrdersClient({
   const [page, setPage] = useState(1);
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
+  const invoiceRef = useRef<HTMLDivElement | null>(null);
 
   const sortedQuotes = useMemo(
     () => [...quotes].sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt)),
@@ -196,6 +195,10 @@ export default function OrdersClient({
     }
   }, [quotes, selectedId]);
 
+  useEffect(() => {
+    if (draft) invoiceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [draft?.id]);
+
   function selectQuote(id: string) {
     const quote = quotes.find((q) => q.id === id);
     setSelectedId(id);
@@ -232,7 +235,7 @@ export default function OrdersClient({
       if (!res.ok) throw new Error(data.error || "Could not mark viewed");
 
       updateQuote(data.quote as QuoteRequest);
-      router.refresh();
+      window.dispatchEvent(new Event("mmachine:new-quote-viewed"));
     } catch (err) {
       setMessage((err as Error).message || "Could not mark viewed");
     }
@@ -259,7 +262,6 @@ export default function OrdersClient({
 
       const updated = data.quote as QuoteRequest;
       updateQuote(updated);
-      router.refresh();
       setMessage(
         options.markPaid
           ? "Order marked as paid."
@@ -355,9 +357,11 @@ export default function OrdersClient({
             </div>
           </div>
 
-          <div className="divide-y divide-racing/5">
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
             {pageQuotes.length === 0 && (
-              <div className="p-5 text-sm text-ink-muted">No orders match that search.</div>
+              <div className="rounded-lg bg-cream-dark p-5 text-sm text-ink-muted sm:col-span-2 xl:col-span-4">
+                No orders match that search.
+              </div>
             )}
             {pageQuotes.map((quote) => {
               const quoteTotals = totals(quote);
@@ -366,7 +370,11 @@ export default function OrdersClient({
               return (
                 <article
                   key={quote.id}
-                  className={`p-4 ${selectedId === quote.id ? "bg-cream-dark" : "bg-white"}`}
+                  className={`rounded-lg border p-4 transition ${
+                    selectedId === quote.id
+                      ? "border-gold bg-cream-dark shadow-sm"
+                      : "border-racing/10 bg-white hover:border-gold/60"
+                  }`}
                 >
                   <button
                     type="button"
@@ -374,26 +382,33 @@ export default function OrdersClient({
                     className="block w-full text-left"
                     aria-current={selectedId === quote.id ? "true" : undefined}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold text-racing">{quote.id}</div>
-                        <div className="mt-1 text-sm text-ink">{quote.customer.name}</div>
-                        <div className="mt-1 text-xs text-ink-muted">
-                          {formatDateTime(quote.submittedAt)}
-                        </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-racing">{quote.id}</div>
+                        <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
+                      </div>
+                      <StatusPill status={quote.status} />
+                    </div>
+                    <div className="mt-3 text-xs text-ink-muted">
+                      {formatDateTime(quote.submittedAt)}
+                    </div>
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <div className="text-xs text-ink-muted">
+                        {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
                       </div>
                       <div className="text-right">
-                        <StatusPill status={quote.status} />
-                        <div className="mt-2 font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
+                        <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
                         <div className="text-xs text-ink-muted">ex VAT</div>
                       </div>
                     </div>
                   </button>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="text-xs text-ink-muted">
-                      {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
-                      {quote.invoiceSentAt ? ` / invoice sent ${formatDateTime(quote.invoiceSentAt)}` : ""}
-                      {quote.paidAt ? ` / paid ${formatDateTime(quote.paidAt)}` : ""}
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
+                    <div className="min-w-0 text-xs text-ink-muted">
+                      {quote.paidAt
+                        ? `Paid ${formatDateTime(quote.paidAt)}`
+                        : quote.invoiceSentAt
+                          ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
+                          : "Not invoiced"}
                     </div>
                     {!paid && (
                       <button
@@ -436,7 +451,7 @@ export default function OrdersClient({
         </div>
 
         {draft && selected && (
-          <div className="min-w-0 bg-white rounded-xl border border-racing/10 p-5">
+          <div ref={invoiceRef} className="min-w-0 scroll-mt-6 bg-white rounded-xl border border-racing/10 p-5">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
                 <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice editor</div>
@@ -505,9 +520,10 @@ export default function OrdersClient({
             )}
 
             <div className="overflow-x-auto border border-racing/10 rounded-lg">
-              <table className="w-full min-w-[780px] table-fixed">
+              <table className="w-full min-w-[930px] table-fixed">
                 <colgroup>
                   <col className="w-[70px]" />
+                  <col className="w-[150px]" />
                   <col />
                   <col className="w-[120px]" />
                   <col className="w-[130px]" />
@@ -516,6 +532,7 @@ export default function OrdersClient({
                 <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
                   <tr>
                     <th className="text-left px-3 py-2">Qty</th>
+                    <th className="text-left px-3 py-2">Part no.</th>
                     <th className="text-left px-3 py-2">Item</th>
                     <th className="text-left px-3 py-2">Unit</th>
                     <th className="text-right px-3 py-2">Each ex VAT</th>
@@ -532,6 +549,14 @@ export default function OrdersClient({
                           value={item.qty}
                           onChange={(e) => patchItem(index, { qty: Number(e.target.value) || 1 })}
                           className="input h-9 text-center"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <input
+                          value={item.code || ""}
+                          onChange={(e) => patchItem(index, { code: e.target.value })}
+                          className="input h-9 font-mono text-xs"
+                          placeholder={item.catalogue === "mini" ? "Mini part no." : "Metal code"}
                         />
                       </td>
                       <td className="px-3 py-2 align-top">
