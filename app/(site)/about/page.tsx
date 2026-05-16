@@ -1,14 +1,38 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "About M-Machine — family-run engineering since 1980",
   description: "M-Machine (Craftgrange Limited) has supplied pressed steel panels, engineered parts and engineering metals from Darlington since 1980.",
+  alternates: { canonical: absoluteUrl("/about") },
+  openGraph: {
+    title: "About M-Machine | M-Machine",
+    description: "Family-run Classic Mini panel, engineering metal and fabrication specialists based in Darlington since 1980.",
+    url: absoluteUrl("/about"),
+    type: "website",
+  },
 };
 
 export default function AboutPage() {
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "About", path: "/about" },
+  ]);
+
+  const aboutPage = {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    name: "About M-Machine",
+    description: metadata.description,
+    url: absoluteUrl("/about"),
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumbs)} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(aboutPage)} />
+
       <Link href="/" className="text-sm text-ink-muted hover:text-racing">← Home</Link>
       <h1 className="font-display text-4xl text-racing mt-2 mb-6">About M-Machine</h1>
 

@@ -21,6 +21,9 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-gold mb-3 text-sm">Catalogues</h4>
             <ul className="space-y-2 text-sm opacity-80">
+              <li><Link href="/parts" className="hover:text-gold">All parts</Link></li>
+              <li><Link href="/parts/classic-mini-panels" className="hover:text-gold">Mini panel categories</Link></li>
+              <li><Link href="/parts/engineering-metals" className="hover:text-gold">Metal categories</Link></li>
               <li><Link href="/catalogue/mini" className="hover:text-gold">Classic Mini panels</Link></li>
               <li><Link href="/catalogue/metals" className="hover:text-gold">Engineering metals</Link></li>
               <li><Link href="/featured" className="hover:text-gold">Featured custom work</Link></li>

@@ -2,10 +2,18 @@ import Link from "next/link";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import type { Metadata } from "next";
+import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Featured custom work — fabrication, machining & restoration",
   description: "Showcase of bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
+  alternates: { canonical: absoluteUrl("/featured") },
+  openGraph: {
+    title: "Featured custom work | M-Machine",
+    description: "Bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
+    url: absoluteUrl("/featured"),
+    type: "website",
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -18,8 +26,24 @@ export default async function FeaturedPage() {
     featuredWork = fallbackFeaturedWork;
   }
 
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Featured work", path: "/featured" },
+  ]);
+
+  const collection = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Featured workshop jobs",
+    description: metadata.description,
+    url: absoluteUrl("/featured"),
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumbs)} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(collection)} />
+
       <div className="mb-10">
         <Link href="/" className="text-sm text-ink-muted hover:text-racing">← Home</Link>
         <h1 className="font-display text-4xl text-racing mt-2 mb-2">Featured workshop jobs</h1>
