@@ -82,6 +82,11 @@ $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 $excel.AskToUpdateLinks = $false
+$excel.ScreenUpdating = $false
+$excel.DisplayStatusBar = $false
+$excel.EnableEvents = $false
+$excel.Interactive = $false
+$excel.UserControl = $false
 
 try {
     Export-CatalogueToPdf -Excel $excel `

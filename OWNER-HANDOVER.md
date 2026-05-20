@@ -13,8 +13,8 @@ M-Machine Master Files
 Save the file and close Excel. The daily sync refreshes the website, catalogue
 files, and downloadable PDFs.
 
-There is also a desktop button named `Run M-Machine Sync Now.bat` for running
-the same update immediately.
+There is also a desktop shortcut named `Run M-Machine Sync Now` for running
+the same update immediately in the background.
 
 The invoice templates stay original. They are not redesigned. The only invoice
 link the sync touches is the Mini invoice's existing Partsbook link, so code
@@ -60,12 +60,14 @@ It contains:
 
 ## Manual refresh
 
-If Guy needs to run it immediately:
+If Guy needs to run it immediately, double-click the desktop shortcut named:
 
-```powershell
-cd C:\mmachine
-npm run daily-sync
+```text
+Run M-Machine Sync Now
 ```
+
+It runs silently in the background. Check the log if you need to confirm what
+happened.
 
 ## What updates automatically
 
@@ -102,3 +104,6 @@ C:\mmachine\daily-sync.log
 
 If the website has not updated, the computer may have been off, Excel may have
 been open, or the internet may have been disconnected during the scheduled run.
+
+The daily GitHub push uses the setup token directly for the configured repo, so
+the owner should not be asked to choose a GitHub account.

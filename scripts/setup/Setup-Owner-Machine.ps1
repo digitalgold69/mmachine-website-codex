@@ -33,6 +33,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:GIT_TERMINAL_PROMPT = "0"
+$env:GCM_INTERACTIVE = "never"
+$env:GIT_ASKPASS = "echo"
 
 function Write-Step {
     param([string]$Message)
@@ -55,6 +58,24 @@ function Exit-WithMessage {
 function Get-RepoUrlWithToken {
     param([string]$Url, [string]$Token)
     return $Url -replace "^https://", "https://x-access-token:${Token}@"
+}
+
+function Set-GitNonInteractiveAuth {
+    param([string]$Url, [string]$Token)
+
+    $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$Token"))
+
+    git remote set-url origin $Url
+    git config --local user.name "M-Machine Daily Sync"
+    git config --local user.email "metals@m-machine.co.uk"
+
+    # Force this repo to use the supplied token directly. This avoids Windows
+    # Git Credential Manager asking the owner to choose a GitHub account.
+    git config --local --unset-all credential.helper 2>$null
+    git config --local credential.interactive never
+    git config --local core.askPass ""
+    git config --local --unset-all http.https://github.com/.extraheader 2>$null
+    git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $basicAuth"
 }
 
 function Get-RequiredExcelFiles {
@@ -159,6 +180,7 @@ if (Test-Path $InstallPath) {
     }
     Write-Host "  $InstallPath already exists - pulling latest changes"
     Push-Location $InstallPath
+    Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
     git pull --rebase --autostash
     if ($LASTEXITCODE -ne 0) {
         Pop-Location
@@ -173,11 +195,7 @@ if (Test-Path $InstallPath) {
 }
 
 Push-Location $InstallPath
-git remote set-url origin $RepoUrl
-git config credential.helper store
-"https://x-access-token:${GitHubToken}@github.com" | Out-File -FilePath "$env:USERPROFILE\.git-credentials" -Encoding ASCII -NoNewline
-git config user.name "M-Machine Daily Sync"
-git config user.email "metals@m-machine.co.uk"
+Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
 Pop-Location
 
 # ------------------------------------------------------------------------------
@@ -211,7 +229,7 @@ Write-Step "Step 4 of 5 - Create desktop folders and scheduled task"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $masterFolder = Join-Path $desktopPath "M-Machine Master Files"
 $customerFolder = Join-Path $desktopPath "M-Machine Customer Files"
-$manualSyncButton = Join-Path $desktopPath "Run M-Machine Sync Now.bat"
+$manualSyncButton = Join-Path $desktopPath "Run M-Machine Sync Now.lnk"
 $ownerInstructions = Join-Path $desktopPath "M-Machine Instructions.txt"
 $dataSourcePath = Join-Path $InstallPath "data-source"
 $finalPath = Join-Path $InstallPath "final-deliverables"
@@ -219,55 +237,82 @@ $finalPath = Join-Path $InstallPath "final-deliverables"
 Create-FolderLink -LinkPath $masterFolder -TargetPath $dataSourcePath -Purpose "put master Excel files here"
 Create-FolderLink -LinkPath $customerFolder -TargetPath $finalPath -Purpose "open refreshed customer files here"
 
-$BatPath = Join-Path $InstallPath "scripts\setup\daily-sync.bat"
-$BatContent = @"
-@echo off
-cd /d "$InstallPath"
-set "LOG=$InstallPath\daily-sync.log"
-set "PYTHONIOENCODING=utf-8:replace"
-echo. >> "%LOG%"
-echo ============================================== >> "%LOG%"
-echo [%date% %time%] Starting daily sync >> "%LOG%"
-echo ============================================== >> "%LOG%"
+$SyncScriptPath = Join-Path $InstallPath "scripts\setup\daily-sync.ps1"
+$SyncScriptContent = @"
+`$ErrorActionPreference = "Stop"
+`$InstallPath = "$InstallPath"
+`$Log = "$InstallPath\daily-sync.log"
 
-git pull --rebase --autostash >> "%LOG%" 2>&1
-if errorlevel 1 (
-    echo [%date% %time%] git pull failed >> "%LOG%"
-    exit /b %errorlevel%
-)
+`$env:PYTHONIOENCODING = "utf-8:replace"
+`$env:GIT_TERMINAL_PROMPT = "0"
+`$env:GCM_INTERACTIVE = "never"
+`$env:GIT_ASKPASS = "echo"
 
-call npm run daily-sync >> "%LOG%" 2>&1
-if errorlevel 1 (
-    echo [%date% %time%] daily-sync failed - skipping git push >> "%LOG%"
-    exit /b %errorlevel%
-)
+function Write-Log {
+    param([string]`$Message)
+    Add-Content -Path `$Log -Value "[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] `$Message"
+}
 
-git add lib/mini-data.ts lib/metals-data.ts data-source/.metal-codes.json public/catalogue >> "%LOG%" 2>&1
+function Invoke-LoggedCommand {
+    param(
+        [string]`$Name,
+        [scriptblock]`$Command
+    )
 
-git diff --cached --quiet
-if errorlevel 1 (
-    echo [%date% %time%] Committing changes >> "%LOG%"
-    git commit -m "Daily sync %date%" >> "%LOG%" 2>&1
-    echo [%date% %time%] Pushing to GitHub >> "%LOG%"
-    git push >> "%LOG%" 2>&1
-) else (
-    echo [%date% %time%] No website changes to commit >> "%LOG%"
-)
+    Write-Log `$Name
+    & `$Command >> `$Log 2>&1
+    if (`$LASTEXITCODE -ne 0) {
+        Write-Log "`$Name failed with exit code `$LASTEXITCODE"
+        exit `$LASTEXITCODE
+    }
+}
 
-echo [%date% %time%] Daily sync done >> "%LOG%"
+Set-Location `$InstallPath
+Add-Content -Path `$Log -Value ""
+Add-Content -Path `$Log -Value "=============================================="
+Write-Log "Starting daily sync"
+Add-Content -Path `$Log -Value "=============================================="
+
+Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autostash }
+Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
+Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts data-source/.metal-codes.json public/catalogue }
+
+git diff --cached --quiet >> `$Log 2>&1
+`$diffExit = `$LASTEXITCODE
+
+if (`$diffExit -eq 1) {
+    Invoke-LoggedCommand "Committing generated changes" { git commit -m "Daily sync `$((Get-Date).ToString('yyyy-MM-dd'))" }
+    Invoke-LoggedCommand "Pushing to GitHub for Vercel deploy" { git push origin HEAD:main }
+} elseif (`$diffExit -eq 0) {
+    Write-Log "No website changes to commit"
+} else {
+    Write-Log "git diff failed with exit code `$diffExit"
+    exit `$diffExit
+}
+
+Write-Log "Daily sync done"
 "@
-Set-Content -Path $BatPath -Value $BatContent -Encoding ASCII
+Set-Content -Path $SyncScriptPath -Value $SyncScriptContent -Encoding ASCII
 
-$ManualSyncContent = @"
+$CompatBatPath = Join-Path $InstallPath "scripts\setup\daily-sync.bat"
+$CompatBatContent = @"
 @echo off
-title M-Machine Sync
-call "$BatPath"
-echo.
-echo Sync finished. Check the M-Machine Customer Files folder.
-echo.
-pause
+start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$SyncScriptPath"
+exit /b 0
 "@
-Set-Content -Path $manualSyncButton -Value $ManualSyncContent -Encoding ASCII
+Set-Content -Path $CompatBatPath -Value $CompatBatContent -Encoding ASCII
+
+$oldManualBat = Join-Path $desktopPath "Run M-Machine Sync Now.bat"
+Remove-Item -Path $oldManualBat -Force -ErrorAction SilentlyContinue
+
+$shortcutShell = New-Object -ComObject WScript.Shell
+$shortcut = $shortcutShell.CreateShortcut($manualSyncButton)
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SyncScriptPath`""
+$shortcut.WorkingDirectory = $InstallPath
+$shortcut.WindowStyle = 7
+$shortcut.Description = "Run the M-Machine website and catalogue sync in the background"
+$shortcut.Save()
 
 $OwnerInstructionsContent = @"
 M-MACHINE DAILY ROUTINE
@@ -297,7 +342,7 @@ Close Excel after saving.
 The computer runs the update automatically every day.
 If you want to run it now, double-click:
 
-Run M-Machine Sync Now.bat
+Run M-Machine Sync Now
 
 Finished customer files appear in:
 
@@ -308,10 +353,10 @@ Set-Content -Path $ownerInstructions -Value $OwnerInstructionsContent -Encoding 
 $TaskName = "M-Machine Daily Sync"
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
-$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$BatPath`""
+$Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SyncScriptPath`""
 $Trigger = New-ScheduledTaskTrigger -Daily -At $DailyRunTime
 $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden
 
 Register-ScheduledTask `
     -TaskName $TaskName `
@@ -322,7 +367,7 @@ Register-ScheduledTask `
     -Description "Daily noon sync for M-Machine: refresh website data, catalogue files, PDFs, and push to GitHub."
 
 Write-Host "  Scheduled task registered: $TaskName at $DailyRunTime daily" -ForegroundColor Green
-Write-Host "  Manual sync button created: Run M-Machine Sync Now.bat" -ForegroundColor Green
+Write-Host "  Manual sync shortcut created: Run M-Machine Sync Now" -ForegroundColor Green
 Write-Host "  Instruction note created: M-Machine Instructions.txt" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------

@@ -18,14 +18,16 @@ The goal is deliberately simple:
 - Desktop folder: `M-Machine Customer Files`
   - Points to `C:\mmachine\final-deliverables`
   - The owner opens refreshed catalogue files here
-- Desktop button: `Run M-Machine Sync Now.bat`
-  - Lets Guy or the owner run the update immediately without PowerShell
+- Desktop shortcut: `Run M-Machine Sync Now`
+  - Runs the update in the background without PowerShell
 - Desktop note: `M-Machine Instructions.txt`
   - A short reminder of which folder and files to use
 - Scheduled task: `M-Machine Daily Sync`
   - Runs daily at noon local UK time by default
   - Refreshes website data, catalogue Excel files, and PDFs
   - Pushes website/PDF updates to GitHub so Vercel redeploys
+  - Runs hidden and uses the supplied GitHub token directly, so no GitHub
+    account picker should appear
 
 ## Files to copy into "M-Machine Master Files"
 
@@ -61,15 +63,18 @@ it and create a new one.
 
 ## Manual sync
 
-After the Excel files are in the master folder:
+After the Excel files are in the master folder, use the desktop shortcut:
 
-```powershell
-cd C:\mmachine
-npm run daily-sync
-```
+`Run M-Machine Sync Now`
 
 The log file is:
 
 ```text
 C:\mmachine\daily-sync.log
+```
+
+For troubleshooting, the background runner is:
+
+```text
+C:\mmachine\scripts\setup\daily-sync.ps1
 ```
