@@ -75,7 +75,9 @@ Cloudflare Workers can be connected to the GitHub repository so pushes to `main`
 Use:
 
 ```text
-Build command: npm run cf:deploy
+Build command: npm run build
+Deploy command: npm run deploy
+Non-production branch deploy command: npm run upload
 ```
 
 Make sure the same environment variables are added to Cloudflare's build/runtime variables before enabling production traffic.
