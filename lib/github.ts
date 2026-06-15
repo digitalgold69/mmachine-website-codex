@@ -1,10 +1,10 @@
 // Minimal GitHub-as-CMS commit helpers.
 //
 // The owner's edits in the dashboard get persisted by committing to the repo
-// via the GitHub Contents API. After the commit lands on `main`, Vercel auto-
-// deploys, and within ~30-60s the live site reflects her changes.
+// via the GitHub Contents API. After the commit lands on `main`, the website
+// host deploys, and shortly afterwards the live site reflects her changes.
 //
-// Env vars (set in Vercel project settings):
+// Env vars (set in the deployment host):
 //   GITHUB_TOKEN         a fine-grained PAT with "Contents: Read & write" on the repo
 //   GITHUB_REPO          owner/repo, e.g. "guy/mmachine-website"
 //   GITHUB_BRANCH        usually "main"; falls back to "main" if unset
@@ -51,7 +51,7 @@ function helpfulGitHubError(action: string, path: string, status: number, body: 
   if (status === 404) {
     return new Error(
       `${action} failed because GitHub could not access ${repo()} on branch ${branch()}. ` +
-        "In Vercel, check GITHUB_REPO is digitalgold69/mmachine-website-codex, " +
+        "In the deployment environment, check GITHUB_REPO is digitalgold69/mmachine-website-codex, " +
         "GITHUB_BRANCH is main, and GITHUB_TOKEN has Contents: Read and write for that repo."
     );
   }

@@ -8,6 +8,7 @@ build/
 .DS_Store
 *.log
 .vercel
+.open-next
 next-env.d.ts
 
 # Master Excel files — owner's pricing data, not for the public repo

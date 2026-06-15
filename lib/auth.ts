@@ -3,7 +3,7 @@
 // service. Suitable for a single-owner admin where the threat model is
 // "casual website visitors shouldn't be able to edit content".
 //
-// Env vars (set in Vercel project settings, NOT committed):
+// Env vars (set in the deployment host, NOT committed):
 //   OWNER_PASSWORD  the password the owner types into the login form
 //   AUTH_SECRET     optional signing secret. If absent, sessions are signed
 //                   using OWNER_PASSWORD so a single env var is enough.
@@ -22,7 +22,7 @@ function getSecret(): string {
   if (!s || s.length < 16) {
     throw new Error(
       "AUTH_SECRET env var is missing or too short (min 16 chars). " +
-      "Set it in Vercel → Project Settings → Environment Variables."
+      "Set it in the deployment environment variables."
     );
   }
   return s;

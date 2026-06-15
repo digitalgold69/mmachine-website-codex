@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const expected = process.env.OWNER_PASSWORD;
   if (!expected) {
     return NextResponse.json(
-      { error: "Server isn't configured. Set OWNER_PASSWORD in Vercel project settings." },
+      { error: "Server isn't configured. Set OWNER_PASSWORD in the deployment environment." },
       { status: 500 }
     );
   }

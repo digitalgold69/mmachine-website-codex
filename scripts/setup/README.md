@@ -25,7 +25,7 @@ The goal is deliberately simple:
 - Scheduled task: `M-Machine Daily Sync`
   - Runs daily at noon local UK time by default
   - Refreshes website data, catalogue Excel files, and PDFs
-  - Pushes website/PDF updates to GitHub so Vercel redeploys
+  - Pushes website/PDF updates to GitHub so the website host redeploys
   - Runs hidden and uses the supplied GitHub token directly, so no GitHub
     account picker should appear
 

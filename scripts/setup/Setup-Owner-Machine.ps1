@@ -9,7 +9,7 @@
 #   4. Creates friendly desktop items:
 #        M-Machine Master Files   -> C:\mmachine\data-source
 #        M-Machine Customer Files -> C:\mmachine\final-deliverables
-#        Run M-Machine Sync Now.bat
+#        Run M-Machine Sync Now
 #        M-Machine Instructions.txt
 #   5. Creates a daily Windows Scheduled Task at noon.
 #
@@ -17,7 +17,7 @@
 #   - Website data updates from Metals.xlsx and PartsbookBenji2014.xlsx.
 #   - Customer catalogue files are rebuilt with fresh prices.
 #   - Invoice templates keep the owner's normal workflow.
-#   - Catalogue PDFs are exported and pushed to GitHub for Vercel.
+#   - Catalogue PDFs are exported and pushed to GitHub for deployment.
 #
 # Important:
 #   The Excel files are not stored in GitHub. After setup, copy the owner's
@@ -282,7 +282,7 @@ git diff --cached --quiet >> `$Log 2>&1
 
 if (`$diffExit -eq 1) {
     Invoke-LoggedCommand "Committing generated changes" { git commit -m "Daily sync `$((Get-Date).ToString('yyyy-MM-dd'))" }
-    Invoke-LoggedCommand "Pushing to GitHub for Vercel deploy" { git push origin HEAD:main }
+    Invoke-LoggedCommand "Pushing to GitHub for website deployment" { git push origin HEAD:main }
 } elseif (`$diffExit -eq 0) {
     Write-Log "No website changes to commit"
 } else {
@@ -295,9 +295,16 @@ Write-Log "Daily sync done"
 Set-Content -Path $SyncScriptPath -Value $SyncScriptContent -Encoding ASCII
 
 $CompatBatPath = Join-Path $InstallPath "scripts\setup\daily-sync.bat"
+$HiddenLauncherPath = Join-Path $InstallPath "scripts\setup\daily-sync.vbs"
+$HiddenLauncherContent = @"
+Set shell = CreateObject("WScript.Shell")
+shell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath""", 0, False
+"@
+Set-Content -Path $HiddenLauncherPath -Value $HiddenLauncherContent -Encoding ASCII
+
 $CompatBatContent = @"
 @echo off
-start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$SyncScriptPath"
+wscript.exe //B //Nologo "$HiddenLauncherPath"
 exit /b 0
 "@
 Set-Content -Path $CompatBatPath -Value $CompatBatContent -Encoding ASCII
@@ -307,8 +314,8 @@ Remove-Item -Path $oldManualBat -Force -ErrorAction SilentlyContinue
 
 $shortcutShell = New-Object -ComObject WScript.Shell
 $shortcut = $shortcutShell.CreateShortcut($manualSyncButton)
-$shortcut.TargetPath = "powershell.exe"
-$shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SyncScriptPath`""
+$shortcut.TargetPath = "wscript.exe"
+$shortcut.Arguments = "//B //Nologo `"$HiddenLauncherPath`""
 $shortcut.WorkingDirectory = $InstallPath
 $shortcut.WindowStyle = 7
 $shortcut.Description = "Run the M-Machine website and catalogue sync in the background"
@@ -353,7 +360,7 @@ Set-Content -Path $ownerInstructions -Value $OwnerInstructionsContent -Encoding 
 $TaskName = "M-Machine Daily Sync"
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
-$Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SyncScriptPath`""
+$Action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "//B //Nologo `"$HiddenLauncherPath`""
 $Trigger = New-ScheduledTaskTrigger -Daily -At $DailyRunTime
 $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden
