@@ -1,18 +1,18 @@
-# M-Machine website — Next.js rebuild
+﻿# M-Machine website â€” Next.js rebuild
 
 A full modern redesign of the M-Machine (Craftgrange Ltd) website, built with Next.js 14, TypeScript, Tailwind CSS and Three.js.
 
 ## What's in it
 
-- **Homepage** — hero, catalogue teasers, featured work, trust stats, CTA
-- **Mini catalogue** — 768 real products parsed from the PDF, filterable by 3D Mini zone, body type, Mark, and free-text search. Features an **interactive 3D Mini** you can rotate and click to filter panels by body location.
-- **Metals catalogue** — 18 sample grades (placeholder — replace with real data when metals PDF is parsed)
-- **Featured work** — showcase of bespoke workshop jobs
-- **About** — company info
-- **Contact** — enquiry form with API endpoint
-- **Owner dashboard** — login, product list with search/filter/edit/add, featured work manager
-- **SEO** — full metadata, OpenGraph, Twitter cards, sitemap, robots
-- **Responsive** — works on mobile
+- **Homepage** â€” hero, catalogue teasers, featured work, trust stats, CTA
+- **Mini catalogue** â€” 768 real products parsed from the PDF, filterable by 3D Mini zone, body type, Mark, and free-text search. Features an **interactive 3D Mini** you can rotate and click to filter panels by body location.
+- **Metals catalogue** â€” 18 sample grades (placeholder â€” replace with real data when metals PDF is parsed)
+- **Featured work** â€” showcase of bespoke workshop jobs
+- **About** â€” company info
+- **Contact** â€” enquiry form with API endpoint
+- **Owner dashboard** â€” login, product list with search/filter/edit/add, featured work manager
+- **SEO** â€” full metadata, OpenGraph, Twitter cards, sitemap, robots
+- **Responsive** â€” works on mobile
 
 ## Tech stack
 
@@ -30,7 +30,7 @@ If you don't have it, download the LTS version from https://nodejs.org. Any vers
 
 ### 2. Open a terminal in this folder
 
-On Windows: Shift + Right-click inside the `mmachine` folder → "Open in Terminal"
+On Windows: Shift + Right-click inside the `mmachine` folder â†’ "Open in Terminal"
 
 ### 3. Install dependencies
 
@@ -38,7 +38,7 @@ On Windows: Shift + Right-click inside the `mmachine` folder → "Open in Termin
 npm install
 ```
 
-This downloads everything the site needs (~1–2 minutes first time).
+This downloads everything the site needs (~1â€“2 minutes first time).
 
 ### 4. Start the dev server
 
@@ -53,12 +53,12 @@ Visit **http://localhost:3000**
 You should see the homepage with British racing green design, Playfair Display headings, and clickable nav. Try:
 
 - Click "Browse Mini panels" to see the 3D Mini + 768 real products
-- Click the bonnet on the 3D Mini — watch the products filter
-- Click "Owner login" in nav → Sign in (any email/password) → Dashboard
+- Click the bonnet on the 3D Mini â€” watch the products filter
+- Click "Owner login" in nav â†’ Sign in (any email/password) â†’ Dashboard
 
-## Deploying to Vercel (for the owners to see)
+## Deploying to Cloudflare
 
-This is the fastest path to a shareable URL.
+The working site is deployed to Cloudflare Workers with OpenNext. Runtime dashboard data uses Cloudflare D1, and featured-work images use Cloudflare R2.
 
 ### 1. Push this folder to GitHub
 
@@ -76,79 +76,80 @@ git remote add origin https://github.com/YOUR-USERNAME/mmachine-website.git
 git push -u origin main
 ```
 
-### 2. Connect to Vercel
+### 2. Connect to Cloudflare Workers
 
-1. Go to https://vercel.com and sign in with GitHub
-2. Click "Add New" → "Project"
+1. Go to https://dash.cloudflare.com and sign in
+2. Open Workers & Pages
 3. Import the `mmachine-website` repo
-4. Accept all defaults (Vercel auto-detects Next.js)
+4. Use the Cloudflare build/deploy commands in CLOUDFLARE-DEPLOYMENT.md
 5. Click "Deploy"
 
-About 2 minutes later you'll have a live URL like `mmachine-website-abc123.vercel.app`. Send that to the owners.
+Cloudflare provides a temporary workers.dev URL first. Attach the real domain when the owners approve the working version.
 
 ### 3. Iterating
 
-Make changes locally → `git add . && git commit -m "..." && git push` → Vercel auto-redeploys.
+Make changes locally â†’ `git add . && git commit -m "..." && git push` â†’ Cloudflare auto-redeploys.
 
 ## File structure
 
 ```
 mmachine/
-├── app/
-│   ├── (site)/          ← public pages (homepage, catalogues, etc.)
-│   ├── dashboard/       ← owner dashboard
-│   ├── api/             ← API routes (enquiry form, products)
-│   ├── layout.tsx       ← root layout + global SEO metadata
-│   ├── globals.css      ← Tailwind + brand CSS
-│   ├── sitemap.ts       ← auto-generates sitemap.xml
-│   └── robots.ts        ← auto-generates robots.txt
-├── components/
-│   ├── Navbar.tsx
-│   ├── Footer.tsx
-│   └── Mini3D.tsx       ← the 3D interactive Mini
-├── lib/
-│   ├── mini-data.ts     ← 768 real products from the PDF catalogue
-│   ├── metals-data.ts   ← metals catalogue (placeholder)
-│   └── featured-data.ts ← featured workshop jobs
-├── public/              ← static assets (photos, PDFs)
-├── tailwind.config.js   ← brand colours + fonts
-├── next.config.js
-├── package.json
-└── tsconfig.json
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ (site)/          â† public pages (homepage, catalogues, etc.)
+â”‚   â”œâ”€â”€ dashboard/       â† owner dashboard
+â”‚   â”œâ”€â”€ api/             â† API routes (enquiry form, products)
+â”‚   â”œâ”€â”€ layout.tsx       â† root layout + global SEO metadata
+â”‚   â”œâ”€â”€ globals.css      â† Tailwind + brand CSS
+â”‚   â”œâ”€â”€ sitemap.ts       â† auto-generates sitemap.xml
+â”‚   â””â”€â”€ robots.ts        â† auto-generates robots.txt
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ Navbar.tsx
+â”‚   â”œâ”€â”€ Footer.tsx
+â”‚   â””â”€â”€ Mini3D.tsx       â† the 3D interactive Mini
+â”œâ”€â”€ lib/
+â”‚   â”œâ”€â”€ mini-data.ts     â† 768 real products from the PDF catalogue
+â”‚   â”œâ”€â”€ metals-data.ts   â† metals catalogue (placeholder)
+â”‚   â””â”€â”€ featured-data.ts â† featured workshop jobs
+â”œâ”€â”€ public/              â† static assets (photos, PDFs)
+â”œâ”€â”€ tailwind.config.js   â† brand colours + fonts
+â”œâ”€â”€ next.config.js
+â”œâ”€â”€ package.json
+â””â”€â”€ tsconfig.json
 ```
 
 ## What's real vs placeholder
 
 **REAL** (parsed from your PDF):
 - All 768 Mini products with codes, names, fits, body type, Mark
-- All 19 catalogue sections (120, 130, 140… Apx1, Apx2)
+- All 19 catalogue sections (120, 130, 140â€¦ Apx1, Apx2)
 - Real prices (ex VAT and inc VAT) from the catalogue
 - All section descriptions from the index page
 
 **PLACEHOLDER** (needs to be replaced before launch):
-- Stock levels (randomly generated — owners will set real ones in the dashboard)
-- Metals catalogue (18 samples — parse the metals PDF to get the real list)
-- Featured work images (SVG placeholders — owners will upload photos)
-- Login (any email/password works — wire up real auth like NextAuth before launch)
-- Enquiry form email (currently just logs to console — wire up Resend/SendGrid)
+- Stock levels (randomly generated â€” owners will set real ones in the dashboard)
+- Metals catalogue (18 samples â€” parse the metals PDF to get the real list)
+- Featured work images (SVG placeholders â€” owners will upload photos)
+- Login (any email/password works â€” wire up real auth like NextAuth before launch)
+- Enquiry form email (currently just logs to console â€” wire up Resend/SendGrid)
 
 ## Next steps to production
 
-1. **Add a real database** — Supabase PostgreSQL free tier is the fastest. Add `@supabase/supabase-js` and swap the `lib/*-data.ts` files for DB calls.
-2. **Real authentication** — NextAuth.js with email/password, or just a simple password-protected dashboard for the owners.
-3. **Email for enquiries** — sign up for Resend (free tier: 3000 emails/month), replace the `console.log` in `/api/enquiry` with a real `resend.emails.send()` call.
-4. **Image uploads** — Cloudinary free tier, or Vercel Blob.
-5. **Parse metals PDF** — use the same Python pdfplumber approach that produced `lib/mini-data.ts`.
-6. **Auto-generate PDF catalogue** — use `pdf-lib` or `puppeteer` to regenerate the public PDF from the database.
+1. **Cloudflare D1** - stores quote requests, order history, and featured-work rows.
+2. **Real authentication** â€” NextAuth.js with email/password, or just a simple password-protected dashboard for the owners.
+3. **Email for enquiries** â€” sign up for Resend (free tier: 3000 emails/month), replace the `console.log` in `/api/enquiry` with a real `resend.emails.send()` call.
+4. **Cloudflare R2** - stores featured-work image uploads.
+5. **Parse metals PDF** â€” use the same Python pdfplumber approach that produced `lib/mini-data.ts`.
+6. **Auto-generate PDF catalogue** â€” use `pdf-lib` or `puppeteer` to regenerate the public PDF from the database.
 
 ## Brand system
 
-- **Racing green** (`#0F3D2E`) — primary, backgrounds, primary text
-- **Heritage gold** (`#B8860B`) — accents, CTAs, highlights
-- **Cream** (`#FBF8F1`) — page background
-- **Playfair Display** — headings (elegant serif, hints at heritage)
-- **Inter** — body (clean, modern, readable)
+- **Racing green** (`#0F3D2E`) â€” primary, backgrounds, primary text
+- **Heritage gold** (`#B8860B`) â€” accents, CTAs, highlights
+- **Cream** (`#FBF8F1`) â€” page background
+- **Playfair Display** â€” headings (elegant serif, hints at heritage)
+- **Inter** â€” body (clean, modern, readable)
 
 ---
 
 Built with Claude. Questions? Phone the developer.
+

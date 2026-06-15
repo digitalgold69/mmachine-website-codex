@@ -15,4 +15,4 @@ layout is preserved.
 | `metals-catalogue.pdf` | `final-deliverables/Metals catalogue 2023.xlsx` |
 | `mini-catalogue.pdf` | `final-deliverables/Mini Catalogue Self Updating.xlsm` |
 
-These PDFs are tracked in git so Vercel can serve them on the website.
+These PDFs are tracked in git so Cloudflare can serve them on the website.

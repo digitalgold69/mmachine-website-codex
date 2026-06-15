@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getD1 } from "@/lib/cloudflare";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 type QuoteRow = {
@@ -6,15 +6,15 @@ type QuoteRow = {
   submitted_at: string;
   updated_at: string;
   status: string;
-  customer: QuoteRequest["customer"];
-  items: QuoteItem[];
+  customer: string;
+  items: string;
   owner_notes: string | null;
   customer_message: string | null;
   carriage_ex_vat: number | null;
   extra_charges_ex_vat: number | null;
   quoted_at: string | null;
-  invoice_sent_at?: string | null;
-  paid_at?: string | null;
+  invoice_sent_at: string | null;
+  paid_at: string | null;
   customer_email_sent_at: string | null;
   owner_email_sent_at: string | null;
 };
@@ -33,14 +33,23 @@ function normaliseStatus(status: string): QuoteStatus {
   return "new";
 }
 
+function parseJson<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 function rowToQuote(row: QuoteRow): QuoteRequest {
   return {
     id: row.id,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
     status: normaliseStatus(row.status),
-    customer: row.customer,
-    items: row.items,
+    customer: parseJson(row.customer, { name: "", email: "", phone: "" }),
+    items: parseJson<QuoteItem[]>(row.items, []),
     ownerNotes: row.owner_notes || "",
     customerMessage: row.customer_message || "",
     carriageExVat: row.carriage_ex_vat,
@@ -53,93 +62,98 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
   };
 }
 
-function quoteToRow(quote: QuoteRequest, legacy = false) {
-  return {
-    id: quote.id,
-    submitted_at: quote.submittedAt,
-    updated_at: quote.updatedAt,
-    status: legacy && quote.status === "invoice_sent" ? "quoted" : quote.status,
-    customer: quote.customer,
-    items: quote.items,
-    owner_notes: quote.ownerNotes || "",
-    customer_message: quote.customerMessage || "",
-    carriage_ex_vat: quote.carriageExVat ?? null,
-    extra_charges_ex_vat: quote.extraChargesExVat ?? null,
-    quoted_at: quote.quotedAt ?? null,
-    ...(legacy ? {} : { invoice_sent_at: quote.invoiceSentAt ?? null }),
-    ...(legacy ? {} : { paid_at: quote.paidAt ?? null }),
-    customer_email_sent_at: quote.customerEmailSentAt ?? null,
-    owner_email_sent_at: quote.ownerEmailSentAt ?? null,
-  };
-}
-
-function isMissingInvoiceColumns(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("invoice_sent_at") || error?.message?.includes("paid_at")
-  );
-}
-
 export async function listQuoteRequests(): Promise<QuoteRequest[]> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .select("*")
-    .order("submitted_at", { ascending: false });
+  const db = await getD1();
+  const result = await db
+    .prepare("select * from quote_requests order by submitted_at desc")
+    .all<QuoteRow>();
 
-  if (error) throw new Error(`Supabase quote_requests read failed: ${error.message}`);
-  return (data || []).map((row) => rowToQuote(row as QuoteRow));
+  if (result.error) throw new Error(`D1 quote_requests read failed: ${result.error}`);
+  return (result.results || []).map(rowToQuote);
 }
 
 export async function countNewQuoteRequests(): Promise<number> {
-  const supabase = getSupabaseAdmin();
-  const { count, error } = await supabase
-    .from("quote_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "new");
+  const db = await getD1();
+  const row = await db
+    .prepare("select count(*) as count from quote_requests where status = ?")
+    .bind("new")
+    .first<{ count: number }>();
 
-  if (error) throw new Error(`Supabase quote_requests count failed: ${error.message}`);
-  return count || 0;
+  return Number(row?.count || 0);
 }
 
 export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const db = await getD1();
+  const row = await db
+    .prepare("select * from quote_requests where id = ?")
+    .bind(id)
+    .first<QuoteRow>();
 
-  if (error) throw new Error(`Supabase quote_requests read failed: ${error.message}`);
-  return data ? rowToQuote(data as QuoteRow) : null;
+  return row ? rowToQuote(row) : null;
 }
 
 export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteRequest> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .upsert(quoteToRow(quote), { onConflict: "id" })
-    .select("*")
-    .single();
+  const db = await getD1();
 
-  if (error && isMissingInvoiceColumns(error)) {
-    if (quote.status === "paid" || quote.paidAt) {
-      throw new Error(
-        "Supabase quote_requests needs the invoice/paid migration before paid orders can be saved."
-      );
-    }
+  const result = await db
+    .prepare(
+      `
+      insert into quote_requests (
+        id,
+        submitted_at,
+        updated_at,
+        status,
+        customer,
+        items,
+        owner_notes,
+        customer_message,
+        carriage_ex_vat,
+        extra_charges_ex_vat,
+        quoted_at,
+        invoice_sent_at,
+        paid_at,
+        customer_email_sent_at,
+        owner_email_sent_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        submitted_at = excluded.submitted_at,
+        updated_at = excluded.updated_at,
+        status = excluded.status,
+        customer = excluded.customer,
+        items = excluded.items,
+        owner_notes = excluded.owner_notes,
+        customer_message = excluded.customer_message,
+        carriage_ex_vat = excluded.carriage_ex_vat,
+        extra_charges_ex_vat = excluded.extra_charges_ex_vat,
+        quoted_at = excluded.quoted_at,
+        invoice_sent_at = excluded.invoice_sent_at,
+        paid_at = excluded.paid_at,
+        customer_email_sent_at = excluded.customer_email_sent_at,
+        owner_email_sent_at = excluded.owner_email_sent_at
+      `
+    )
+    .bind(
+      quote.id,
+      quote.submittedAt,
+      quote.updatedAt,
+      quote.status,
+      JSON.stringify(quote.customer),
+      JSON.stringify(quote.items),
+      quote.ownerNotes || "",
+      quote.customerMessage || "",
+      quote.carriageExVat ?? null,
+      quote.extraChargesExVat ?? null,
+      quote.quotedAt ?? null,
+      quote.invoiceSentAt ?? null,
+      quote.paidAt ?? null,
+      quote.customerEmailSentAt ?? null,
+      quote.ownerEmailSentAt ?? null
+    )
+    .run();
 
-    const legacy = await supabase
-      .from("quote_requests")
-      .upsert(quoteToRow(quote, true), { onConflict: "id" })
-      .select("*")
-      .single();
+  if (result.error) throw new Error(`D1 quote_requests save failed: ${result.error}`);
 
-    if (legacy.error) {
-      throw new Error(`Supabase quote_requests save failed: ${legacy.error.message}`);
-    }
-    return rowToQuote(legacy.data as QuoteRow);
-  }
-
-  if (error) throw new Error(`Supabase quote_requests save failed: ${error.message}`);
-  return rowToQuote(data as QuoteRow);
+  const saved = await getQuoteRequest(quote.id);
+  if (!saved) throw new Error("D1 quote_requests save failed: saved row could not be read.");
+  return saved;
 }

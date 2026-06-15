@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getD1, getFeaturedImagesBucket } from "@/lib/cloudflare";
 
 export type FeaturedWork = {
   id: string;
@@ -32,9 +32,12 @@ type FeaturedRow = {
   full_story: string | null;
   image_url: string | null;
   image_path: string | null;
+  created_at: string;
 };
 
-const BUCKET = "featured-work";
+function imageUrlFromPath(path: string | null) {
+  return path ? `/api/featured-images/${encodeURIComponent(path)}` : null;
+}
 
 function rowToWork(row: FeaturedRow): FeaturedWork {
   return {
@@ -45,7 +48,7 @@ function rowToWork(row: FeaturedRow): FeaturedWork {
     year: row.year || new Date().getFullYear(),
     category: row.category || "Fabrication",
     fullStory: row.full_story || "",
-    imagePath: row.image_url || null,
+    imagePath: row.image_url || imageUrlFromPath(row.image_path),
   };
 }
 
@@ -62,15 +65,26 @@ function workToEntry(work: FeaturedWork): FeaturedEntry {
   };
 }
 
-export async function listFeaturedWork(): Promise<FeaturedWork[]> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("featured_work")
-    .select("id,title,description,tag,year,category,full_story,image_url,image_path")
-    .order("created_at", { ascending: false });
+async function getFeaturedRow(id: string): Promise<FeaturedRow | null> {
+  const db = await getD1();
+  return db
+    .prepare(
+      "select id,title,description,tag,year,category,full_story,image_url,image_path,created_at from featured_work where id = ?"
+    )
+    .bind(id)
+    .first<FeaturedRow>();
+}
 
-  if (error) throw new Error(`Supabase featured_work read failed: ${error.message}`);
-  return (data || []).map((row) => rowToWork(row as FeaturedRow));
+export async function listFeaturedWork(): Promise<FeaturedWork[]> {
+  const db = await getD1();
+  const result = await db
+    .prepare(
+      "select id,title,description,tag,year,category,full_story,image_url,image_path,created_at from featured_work order by created_at desc"
+    )
+    .all<FeaturedRow>();
+
+  if (result.error) throw new Error(`D1 featured_work read failed: ${result.error}`);
+  return (result.results || []).map(rowToWork);
 }
 
 export async function listFeaturedEntries(): Promise<FeaturedEntry[]> {
@@ -85,46 +99,38 @@ function extFromDataUrl(url: string): string | null {
   return sub === "jpeg" ? "jpg" : sub;
 }
 
+function contentTypeFromExt(ext: string) {
+  return `image/${ext === "jpg" ? "jpeg" : ext}`;
+}
+
 function bytesFromDataUrl(url: string): Uint8Array {
   const idx = url.indexOf("base64,");
   if (idx < 0) throw new Error("Image isn't a base64 data URL");
   return new Uint8Array(Buffer.from(url.slice(idx + "base64,".length), "base64"));
 }
 
-async function ensureFeaturedBucket() {
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage.createBucket(BUCKET, {
-    public: true,
-    fileSizeLimit: 5 * 1024 * 1024,
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-  });
-
-  if (error && !/already exists/i.test(error.message)) {
-    throw new Error(`Supabase storage setup failed: ${error.message}`);
-  }
-}
-
 export async function saveFeaturedEntry(input: {
   entry: Partial<FeaturedEntry>;
   imageDataUrl?: string;
 }): Promise<FeaturedEntry> {
-  const supabase = getSupabaseAdmin();
+  const db = await getD1();
   const entry = input.entry;
 
   if (!entry.title) throw new Error("Missing title");
 
   let id = entry.id && !entry.id.startsWith("new-") ? safeId(entry.id) : "";
   if (!id) {
-    const { data, error } = await supabase.from("featured_work").select("id");
-    if (error) throw new Error(`Supabase featured_work id check failed: ${error.message}`);
-    const taken = new Set((data || []).map((row) => row.id as string));
+    const existing = await db.prepare("select id from featured_work").all<{ id: string }>();
+    if (existing.error) throw new Error(`D1 featured_work id check failed: ${existing.error}`);
+    const taken = new Set((existing.results || []).map((row) => row.id));
     let n = 1;
     while (taken.has(`f${String(n).padStart(3, "0")}`)) n++;
     id = `f${String(n).padStart(3, "0")}`;
   }
 
-  let imageUrl = (entry.image || "").trim();
-  let imagePath: string | null = null;
+  const current = await getFeaturedRow(id);
+  let imageUrl = current?.image_url || null;
+  let imagePath = current?.image_path || null;
 
   if (input.imageDataUrl) {
     const ext = extFromDataUrl(input.imageDataUrl);
@@ -135,54 +141,85 @@ export async function saveFeaturedEntry(input: {
       throw new Error("Image is too large. Please use a photo under 5 MB.");
     }
 
-    await ensureFeaturedBucket();
+    const bucket = await getFeaturedImagesBucket();
     imagePath = `${id}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(imagePath, bytes, {
-        contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw new Error(`Supabase image upload failed: ${uploadError.message}`);
-    }
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(imagePath);
-    imageUrl = data.publicUrl;
+    imageUrl = null;
+    await bucket.put(imagePath, bytes, {
+      httpMetadata: { contentType: contentTypeFromExt(ext) },
+    });
+  } else if (entry.image?.startsWith("http://") || entry.image?.startsWith("https://")) {
+    imageUrl = entry.image.trim();
   }
 
-  const row = {
-    id,
-    title: String(entry.title).trim(),
-    description: String(entry.description || "").trim(),
-    tag: String(entry.tag || "Bespoke").trim(),
-    year: Number.isFinite(entry.year as number) ? Number(entry.year) : new Date().getFullYear(),
-    category: String(entry.category || "Fabrication").trim(),
-    full_story: String(entry.fullStory || "").trim(),
-    image_url: imageUrl || null,
-    image_path: imagePath,
-    updated_at: new Date().toISOString(),
-  };
+  const now = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `
+      insert into featured_work (
+        id,
+        title,
+        description,
+        tag,
+        year,
+        category,
+        full_story,
+        image_url,
+        image_path,
+        created_at,
+        updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        title = excluded.title,
+        description = excluded.description,
+        tag = excluded.tag,
+        year = excluded.year,
+        category = excluded.category,
+        full_story = excluded.full_story,
+        image_url = excluded.image_url,
+        image_path = excluded.image_path,
+        updated_at = excluded.updated_at
+      `
+    )
+    .bind(
+      id,
+      String(entry.title).trim(),
+      String(entry.description || "").trim(),
+      String(entry.tag || "Bespoke").trim(),
+      Number.isFinite(entry.year as number) ? Number(entry.year) : new Date().getFullYear(),
+      String(entry.category || "Fabrication").trim(),
+      String(entry.fullStory || "").trim(),
+      imageUrl,
+      imagePath,
+      current?.created_at || now,
+      now
+    )
+    .run();
 
-  const { data, error } = await supabase
-    .from("featured_work")
-    .upsert(row, { onConflict: "id" })
-    .select("id,title,description,tag,year,category,full_story,image_url,image_path")
-    .single();
+  if (result.error) throw new Error(`D1 featured_work save failed: ${result.error}`);
 
-  if (error) throw new Error(`Supabase featured_work save failed: ${error.message}`);
-  return workToEntry(rowToWork(data as FeaturedRow));
+  const saved = await getFeaturedRow(id);
+  if (!saved) throw new Error("D1 featured_work save failed: saved row could not be read.");
+  return workToEntry(rowToWork(saved));
 }
 
 export async function deleteFeaturedEntry(id: string): Promise<void> {
   const safe = safeId(id);
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("featured_work").delete().eq("id", safe);
-  if (error) throw new Error(`Supabase featured_work delete failed: ${error.message}`);
+  const current = await getFeaturedRow(safe);
+  const db = await getD1();
+  const result = await db.prepare("delete from featured_work where id = ?").bind(safe).run();
+
+  if (result.error) throw new Error(`D1 featured_work delete failed: ${result.error}`);
+
+  if (current?.image_path) {
+    try {
+      const bucket = await getFeaturedImagesBucket();
+      await bucket.delete(current.image_path);
+    } catch {
+      // The row is already deleted; a stale image object is not worth failing the request.
+    }
+  }
 }
 
 function safeId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) || `f${Date.now()}`;
 }
-

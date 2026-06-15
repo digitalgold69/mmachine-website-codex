@@ -196,7 +196,7 @@ export default async function DashboardHomePage() {
             <span className="text-xs font-mono text-gold">{featuredCount} JOBS</span>
           </div>
           <p className="text-sm text-ink-muted mb-3">
-            Manage workshop case studies and images from Supabase.
+            Manage workshop case studies and images from Cloudflare.
           </p>
           <span className="text-sm font-medium text-racing group-hover:text-gold">Open featured work</span>
         </Link>

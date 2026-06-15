@@ -1,52 +1,49 @@
--- Run this once in Supabase SQL Editor for the M-Machine project.
--- It creates the live featured-work table and public image bucket.
+create table if not exists quote_requests (
+  id text primary key,
+  submitted_at text not null,
+  updated_at text not null,
+  status text not null default 'new'
+    check (status in ('new', 'reviewing', 'invoice_sent', 'paid', 'closed')),
+  customer text not null,
+  items text not null,
+  owner_notes text not null default '',
+  customer_message text not null default '',
+  carriage_ex_vat real,
+  extra_charges_ex_vat real,
+  quoted_at text,
+  invoice_sent_at text,
+  paid_at text,
+  customer_email_sent_at text,
+  owner_email_sent_at text
+);
 
-create table if not exists public.featured_work (
+create index if not exists quote_requests_submitted_at_idx
+on quote_requests (submitted_at desc);
+
+create index if not exists quote_requests_status_idx
+on quote_requests (status);
+
+create index if not exists quote_requests_paid_at_idx
+on quote_requests (paid_at desc);
+
+create table if not exists featured_work (
   id text primary key,
   title text not null,
   description text not null default '',
   tag text not null default 'Bespoke',
-  year integer not null default extract(year from now())::integer,
+  year integer not null default 2026,
   category text not null default 'Fabrication',
   full_story text not null default '',
   image_url text,
   image_path text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at text not null,
+  updated_at text not null
 );
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+create index if not exists featured_work_created_at_idx
+on featured_work (created_at desc);
 
-drop trigger if exists set_featured_work_updated_at on public.featured_work;
-create trigger set_featured_work_updated_at
-before update on public.featured_work
-for each row
-execute function public.set_updated_at();
-
-alter table public.featured_work enable row level security;
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'featured-work',
-  'featured-work',
-  true,
-  5242880,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-)
-on conflict (id) do update set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
-insert into public.featured_work (
+insert into featured_work (
   id,
   title,
   description,
@@ -56,7 +53,8 @@ insert into public.featured_work (
   full_story,
   image_url,
   image_path,
-  created_at
+  created_at,
+  updated_at
 ) values
 (
   'f001',
@@ -68,7 +66,8 @@ insert into public.featured_work (
   'A customer brought us a partly-finished 1275GT restoration needing a functional scoop that matched original Works rally specification. We formed it by hand over a timber buck, using our English wheel to achieve the smooth crown and shrinker-stretcher to tighten the returns. Final finish hand-polished before paint.',
   null,
   null,
-  now() - interval '4 minutes'
+  '2026-06-15T12:00:00.000Z',
+  '2026-06-15T12:00:00.000Z'
 ),
 (
   'f002',
@@ -80,7 +79,8 @@ insert into public.featured_work (
   'Design brief called for equal-length primaries with minimum ground clearance interference. Mandrel-bent primaries TIG-welded to a laser-cut collector plate. Full flow-benched before delivery.',
   null,
   null,
-  now() - interval '3 minutes'
+  '2026-06-15T12:01:00.000Z',
+  '2026-06-15T12:01:00.000Z'
 ),
 (
   'f003',
@@ -92,7 +92,8 @@ insert into public.featured_work (
   'Badly pitted original hub carriers stripped, dimensionally surveyed, then machined back to drawing tolerance. Heat treated to Rc 58-62 and ground finished. Restored pieces exceed new-part tolerance.',
   null,
   null,
-  now() - interval '2 minutes'
+  '2026-06-15T12:02:00.000Z',
+  '2026-06-15T12:02:00.000Z'
 ),
 (
   'f004',
@@ -104,7 +105,7 @@ insert into public.featured_work (
   'Engine bay relocation for a full race build required a compact, sealed battery tray in stainless. Designed in CAD, laser cut, folded and TIG welded in-house, then powder coated satin black.',
   null,
   null,
-  now() - interval '1 minute'
+  '2026-06-15T12:03:00.000Z',
+  '2026-06-15T12:03:00.000Z'
 )
-on conflict (id) do nothing;
-
+on conflict(id) do nothing;

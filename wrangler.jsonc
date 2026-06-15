@@ -10,6 +10,19 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mmachine-runtime",
+      "database_id": "5278be02-178b-40e7-b5ed-fc4f8bdbf284"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FEATURED_IMAGES",
+      "bucket_name": "mmachine-featured-images"
+    }
+  ],
   "observability": {
     "enabled": true
   }

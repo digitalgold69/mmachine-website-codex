@@ -8,6 +8,12 @@ This site is a full Next.js app, not a static-only site. It uses API routes for:
 - featured-work updates
 - email sending
 
+Runtime content is stored in Cloudflare:
+
+- quote/order requests: D1 database binding `DB`
+- featured-work rows: D1 database binding `DB`
+- featured-work images: R2 bucket binding `FEATURED_IMAGES`
+
 Deploy it to Cloudflare Workers using the OpenNext adapter.
 
 ## Placeholder URL
@@ -43,13 +49,8 @@ Required:
 
 ```text
 NEXT_PUBLIC_SITE_URL
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
 OWNER_PASSWORD
 AUTH_SECRET
-GITHUB_TOKEN
-GITHUB_REPO
 ```
 
 Required when email sending goes live:
@@ -60,13 +61,26 @@ RESEND_API_KEY
 QUOTE_FROM_EMAIL
 ```
 
-Optional:
+`NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
+
+## Cloudflare Storage
+
+Create these before deploying the D1/R2 version:
 
 ```text
-GITHUB_BRANCH
+D1 database name: mmachine-runtime
+D1 binding: DB
+R2 bucket name: mmachine-featured-images
+R2 binding: FEATURED_IMAGES
 ```
 
-`NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
+After creating the D1 database, put its `database_id` into `wrangler.jsonc`.
+
+Run the D1 schema once:
+
+```powershell
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0001_mmachine_runtime.sql
+```
 
 ## GitHub Auto Deploy
 
@@ -88,4 +102,4 @@ Make sure the same environment variables are added to Cloudflare's build/runtime
 
 ## Owner Daily Sync
 
-The owner daily sync does not need to know whether the public site is hosted on Vercel or Cloudflare. It pushes refreshed generated files to GitHub. The hosting provider then redeploys from GitHub.
+The owner daily sync does not need to know whether the runtime order data is in D1. It pushes refreshed generated catalogue files to GitHub. The hosting provider then redeploys from GitHub.

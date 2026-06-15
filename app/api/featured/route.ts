@@ -1,8 +1,8 @@
 // /api/featured
 //
-// Runtime dashboard CMS for featured work. Text is stored in Supabase
-// Postgres and images are stored in Supabase Storage, so owner edits update
-// immediately without committing to GitHub or waiting for a Vercel rebuild.
+// Runtime dashboard CMS for featured work. Text is stored in Cloudflare D1
+// and images are stored in Cloudflare R2, so owner edits update immediately
+// without committing to GitHub or waiting for a rebuild.
 
 import { NextResponse } from "next/server";
 import { requireLogin } from "@/lib/auth";
