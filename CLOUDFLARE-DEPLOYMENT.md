@@ -75,10 +75,14 @@ Cloudflare Workers can be connected to the GitHub repository so pushes to `main`
 Use:
 
 ```text
-Build command: npm run build
-Deploy command: npm run deploy
+Build command: npm run cf:build
+Deploy command: npx wrangler deploy
 Non-production branch deploy command: npm run upload
 ```
+
+`npm run cf:build` runs the OpenNext Cloudflare build. A plain `next build` is
+not enough for Workers because it does not create the `.open-next` output used
+by the deploy step.
 
 Make sure the same environment variables are added to Cloudflare's build/runtime variables before enabling production traffic.
 
