@@ -187,7 +187,7 @@ export async function sendQuoteEmail(opts: {
   const from = process.env.QUOTE_FROM_EMAIL;
 
   if (!apiKey || !from) {
-    return { ok: false, skipped: true, error: "RESEND_API_KEY or QUOTE_FROM_EMAIL is not configured" };
+    return { ok: false, skipped: true, error: "Email sending is unavailable" };
   }
 
   const res = await fetch("https://api.resend.com/emails", {

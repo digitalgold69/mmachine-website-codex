@@ -65,7 +65,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
-  const [success, setSuccess] = useState<{ quoteId: string; ownerEmailSent: boolean } | null>(null);
+  const [success, setSuccess] = useState<{ quoteId: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -170,7 +170,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       formEl.reset();
       setItems([]);
       setArrangeOwnDelivery(false);
-      setSuccess({ quoteId: data.quoteId, ownerEmailSent: data.ownerEmailSent === true });
+      setSuccess({ quoteId: data.quoteId });
     } catch (err) {
       setMessage((err as Error).message || "Quote request failed");
     } finally {
@@ -274,12 +274,6 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                     <div className="mt-4 rounded-md bg-white p-3 text-sm text-racing">
                       Order reference: <strong>{success.quoteId}</strong>
                     </div>
-                    {!success.ownerEmailSent && (
-                      <p className="mt-3 text-xs text-ink-muted">
-                        Your request has been saved. The owner email service is not configured yet, so M-Machine
-                        can review it from the dashboard.
-                      </p>
-                    )}
                     <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
                       <button type="button" onClick={closeDrawer} className="btn-primary justify-center">
                         Continue browsing

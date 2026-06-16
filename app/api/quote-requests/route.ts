@@ -58,7 +58,10 @@ export async function GET() {
     const quotes = await listQuoteRequests();
     return NextResponse.json({ quotes });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Orders could not be loaded. Please try again." },
+      { status: 500 }
+    );
   }
 }
 
@@ -141,7 +144,10 @@ export async function POST(req: Request) {
     const saved = await saveQuoteRequest(quote);
     return NextResponse.json({ ok: true, quoteId: saved.id, ownerEmailSent: email.ok });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Order request could not be submitted. Please try again or contact M-Machine." },
+      { status: 500 }
+    );
   }
 }
 
@@ -205,7 +211,7 @@ export async function PATCH(req: Request) {
       });
       if (!email.ok) {
         return NextResponse.json(
-          { error: email.error || "Customer email failed" },
+          { error: "Email could not be sent. Please send manually and try again later." },
           { status: 500 }
         );
       }
@@ -226,6 +232,6 @@ export async function PATCH(req: Request) {
     const saved = await saveQuoteRequest(next);
     return NextResponse.json({ ok: true, quote: saved, customerEmailSent });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return NextResponse.json({ error: "Order could not be saved. Please try again." }, { status: 500 });
   }
 }

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const expected = process.env.OWNER_PASSWORD;
   if (!expected) {
     return NextResponse.json(
-      { error: "Server isn't configured. Set OWNER_PASSWORD in the deployment environment." },
+      { error: "Owner login is temporarily unavailable." },
       { status: 500 }
     );
   }
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     token = makeSessionToken();
   } catch (err) {
     return NextResponse.json(
-      { error: (err as Error).message || "Server login configuration is incomplete." },
+      { error: "Owner login is temporarily unavailable." },
       { status: 500 }
     );
   }
