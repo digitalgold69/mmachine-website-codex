@@ -21,6 +21,8 @@ export type QuoteCustomer = {
   email: string;
   phone: string;
   company?: string;
+  address?: string;
+  arrangeOwnDelivery?: boolean;
   message?: string;
 };
 

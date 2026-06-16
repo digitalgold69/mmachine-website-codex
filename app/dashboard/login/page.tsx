@@ -1,79 +1,29 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
+import { isLoggedIn } from "@/lib/auth";
+import LoginForm from "./LoginForm";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+export const dynamic = "force-dynamic";
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const formData = new FormData(e.currentTarget);
-    const password = formData.get("password") as string;
-
-    try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const text = await res.text();
-      let data: { error?: string } = {};
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
-      if (res.ok) {
-        router.replace("/dashboard");
-        router.refresh();
-      } else {
-        setError(data.error || `Sign in failed (${res.status})`);
-        setLoading(false);
-      }
-    } catch (err) {
-      setError((err as Error).message || "Couldn't reach the server. Try again in a moment.");
-      setLoading(false);
-    }
-  };
+export default async function LoginPage() {
+  if (await isLoggedIn()) redirect("/dashboard");
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-cream p-4">
       <div className="w-full max-w-md">
-        <Link href="/" className="flex items-center gap-3 justify-center mb-8">
+        <Link href="/" className="mb-8 flex items-center justify-center gap-3">
           <BrandMark priority className="h-12 w-12" />
           <span className="font-display text-xl text-racing">M-Machine owner dashboard</span>
         </Link>
 
-        <div className="bg-white rounded-2xl border border-racing/10 p-8">
-          <h1 className="font-display text-2xl text-racing mb-2">Sign in</h1>
-          <p className="text-sm text-ink-muted mb-6">Enter the owner password to manage orders and website content.</p>
+        <div className="rounded-2xl border border-racing/10 bg-white p-8">
+          <h1 className="mb-2 font-display text-2xl text-racing">Sign in</h1>
+          <p className="mb-6 text-sm text-ink-muted">
+            Enter the owner password to manage orders and website content.
+          </p>
 
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <label className="label">Password</label>
-              <input
-                type="password"
-                name="password"
-                className="input"
-                placeholder="••••••••"
-                required
-                autoFocus
-              />
-            </div>
-            {error && <div className="mb-4 text-sm text-red-700 bg-red-50 p-2 rounded">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
-              {loading ? "Signing in…" : "Sign in →"}
-            </button>
-          </form>
+          <LoginForm />
         </div>
       </div>
     </div>

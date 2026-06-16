@@ -4,6 +4,7 @@ import { isLoggedIn } from "@/lib/auth";
 import { countNewQuoteRequests } from "@/lib/quotes";
 import DashboardNav from "./DashboardNav";
 import BrandMark from "@/components/BrandMark";
+import SignOutButton from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex shrink-0 items-center gap-3 text-sm">
             <Link href="/" className="text-cream/80 hover:text-gold">Back to website</Link>
             <span className="text-cream/40">|</span>
-            <Link href="/dashboard/login" className="text-cream/80 hover:text-gold">Sign out</Link>
+            <SignOutButton />
           </div>
         </div>
       </header>

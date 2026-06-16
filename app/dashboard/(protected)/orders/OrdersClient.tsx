@@ -681,6 +681,16 @@ export default function OrdersClient({
                 {draft.customer.company && (
                   <div className="text-sm text-ink-muted">{draft.customer.company}</div>
                 )}
+                <div className="mt-3 rounded-lg bg-cream-dark p-3 text-sm text-ink">
+                  <div className="label mb-1">Delivery</div>
+                  {draft.customer.arrangeOwnDelivery ? (
+                    <p>Customer will arrange delivery / collection.</p>
+                  ) : (
+                    <p className="whitespace-pre-wrap">
+                      {draft.customer.address || "No delivery address supplied"}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex min-w-[180px] flex-col gap-3">
                 <div>

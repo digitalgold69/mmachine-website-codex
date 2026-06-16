@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { QuoteItem } from "@/lib/quote-types";
 
@@ -63,6 +64,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const [pendingQty, setPendingQty] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
+  const [success, setSuccess] = useState<{ quoteId: string; ownerEmailSent: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -111,6 +114,12 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
     setMessage("");
   }
 
+  function closeDrawer() {
+    setDrawerOpen(false);
+    setMessage("");
+    if (success) setSuccess(null);
+  }
+
   function updateQty(key: string, qty: number) {
     setItems((current) =>
       current.map((item) =>
@@ -131,6 +140,13 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
     setMessage("");
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const address = String(form.get("address") ?? "").trim();
+
+    if (!arrangeOwnDelivery && !address) {
+      setMessage("Please enter a delivery address, or tick the collection / own delivery option.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/quote-requests", {
@@ -142,6 +158,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             email: form.get("email"),
             phone: form.get("phone"),
             company: form.get("company"),
+            address,
+            arrangeOwnDelivery,
             message: form.get("message"),
           },
           items,
@@ -151,7 +169,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       if (!res.ok) throw new Error(data.error || "Quote request failed");
       formEl.reset();
       setItems([]);
-      setMessage(`Order submitted. Reference: ${data.quoteId}`);
+      setArrangeOwnDelivery(false);
+      setSuccess({ quoteId: data.quoteId, ownerEmailSent: data.ownerEmailSent === true });
     } catch (err) {
       setMessage((err as Error).message || "Quote request failed");
     } finally {
@@ -233,7 +252,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
               </div>
               <button
                 type="button"
-                onClick={() => setDrawerOpen(false)}
+                onClick={closeDrawer}
                 className="h-9 w-9 rounded-md text-xl text-racing hover:bg-cream-dark"
                 aria-label="Close quote cart"
               >
@@ -242,7 +261,36 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-              {items.length === 0 ? (
+              {success ? (
+                <div className="flex min-h-full items-center justify-center">
+                  <div className="w-full rounded-lg border border-racing/10 bg-cream-dark p-6 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-racing text-lg font-semibold text-cream">
+                      OK
+                    </div>
+                    <h3 className="font-display text-2xl text-racing">Thanks for your request</h3>
+                    <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-muted">
+                      We will be in touch to confirm your order, agree delivery or collection, and arrange payment.
+                    </p>
+                    <div className="mt-4 rounded-md bg-white p-3 text-sm text-racing">
+                      Order reference: <strong>{success.quoteId}</strong>
+                    </div>
+                    {!success.ownerEmailSent && (
+                      <p className="mt-3 text-xs text-ink-muted">
+                        Your request has been saved. The owner email service is not configured yet, so M-Machine
+                        can review it from the dashboard.
+                      </p>
+                    )}
+                    <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                      <button type="button" onClick={closeDrawer} className="btn-primary justify-center">
+                        Continue browsing
+                      </button>
+                      <Link href="/contact" onClick={closeDrawer} className="btn-secondary justify-center">
+                        Contact M-Machine
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : items.length === 0 ? (
                 <div className="rounded-lg bg-cream-dark p-5 text-sm text-ink-muted">
                   Your quote cart is empty.
                 </div>
@@ -287,6 +335,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 </div>
               )}
 
+              {!success && items.length > 0 && (
               <form onSubmit={submitQuote} className="mt-5 space-y-3 border-t border-racing/10 pt-5">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
@@ -305,6 +354,32 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                     <label className="label">Phone *</label>
                     <input name="phone" required className="input" />
                   </div>
+                </div>
+                <div>
+                  <label className="label">Delivery</label>
+                  {!arrangeOwnDelivery && (
+                    <textarea
+                      name="address"
+                      rows={4}
+                      required
+                      className="input resize-none"
+                      placeholder="Full delivery address, including postcode"
+                    />
+                  )}
+                  <label className="mt-3 flex items-start gap-3 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
+                    <input
+                      type="checkbox"
+                      checked={arrangeOwnDelivery}
+                      onChange={(e) => setArrangeOwnDelivery(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      I will arrange delivery / collection
+                      <span className="block text-xs text-ink-muted">
+                        Tick this if you do not need M-Machine to quote carriage.
+                      </span>
+                    </span>
+                  </label>
                 </div>
                 <div>
                   <label className="label">Message</label>
@@ -328,6 +403,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                   <div className="rounded-lg bg-cream-dark p-3 text-sm text-racing">{message}</div>
                 )}
               </form>
+              )}
             </div>
           </aside>
         </div>

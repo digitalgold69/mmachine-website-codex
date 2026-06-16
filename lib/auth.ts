@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
 const COOKIE_NAME = "mmachine_admin";
-const SESSION_DAYS = 14;
+const SESSION_DAYS = 30;
 
 function getSecret(): string {
   const s = process.env.AUTH_SECRET?.trim();

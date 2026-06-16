@@ -69,6 +69,8 @@ export async function POST(req: Request) {
       email?: string;
       phone?: string;
       company?: string;
+      address?: string;
+      arrangeOwnDelivery?: boolean;
       message?: string;
     };
     items?: Partial<QuoteItem>[];
@@ -85,11 +87,20 @@ export async function POST(req: Request) {
     email: asString(body.customer?.email, 220),
     phone: asString(body.customer?.phone, 80),
     company: asString(body.customer?.company, 180),
+    address: asString(body.customer?.address, 1200),
+    arrangeOwnDelivery: body.customer?.arrangeOwnDelivery === true,
     message: asString(body.customer?.message, 2000),
   };
 
   if (!customer.name || !customer.email || !customer.phone) {
     return NextResponse.json({ error: "Name, email and phone are required" }, { status: 400 });
+  }
+
+  if (!customer.arrangeOwnDelivery && !customer.address) {
+    return NextResponse.json(
+      { error: "Delivery address is required unless you will arrange collection or delivery" },
+      { status: 400 }
+    );
   }
 
   const rawItems = Array.isArray(body.items) ? body.items : [];

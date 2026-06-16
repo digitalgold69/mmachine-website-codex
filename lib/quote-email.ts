@@ -59,6 +59,12 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
     <p><strong>Email:</strong> ${escapeHtml(quote.customer.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(quote.customer.phone)}</p>
     <p><strong>Company:</strong> ${escapeHtml(quote.customer.company || "")}</p>
+    <p><strong>Delivery:</strong> ${quote.customer.arrangeOwnDelivery ? "Customer will arrange delivery or collection" : "Delivery quote required"}</p>
+    ${
+      quote.customer.arrangeOwnDelivery
+        ? ""
+        : `<p><strong>Delivery address:</strong><br>${escapeHtml(quote.customer.address || "").replace(/\n/g, "<br>")}</p>`
+    }
     <p><strong>Customer note:</strong><br>${escapeHtml(quote.customer.message || "").replace(/\n/g, "<br>")}</p>
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
       <thead>
@@ -124,6 +130,11 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
               <div>${escapeHtml(quote.customer.email)}</div>
               <div>${escapeHtml(quote.customer.phone)}</div>
               ${quote.customer.company ? `<div>${escapeHtml(quote.customer.company)}</div>` : ""}
+              ${
+                quote.customer.arrangeOwnDelivery
+                  ? `<div style="margin-top:8px;color:#6b5a46">Customer will arrange delivery or collection</div>`
+                  : `<div style="margin-top:8px;white-space:pre-line">${escapeHtml(quote.customer.address || "")}</div>`
+              }
             </div>
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#6b5a46">Reference</div>
