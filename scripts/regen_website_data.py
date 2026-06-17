@@ -87,16 +87,20 @@ SECTIONS = [
 ]
 
 METALS_CATEGORIES = [
-    {"key": "tool_steel",  "label": "Tool steels"},
-    {"key": "mild_steel",  "label": "Mild / carbon steel"},
-    {"key": "stainless",   "label": "Stainless steel"},
-    {"key": "aluminium",   "label": "Aluminium"},
-    {"key": "brass",       "label": "Brass"},
-    {"key": "bronze",      "label": "Bronze"},
-    {"key": "copper",      "label": "Copper"},
-    {"key": "cast_iron",   "label": "Cast iron"},
-    {"key": "plastics",    "label": "Plastics"},
-    {"key": "misc",        "label": "Misc"},
+    {"key": "aluminium", "label": "Aluminium"},
+    {"key": "aluminium_bronze_manganese_bronze", "label": "Aluminium Bronze/Manganese Bronze"},
+    {"key": "brass", "label": "Brass"},
+    {"key": "cast_iron", "label": "Cast Iron"},
+    {"key": "copper", "label": "Copper"},
+    {"key": "gauge_plate", "label": "Gauge Plate"},
+    {"key": "nickel_silver", "label": "Nickel Silver"},
+    {"key": "phosphor_bronze", "label": "Phosphor Bronze"},
+    {"key": "leaded_gunmetal", "label": "Leaded Gunmetal"},
+    {"key": "plastics", "label": "Plastics"},
+    {"key": "stainless_steel", "label": "Stainless Steel"},
+    {"key": "steel", "label": "Steel"},
+    {"key": "silver_steel", "label": "Silver steel"},
+    {"key": "steel_tube", "label": "Steel Tube"},
 ]
 
 
@@ -138,17 +142,36 @@ def round2(x):
 
 
 def category_from_metal_sheet(name):
-    n = name.lower()
-    if n.startswith("alu"): return "aluminium"
-    if n.startswith("brass"): return "brass"
-    if "bronze" in n or n.startswith("ph brnz") or n.startswith("pb"): return "bronze"
-    if n.startswith("cu") or "copper" in n or "nickel silver" in n or "nil ag" in n: return "copper"
-    if "stainless" in n or n.startswith("st steel") or n.startswith(" stainless") or n.startswith("st st"): return "stainless"
-    if n.startswith("steel") or "gauge plate" in n or "silver steel" in n: return "mild_steel"
-    if "cast" in n: return "cast_iron"
-    if "plastic" in n: return "plastics"
-    if "lg" in n or "colphos" in n: return "bronze"
-    return "misc"
+    n = name.strip().lower()
+    if n == "steel tube":
+        return "steel_tube"
+    if n == "silver steel":
+        return "silver_steel"
+    if "gauge plate" in n:
+        return "gauge_plate"
+    if "nickel silver" in n or "nil ag" in n:
+        return "nickel_silver"
+    if n == "lg":
+        return "leaded_gunmetal"
+    if n.startswith("pb") or n == "colphos":
+        return "phosphor_bronze"
+    if "alu bronze" in n or "magn bronz" in n:
+        return "aluminium_bronze_manganese_bronze"
+    if n.startswith("alu"):
+        return "aluminium"
+    if n.startswith("brass"):
+        return "brass"
+    if n.startswith("copper"):
+        return "copper"
+    if "cast" in n:
+        return "cast_iron"
+    if "plastic" in n:
+        return "plastics"
+    if "stainless" in n or n.startswith("st steel") or n.startswith("st st"):
+        return "stainless_steel"
+    if n.startswith("steel"):
+        return "steel"
+    return "steel"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -106,7 +106,7 @@ export function getAllSeoCategories(): SeoCategory[] {
       kind: "metals-index",
       slug: "engineering-metals",
       title: "Engineering metals",
-      description: `${metals.length} engineering metal catalogue lines including aluminium, stainless steel, tool steels, brass, bronze and plastics.`,
+      description: `${metals.length} engineering metal catalogue lines including aluminium, brass, copper, bronze, plastics, stainless steel, steel, silver steel and steel tube.`,
       products: metals,
     },
     ...metalCategories.map((category): SeoCategory => {
