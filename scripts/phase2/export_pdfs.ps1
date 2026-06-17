@@ -82,10 +82,24 @@ function Export-CatalogueToPdf {
 
         if ($isMetalsCatalogue) {
             Write-Host "  applying metals catalogue PDF page layout"
+            $dateCulture = [System.Globalization.CultureInfo]::GetCultureInfo("en-GB")
+            $now = Get-Date
+            $catalogueYear = $now.ToString("yyyy", $dateCulture)
+            $catalogueMonth = $now.ToString("MMMM yyyy", $dateCulture)
+            $catalogueHeader = "Metals Catalogue $catalogueYear"
+
+            try {
+                $wb.Worksheets.Item("Front sheet").Range("A19").Value2 = $catalogueMonth
+            } catch {
+                Write-Host "  warning: could not update metals cover date" -ForegroundColor Yellow
+            }
+
             foreach ($sheet in @($wb.Worksheets)) {
                 if ($sheet.Visible -eq 0) { continue }
                 $printArea = [string]$sheet.PageSetup.PrintArea
                 if ([string]::IsNullOrWhiteSpace($printArea)) { continue }
+
+                $sheet.PageSetup.CenterHeader = $catalogueHeader
 
                 if ($sheet.Name -eq "Carriage Rates") {
                     $sheet.PageSetup.PrintArea = '$A$1:$I$37'
