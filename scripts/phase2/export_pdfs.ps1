@@ -55,6 +55,49 @@ function Export-CatalogueToPdf {
             }
         }
 
+        foreach ($sheet in @($wb.Worksheets)) {
+            try {
+                if ($sheet.Visible -eq 0) { continue }
+                if ($originalStates.ContainsKey($sheet.Name)) { continue }
+
+                $printArea = [string]$sheet.PageSetup.PrintArea
+                if ([string]::IsNullOrWhiteSpace($printArea)) {
+                    $originalStates[$sheet.Name] = $sheet.Visible
+                    $sheet.Visible = 0
+                    Write-Host "  hiding non-print sheet '$($sheet.Name)'"
+                }
+            } catch {
+                Write-Host "  warning: could not inspect sheet '$($sheet.Name)' for PDF export" -ForegroundColor Yellow
+            }
+        }
+
+        $isMetalsCatalogue = $false
+        try {
+            $null = $wb.Worksheets.Item("Carriage Rates")
+            $null = $wb.Worksheets.Item("Steel Tube")
+            $isMetalsCatalogue = $true
+        } catch {
+            $isMetalsCatalogue = $false
+        }
+
+        if ($isMetalsCatalogue) {
+            Write-Host "  applying metals catalogue PDF page layout"
+            foreach ($sheet in @($wb.Worksheets)) {
+                if ($sheet.Visible -eq 0) { continue }
+                $printArea = [string]$sheet.PageSetup.PrintArea
+                if ([string]::IsNullOrWhiteSpace($printArea)) { continue }
+
+                if ($sheet.Name -eq "Carriage Rates") {
+                    $sheet.PageSetup.PrintArea = '$A$1:$I$37'
+                    continue
+                }
+
+                if ($sheet.Name -notin @("Front sheet", "T&Cs", "Conversion table")) {
+                    $sheet.PageSetup.Zoom = 96
+                }
+            }
+        }
+
         $wb.ExportAsFixedFormat(
             0,
             $OutputPath,

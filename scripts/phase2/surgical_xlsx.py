@@ -219,6 +219,43 @@ def remove_sheet_if_present(tempdir, sheet_name):
     return True
 
 
+def remove_calc_chain_if_present(tempdir):
+    """Remove Excel's cached calculation chain.
+
+    The metals catalogue sync rewrites formulas directly in the worksheet XML.
+    Keeping the source workbook's old calcChain.xml can leave Excel with a
+    stale formula dependency map, so let Excel rebuild it on open/export.
+    """
+    calc_path = os.path.join(tempdir, "xl", "calcChain.xml")
+    if os.path.exists(calc_path):
+        os.remove(calc_path)
+
+    rels_path = os.path.join(tempdir, "xl", "_rels", "workbook.xml.rels")
+    if os.path.exists(rels_path):
+        rels = _read(tempdir, "xl/_rels/workbook.xml.rels")
+        rels = re.sub(
+            r'<Relationship\b[^>]*Type="[^"]*/calcChain"[^>]*/>',
+            "",
+            rels,
+        )
+        rels = re.sub(
+            r'<Relationship\b[^>]*Target="calcChain\.xml"[^>]*/>',
+            "",
+            rels,
+        )
+        _write(tempdir, "xl/_rels/workbook.xml.rels", rels)
+
+    ct_path = os.path.join(tempdir, "[Content_Types].xml")
+    if os.path.exists(ct_path):
+        ct = _read(tempdir, "[Content_Types].xml")
+        ct = re.sub(
+            r'<Override\b[^>]*PartName="/xl/calcChain\.xml"[^>]*/>',
+            "",
+            ct,
+        )
+        _write(tempdir, "[Content_Types].xml", ct)
+
+
 # ---------------------------------------------------------------------------
 # Helpers for building sheet XML
 # ---------------------------------------------------------------------------
@@ -320,7 +357,21 @@ def replace_cell_in_row(row_xml, ref, new_cell_xml):
                 count=1,
             )
         return row_xml[:m.start()] + new_cell_xml + row_xml[m.end():]
-    # No existing cell — insert before </row>
+    # No existing cell. Insert in column order; Excel is much stricter than
+    # XML parsers and may refuse rows ordered like A, B, K, H.
+    target_col = re.match(r"([A-Z]+)\d+", ref).group(1)
+
+    def col_to_num(col):
+        n = 0
+        for ch in col:
+            n = n * 26 + (ord(ch) - ord("A") + 1)
+        return n
+
+    target_idx = col_to_num(target_col)
+    for cell_m in re.finditer(r'<c\b[^>]*\br="([A-Z]+)\d+"', row_xml):
+        if col_to_num(cell_m.group(1)) > target_idx:
+            return row_xml[:cell_m.start()] + new_cell_xml + row_xml[cell_m.start():]
+
     return row_xml.replace("</row>", new_cell_xml + "</row>", 1)
 
 
@@ -400,6 +451,68 @@ def hide_column_in_sheet(sheet_xml_path, col_idx):
         f'<col min="{col_idx}" max="{col_idx}" '
         f'width="9" hidden="1" customWidth="1"/>'
     )
+
+    def set_attr(tag, name, value):
+        if re.search(rf'\b{name}="[^"]*"', tag):
+            return re.sub(rf'\b{name}="[^"]*"', f'{name}="{value}"', tag, count=1)
+        return tag.replace("/>", f' {name}="{value}"/>', 1)
+
+    def set_min_max(tag, min_val, max_val):
+        tag = set_attr(tag, "min", min_val)
+        tag = set_attr(tag, "max", max_val)
+        return tag
+
+    def hidden_col_from(tag):
+        tag = set_min_max(tag, col_idx, col_idx)
+        tag = set_attr(tag, "hidden", "1")
+        return tag
+
+    if "<cols>" in xml:
+        m = re.search(r"<cols>(.*?)</cols>", xml, re.DOTALL)
+        cols_inner = m.group(1)
+        tags = re.findall(r"<col\b[^>]*/>", cols_inner)
+        rebuilt = []
+        inserted = False
+
+        for tag in tags:
+            min_m = re.search(r'\bmin="(\d+)"', tag)
+            max_m = re.search(r'\bmax="(\d+)"', tag)
+            if not min_m or not max_m:
+                rebuilt.append(tag)
+                continue
+
+            min_val = int(min_m.group(1))
+            max_val = int(max_m.group(1))
+
+            if max_val < col_idx:
+                rebuilt.append(tag)
+                continue
+
+            if min_val > col_idx:
+                if not inserted:
+                    rebuilt.append(new_col)
+                    inserted = True
+                rebuilt.append(tag)
+                continue
+
+            if min_val <= col_idx <= max_val:
+                if min_val < col_idx:
+                    rebuilt.append(set_min_max(tag, min_val, col_idx - 1))
+                rebuilt.append(hidden_col_from(tag))
+                inserted = True
+                if col_idx < max_val:
+                    rebuilt.append(set_min_max(tag, col_idx + 1, max_val))
+                continue
+
+            rebuilt.append(tag)
+
+        if not inserted:
+            rebuilt.append(new_col)
+
+        xml = xml[:m.start(1)] + "".join(rebuilt) + xml[m.end(1):]
+        with open(sheet_xml_path, "w", encoding="utf-8") as f:
+            f.write(xml)
+        return
 
     # If the sheet has a <cols>...</cols> block, append our col into it
     if "<cols>" in xml:

@@ -40,6 +40,7 @@ from build_lookup import build_lookup_rows, normalise, make_key
 from metal_codes import candidate_code
 from surgical_xlsx import (
     open_for_surgery, repack_zip, add_sheet, remove_sheet_if_present,
+    remove_calc_chain_if_present,
     map_sheet_names_to_xml_files, edit_sheet_xml, extend_sheet_dimension,
     cell_str, cell_num, cell_formula, col_letter, hide_column_in_sheet,
 )
@@ -111,7 +112,7 @@ def build_pricelookup_xml(rows):
         '<sheetFormatPr defaultRowHeight="15"/>',
         '<cols>',
         '<col min="1" max="1" width="70" customWidth="1"/>',
-        '<col min="2" max="5" width="16" customWidth="1"/>',
+        '<col min="2" max="4" width="16" customWidth="1"/>',
         '<col min="5" max="5" width="22" customWidth="1"/>',
         '<col min="6" max="6" width="10" customWidth="1"/>',
         '<col min="7" max="9" width="16" customWidth="1"/>',
@@ -235,9 +236,20 @@ def wire_catalogue():
             spec  = s(ws.cell(row_idx, 3).value)
             size  = s(ws.cell(row_idx, 4).value)
             existing_price = ws.cell(row_idx, 5).value
+            row_edits = []
+
+            # Always rewrite legacy inc-VAT formulas before row skipping.
+            # The source workbook uses shared formulas in column G; replacing
+            # only some rows can leave Excel with broken shared-formula groups.
+            g_val = ws.cell(row_idx, 7).value
+            if isinstance(g_val, str) and g_val.startswith("="):
+                g_formula = f'IF(E{row_idx}="","",E{row_idx}*1.2)'
+                row_edits.append((f"G{row_idx}", cell_formula(f"G{row_idx}", g_formula)))
 
             if not size and not metal:
                 counts["no-data"] += 1
+                if row_edits:
+                    edits[row_idx] = row_edits
                 continue
 
             matched_key, confidence = find_match(
@@ -245,7 +257,6 @@ def wire_catalogue():
             )
             counts[confidence] += 1
 
-            row_edits = []
             if matched_key and confidence in HIGH_CONFIDENCE:
                 # E (price) looks up via VLOOKUP. H (Code) does the same.
                 # The catalogue's _PriceLookup layout:
@@ -273,13 +284,6 @@ def wire_catalogue():
                     "matchedSrc": keys[matched_key]["src"] if matched_key else "",
                 })
 
-            # Always rewrite col G's inc-VAT formula if it's the legacy
-            # =SUM(E + (E * 20%)) form — IFERROR-wrap so blanks don't error
-            g_val = ws.cell(row_idx, 7).value
-            if isinstance(g_val, str) and g_val.startswith("=") and "IFERROR" not in g_val.upper():
-                g_formula = f'IFERROR(E{row_idx}*1.2,"")'
-                row_edits.append((f"G{row_idx}", cell_formula(f"G{row_idx}", g_formula)))
-
             if row_edits:
                 edits[row_idx] = row_edits
 
@@ -301,6 +305,7 @@ def wire_catalogue():
         # Be idempotent
         for cleanup in ("_PriceLookup", "_ReviewMe"):
             remove_sheet_if_present(tempdir, cleanup)
+        remove_calc_chain_if_present(tempdir)
 
         # Apply cell edits to each metal data sheet
         sheet_path_map = map_sheet_names_to_xml_files(tempdir)
@@ -331,14 +336,6 @@ def wire_catalogue():
     finally:
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
-
-    # Compatibility pass: the original workbook opens in Excel, but after
-    # adding sheets at the ZIP/XML level Excel can reject this particular
-    # metals workbook unless the package relationships are normalised. Metals
-    # is .xlsx (no VBA), so saving once through openpyxl is safe.
-    wb = openpyxl.load_workbook(CATALOGUE)
-    wb.save(CATALOGUE)
-    wb.close()
 
     print()
     print(f"  Match summary:")
