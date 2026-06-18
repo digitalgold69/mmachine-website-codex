@@ -891,8 +891,8 @@ export const products: Product[] = [
     "bodyType": "Van",
     "mark": "Mark 1-2",
     "hand": "LH assembly",
-    "priceExVat": 143.5,
-    "priceIncVat": 172.2,
+    "priceExVat": 50,
+    "priceIncVat": 60.0,
     "stock": "in",
     "stockQty": 0,
     "category": "mini"

@@ -112,6 +112,24 @@ function Export-CatalogueToPdf {
             }
         }
 
+        # The rebuilt catalogues contain fresh lookup tables, but Excel may
+        # otherwise export old cached formula results. Calculate only sheets
+        # that are actually printed; a full workbook rebuild can stall on
+        # unrelated legacy external references in these old workbooks.
+        Write-Host "  recalculating printable catalogue sheets"
+        foreach ($sheet in @($wb.Worksheets)) {
+            if ($sheet.Visible -eq 0) { continue }
+            $printArea = [string]$sheet.PageSetup.PrintArea
+            if ([string]::IsNullOrWhiteSpace($printArea)) { continue }
+            try {
+                $formulaCells = $sheet.UsedRange.SpecialCells(-4123) # xlCellTypeFormulas
+                $formulaCells.Dirty()
+            } catch {
+                # This printable sheet has no formula cells.
+            }
+            $sheet.Calculate()
+        }
+
         $wb.ExportAsFixedFormat(
             0,
             $OutputPath,

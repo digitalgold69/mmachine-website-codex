@@ -51,6 +51,14 @@ def s(v):
     return str(v).strip()
 
 
+def normalise_metal(v):
+    """Normalise known master-only metal labels to catalogue wording."""
+    value = normalise(v)
+    if value == "steel ang":
+        return "steel"
+    return value
+
+
 def build_indexes(rows):
     """Build the lookup indexes used by find_match."""
     keys = {}
@@ -59,7 +67,7 @@ def build_indexes(rows):
     for row in rows:
         key, shape, metal, spec, size, priceEx, unit, srcSheet, srcRow = row[:9]
         metal_n, spec_n, size_n, shape_n = (
-            normalise(metal), normalise(spec), normalise(size), normalise(shape)
+            normalise_metal(metal), normalise(spec), normalise(size), normalise(shape)
         )
         keys[key] = {
             "shape": shape, "metal": metal, "spec": spec, "size": size,
@@ -72,7 +80,7 @@ def build_indexes(rows):
 
 def find_match(metal, spec, size, shape, keys, by_metal_size, by_metal_spec_size):
     metal_n, spec_n, size_n, shape_n = (
-        normalise(metal), normalise(spec), normalise(size), normalise(shape)
+        normalise_metal(metal), normalise(spec), normalise(size), normalise(shape)
     )
     k = make_key(metal, spec, size, shape)
     if k in keys: return k, "exact"
