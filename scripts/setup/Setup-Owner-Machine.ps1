@@ -196,6 +196,12 @@ if (Test-Path $InstallPath) {
 
 Push-Location $InstallPath
 Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
+Write-Host "  Checking that the GitHub token can publish updates ..."
+git push --dry-run origin HEAD:main
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    Exit-WithMessage "The GitHub token cannot write to this repo. Create a fine-grained token for mmachine-website-codex with Contents set to Read and write."
+}
 Pop-Location
 
 # ------------------------------------------------------------------------------
