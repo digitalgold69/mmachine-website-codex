@@ -375,7 +375,12 @@ def replace_cell_in_row(row_xml, ref, new_cell_xml):
     return row_xml.replace("</row>", new_cell_xml + "</row>", 1)
 
 
-_ROW_REGEX = re.compile(r'<row[ \t]+r="(\d+)"(?:[ \t][^>]*)?>.*?</row>', re.DOTALL)
+# Do not let a self-closing blank row consume the next populated row. Older
+# Excel files contain both <row .../> and <row ...>...</row> forms.
+_ROW_REGEX = re.compile(
+    r'<row\b(?=[^>]*\br="(\d+)")[^>]*(?<!/)>.*?</row>',
+    re.DOTALL,
+)
 
 
 def edit_sheet_xml(sheet_xml_path, row_edits):

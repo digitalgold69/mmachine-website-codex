@@ -259,6 +259,18 @@ function Write-Log {
     Add-Content -Path `$Log -Value "[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] `$Message"
 }
 
+try {
+    `$LockStream = [System.IO.File]::Open(
+        "$InstallPath\daily-sync.lock",
+        [System.IO.FileMode]::OpenOrCreate,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None
+    )
+} catch {
+    Write-Log "Sync skipped because another M-Machine sync is already running"
+    exit 0
+}
+
 function Invoke-LoggedCommand {
     param(
         [string]`$Name,
@@ -281,7 +293,7 @@ Add-Content -Path `$Log -Value "=============================================="
 
 Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autostash }
 Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
-Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts data-source/.metal-codes.json public/catalogue }
+Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue }
 
 git diff --cached --quiet >> `$Log 2>&1
 `$diffExit = `$LASTEXITCODE
@@ -297,6 +309,7 @@ if (`$diffExit -eq 1) {
 }
 
 Write-Log "Daily sync done"
+`$LockStream.Dispose()
 "@
 Set-Content -Path $SyncScriptPath -Value $SyncScriptContent -Encoding ASCII
 

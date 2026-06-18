@@ -21,6 +21,7 @@ import re
 import shutil
 import sys
 import warnings
+from collections import defaultdict
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -36,8 +37,13 @@ PROJECT_ROOT = HERE.parent.parent
 CATALOGUE_SRC = str(PROJECT_ROOT / "data-source" / "Metals catalogue 2023.xlsx")
 CATALOGUE = str(PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx")
 
-from build_lookup import build_lookup_rows, normalise, make_key
-from metal_codes import candidate_code
+from build_lookup import build_lookup_rows
+from catalogue_codes import CatalogueCodeRegistry
+from metal_matching import (
+    MetalMatcher,
+    make_catalogue_base,
+    make_catalogue_link_id,
+)
 from surgical_xlsx import (
     open_for_surgery, repack_zip, add_sheet, remove_sheet_if_present,
     remove_calc_chain_if_present,
@@ -51,48 +57,16 @@ def s(v):
     return str(v).strip()
 
 
-def normalise_metal(v):
-    """Normalise known master-only metal labels to catalogue wording."""
-    value = normalise(v)
-    if value == "steel ang":
-        return "steel"
-    return value
-
-
 def build_indexes(rows):
-    """Build the lookup indexes used by find_match."""
+    """Build a direct lookup-key index for catalogue formulas."""
     keys = {}
-    by_metal_size = {}
-    by_metal_spec_size = {}
     for row in rows:
         key, shape, metal, spec, size, priceEx, unit, srcSheet, srcRow = row[:9]
-        metal_n, spec_n, size_n, shape_n = (
-            normalise_metal(metal), normalise(spec), normalise(size), normalise(shape)
-        )
         keys[key] = {
             "shape": shape, "metal": metal, "spec": spec, "size": size,
             "priceEx": priceEx, "unit": unit, "src": f"{srcSheet}!{srcRow}",
         }
-        by_metal_size.setdefault((metal_n, size_n), []).append((key, spec_n, shape_n))
-        by_metal_spec_size.setdefault((metal_n, spec_n, size_n), []).append(key)
-    return keys, by_metal_size, by_metal_spec_size
-
-
-def find_match(metal, spec, size, shape, keys, by_metal_size, by_metal_spec_size):
-    metal_n, spec_n, size_n, shape_n = (
-        normalise_metal(metal), normalise(spec), normalise(size), normalise(shape)
-    )
-    k = make_key(metal, spec, size, shape)
-    if k in keys: return k, "exact"
-    cs = by_metal_spec_size.get((metal_n, spec_n, size_n), [])
-    if cs: return cs[0], "no-shape"
-    for key, spec_master_n, shape_master_n in by_metal_size.get((metal_n, size_n), []):
-        if spec_n and spec_master_n and (spec_n in spec_master_n or spec_master_n in spec_n):
-            return key, "spec-fuzzy"
-    pool = by_metal_size.get((metal_n, size_n), [])
-    if pool:
-        return pool[0][0], "size-only"
-    return None, "unmatched"
+    return keys
 
 
 def is_data_sheet(ws):
@@ -106,7 +80,7 @@ def build_pricelookup_xml(rows):
             Source Sheet | Source Row | Code
     """
     headers = ["Key", "Shape", "Metal", "Spec", "Size", "£ ex VAT", "Unit",
-               "Source Sheet", "Source Row", "Code"]
+               "Source Sheet", "Source Row", "Code", "Grade", "Stable Link ID"]
     n_rows = len(rows) + 1
     last_col = col_letter(len(headers))
 
@@ -125,6 +99,7 @@ def build_pricelookup_xml(rows):
         '<col min="6" max="6" width="10" customWidth="1"/>',
         '<col min="7" max="9" width="16" customWidth="1"/>',
         '<col min="10" max="10" width="32" customWidth="1"/>',
+        '<col min="11" max="12" width="42" customWidth="1"/>',
         '</cols>',
         '<sheetData>',
     ]
@@ -137,7 +112,7 @@ def build_pricelookup_xml(rows):
     for ri, row in enumerate(rows, start=2):
         parts.append(f'<row r="{ri}">')
         # row tuple length: 10 (Key, Shape, Metal, Spec, Size, £, Unit, Sheet, SrcRow, Code)
-        for ci, val in enumerate(row[:10], 1):
+        for ci, val in enumerate(row[:12], 1):
             ref = f"{col_letter(ci)}{ri}"
             if val is None or val == "":
                 continue
@@ -211,23 +186,21 @@ def build_reviewme_xml(review_rows):
     return "\n".join(parts)
 
 
-HIGH_CONFIDENCE = {"exact", "no-shape", "spec-fuzzy"}
-
-
 def wire_catalogue():
     print(f"  Source:  {CATALOGUE_SRC}")
     print(f"  Output:  {CATALOGUE}")
 
     rows, _collisions = build_lookup_rows()
-    keys, by_metal_size, by_metal_spec_size = build_indexes(rows)
+    keys = build_indexes(rows)
+    matcher = MetalMatcher(rows)
+    code_registry = CatalogueCodeRegistry()
     print(f"  Master rows: {len(rows)}")
 
     # --- 1. Read catalogue with openpyxl (do NOT save) -------------------
     src_wb = openpyxl.load_workbook(CATALOGUE_SRC)
     sheet_edits = {}    # sheet_name -> {row_idx: [(ref, cell_xml), ...]}
     review_rows = []
-    counts = {"exact": 0, "no-shape": 0, "spec-fuzzy": 0, "size-only": 0,
-              "unmatched": 0, "no-data": 0, "auto_linked": 0}
+    counts = defaultdict(int)
 
     for sheet_name in src_wb.sheetnames:
         if sheet_name.startswith("_"):
@@ -237,6 +210,7 @@ def wire_catalogue():
             continue
 
         edits = {}
+        occurrences = defaultdict(int)
 
         for row_idx in range(2, ws.max_row + 1):
             shape = s(ws.cell(row_idx, 1).value)
@@ -244,6 +218,7 @@ def wire_catalogue():
             spec  = s(ws.cell(row_idx, 3).value)
             size  = s(ws.cell(row_idx, 4).value)
             existing_price = ws.cell(row_idx, 5).value
+            unit = s(ws.cell(row_idx, 6).value)
             row_edits = []
 
             # Always rewrite legacy inc-VAT formulas before row skipping.
@@ -260,29 +235,47 @@ def wire_catalogue():
                     edits[row_idx] = row_edits
                 continue
 
-            matched_key, confidence = find_match(
-                metal, spec, size, shape, keys, by_metal_size, by_metal_spec_size
+            base = make_catalogue_base(
+                sheet_name, shape, metal, spec, size, unit
             )
+            occurrences[base] += 1
+            link_id = make_catalogue_link_id(
+                sheet_name, shape, metal, spec, size, unit, occurrences[base]
+            )
+            result = matcher.match(
+                {
+                    "shape": shape,
+                    "metal": metal,
+                    "spec": spec,
+                    "size": size,
+                    "unit": unit,
+                },
+                link_id,
+                existing_price=existing_price,
+            )
+            matched_key = result.lookup_key
+            confidence = result.confidence
             counts[confidence] += 1
+            public_code = code_registry.get(
+                link_id, metal, spec, size, shape
+            )
 
-            if matched_key and confidence in HIGH_CONFIDENCE:
+            if matched_key:
                 # E (price) looks up via VLOOKUP. H (Code) does the same.
                 # The catalogue's _PriceLookup layout:
                 #   A=Key, B=Shape, C=Metal, D=Spec, E=Size, F=£ ex VAT, G=Unit,
                 #   H=Source Sheet, I=Source Row, J=Code
                 e_formula = f'IFERROR(VLOOKUP(K{row_idx},_PriceLookup!$A:$F,6,FALSE),0)'
-                h_formula = f'IFERROR(VLOOKUP(K{row_idx},_PriceLookup!$A:$J,10,FALSE),"")'
                 row_edits.append((f"E{row_idx}", cell_formula(f"E{row_idx}", e_formula)))
-                row_edits.append((f"H{row_idx}", cell_formula(f"H{row_idx}", h_formula)))
+                row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", public_code)))
                 row_edits.append((f"K{row_idx}", cell_str(f"K{row_idx}", matched_key)))
                 counts["auto_linked"] += 1
             else:
                 # Not auto-linked — but still want a Code in column H so the
                 # owner / customers can read it off the catalogue. Use the
                 # candidate code from this row's own text (no master lookup).
-                fallback_code = candidate_code(metal, spec, size)
-                if fallback_code:
-                    row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", fallback_code)))
+                if public_code:
+                    row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", public_code)))
                 review_rows.append({
                     "sheet": sheet_name, "row": row_idx,
                     "shape": shape, "metal": metal, "spec": spec, "size": size,
@@ -299,11 +292,10 @@ def wire_catalogue():
             sheet_edits[sheet_name] = edits
 
     src_wb.close()
+    matcher.save()
+    code_registry.save()
 
-    # Sort review rows: most suspicious first
-    confidence_rank = {"unmatched": 0, "size-only": 1, "spec-fuzzy": 2, "no-shape": 3, "exact": 4}
-    review_rows.sort(key=lambda r: (confidence_rank.get(r["confidence"], 9),
-                                      r["sheet"], r["row"]))
+    review_rows.sort(key=lambda r: (r["confidence"], r["sheet"], r["row"]))
 
     # --- 2. Surgical edits — extract directly from the source ------------
     # (avoids a permission error if the destination is open in Excel)
@@ -332,12 +324,17 @@ def wire_catalogue():
                 edits.setdefault(1, []).append(("K1", cell_str("K1", "Lookup Key")))
 
             applied, missing = edit_sheet_xml(str(sheet_path), edits)
+            if missing:
+                print(
+                    f"  WARNING: {sheet_name} has {len(missing)} XML rows "
+                    f"that could not be updated: {missing[:12]}"
+                )
             extend_sheet_dimension(str(sheet_path), "K")
             hide_column_in_sheet(str(sheet_path), 11)  # column K
 
-        # Add the two new sheets
+        # Only the private lookup is embedded. Diagnostics stay in the sync
+        # log rather than adding an owner-visible worksheet.
         add_sheet(tempdir, "_PriceLookup", build_pricelookup_xml(rows), hidden=True)
-        add_sheet(tempdir, "_ReviewMe", build_reviewme_xml(review_rows))
 
         repack_zip(tempdir, CATALOGUE)
         tempdir = None
@@ -347,10 +344,21 @@ def wire_catalogue():
 
     print()
     print(f"  Match summary:")
-    for k in ("exact", "no-shape", "spec-fuzzy", "size-only", "unmatched", "no-data"):
+    for k in ("persisted", "strong", "spec", "unique", "price-bootstrap",
+              "equivalent-duplicate", "deterministic", "ambiguous",
+              "unmatched", "no-data"):
         print(f"    {k:12s}: {counts[k]}")
     print(f"  Auto-linked (VLOOKUP):  {counts['auto_linked']}")
-    print(f"  In _ReviewMe:           {len(review_rows)}")
+    print(f"  Unresolved rows:         {len(review_rows)}")
+    if matcher.broken_links:
+        print(f"  WARNING: {len(matcher.broken_links)} saved links pointed to removed master rows")
+    for item in review_rows[:12]:
+        print(
+            f"    {item['confidence']}: {item['sheet']}!{item['row']} - "
+            f"{item['metal']} / {item['spec']} / {item['size']}"
+        )
+    if len(review_rows) > 12:
+        print(f"    ... plus {len(review_rows) - 12} more unresolved rows")
     print("  OK Excel-compatible catalogue written")
 
 

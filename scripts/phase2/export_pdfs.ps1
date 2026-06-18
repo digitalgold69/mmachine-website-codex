@@ -10,7 +10,7 @@
 param(
     [string]$Source = "final-deliverables\Metals catalogue 2023.xlsx",
     [string]$Output = "public\catalogue\metals-catalogue.pdf",
-    [string[]]$HideSheets = @("_PriceLookup", "_ReviewMe"),
+    [string[]]$HideSheets = @("_PriceLookup"),
 
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
     [string]$Output2 = "public\catalogue\mini-catalogue.pdf",

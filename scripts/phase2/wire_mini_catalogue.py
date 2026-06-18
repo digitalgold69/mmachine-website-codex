@@ -42,7 +42,8 @@ MINI_CAT = str(PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updati
 
 from surgical_xlsx import (
     open_for_surgery, repack_zip, add_sheet, remove_sheet_if_present,
-    map_sheet_names_to_xml_files, cell_str, cell_num, col_letter, _read, _write,
+    remove_calc_chain_if_present, map_sheet_names_to_xml_files, edit_sheet_xml,
+    cell_str, cell_num, cell_formula, col_letter, _read, _write,
 )
 
 
@@ -53,6 +54,51 @@ EXTERNAL_PATTERNS = [
     r"'\[1\]Parts Data'!\$A:\$E",
 ]
 INTERNAL_REPLACEMENT = "_PriceLookup!$A:$B"
+PART_CODE_REGEX = re.compile(r"^[\d.]+\.\d{2}\.\d{2}\.\d{2}[A-Z]?$|^[A-Z0-9-]{4,}$")
+
+
+def looks_like_part_code(value):
+    value = str(value or "").strip()
+    return (
+        bool(value)
+        and " " not in value
+        and 3 <= len(value) <= 30
+        and bool(PART_CODE_REGEX.match(value))
+    )
+
+
+def code_description_columns(ws):
+    pairs = []
+    for col in range(1, ws.max_column + 1):
+        if str(ws.cell(1, col).value or "").strip().lower() == "code":
+            pairs.append((col, col + 1))
+    return pairs
+
+
+def build_internal_formula_edits(ws):
+    edits = {}
+    for code_col, _description_col in code_description_columns(ws):
+        price_col = code_col + 2
+        inc_vat_col = code_col + 3
+        for row in range(2, ws.max_row + 1):
+            if not looks_like_part_code(ws.cell(row, code_col).value):
+                continue
+            code_ref = f"{col_letter(code_col)}{row}"
+            price_ref = f"{col_letter(price_col)}{row}"
+            inc_ref = f"{col_letter(inc_vat_col)}{row}"
+            if ws.cell(row, price_col).data_type != "f":
+                price_formula = (
+                    f'IFERROR(VLOOKUP({code_ref},_PriceLookup!$A:$B,2,FALSE)," ")'
+                )
+                edits.setdefault(row, []).append(
+                    (price_ref, cell_formula(price_ref, price_formula))
+                )
+            if ws.cell(row, inc_vat_col).data_type != "f":
+                inc_formula = f'IFERROR(({price_ref}/100*20)+{price_ref}," ")'
+                edits.setdefault(row, []).append(
+                    (inc_ref, cell_formula(inc_ref, inc_formula))
+                )
+    return edits
 
 
 def load_partsbook_codes():
@@ -183,6 +229,7 @@ def wire_mini_catalogue():
 
     rows = load_partsbook_codes()
     print(f"  PartsbookBenji codes: {len(rows)}")
+    source_wb = openpyxl.load_workbook(MINI_CAT_SRC, data_only=False, keep_vba=True)
 
     Path(MINI_CAT).parent.mkdir(parents=True, exist_ok=True)
     # Extract directly from the source (avoids permission error if destination is open)
@@ -191,21 +238,30 @@ def wire_mini_catalogue():
         remove_sheet_if_present(tempdir, "_PriceLookup")
         add_sheet(tempdir, "_PriceLookup", build_pricelookup_xml(rows), hidden=True)
 
-        # Rewrite external-link references in every B-sheet (and APX1, APX2)
+        # Rewrite the existing formulas in place so all original formatting
+        # and legacy workbook structure stay untouched. If a newly-added row
+        # has no real formula, insert the two formulas just for that row.
         sheet_path_map = map_sheet_names_to_xml_files(tempdir)
         total_rewrites = 0
         sheets_touched = 0
         for sheet_name, xml_rel in sheet_path_map.items():
-            # B-sheets are pages, so 120B, 130B, etc. APX1 / APX2 too.
             if not (re.fullmatch(r"\d+B", sheet_name) or sheet_name in {"APX1", "APX2"}):
                 continue
             sheet_path = Path(tempdir) / xml_rel
-            n = rewrite_external_references_in_sheet(str(sheet_path))
-            if n > 0:
+            rewritten = rewrite_external_references_in_sheet(str(sheet_path))
+            edits = build_internal_formula_edits(source_wb[sheet_name])
+            if edits:
+                _applied, missing = edit_sheet_xml(str(sheet_path), edits)
+                if missing:
+                    raise RuntimeError(
+                        f"{sheet_name}: could not update formula rows {missing[:12]}"
+                    )
+            inserted = sum(len(row_edits) for row_edits in edits.values())
+            if rewritten or inserted:
                 sheets_touched += 1
-                total_rewrites += n
+                total_rewrites += rewritten + inserted
 
-        print(f"  Rewrote {total_rewrites} formulas across {sheets_touched} catalogue pages")
+        print(f"  Refreshed {total_rewrites} formulas across {sheets_touched} catalogue pages")
 
         # Strip the external-link metadata so Excel doesn't prompt
         remove_external_link_rels(tempdir)
@@ -213,6 +269,7 @@ def wire_mini_catalogue():
         repack_zip(tempdir, MINI_CAT)
         tempdir = None
     finally:
+        source_wb.close()
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
 

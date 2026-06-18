@@ -25,6 +25,7 @@ import re
 import shutil
 import sys
 import warnings
+from collections import defaultdict
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -56,7 +57,13 @@ METALS_CAT   = SRC / "Metals catalogue 2023.xlsx"
 METALS       = SRC / "Metals.xlsx"
 
 from build_lookup import build_lookup_rows
-from wire_catalogue import build_indexes, find_match, HIGH_CONFIDENCE, s as strip_str, is_data_sheet
+from catalogue_codes import CatalogueCodeRegistry
+from metal_matching import (
+    MetalMatcher,
+    make_catalogue_base,
+    make_catalogue_link_id,
+)
+from wire_catalogue import build_indexes, s as strip_str, is_data_sheet
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -357,16 +364,9 @@ def build_metals_products():
 
     # Master lookup (also loads + persists the .metal-codes.json mapping)
     rows, _collisions = build_lookup_rows()
-    keys, by_metal_size, by_metal_spec_size = build_indexes(rows)
-
-    # Build a code-by-key index so we can attach the assigned code to each
-    # catalogue row that auto-links. master tuple has the code at index 9.
-    code_by_master_key = {row[0]: row[9] for row in rows}
-
-    # For unmatched catalogue rows we still want a sensible code. Use the
-    # same code-assigner so collisions across catalogue+master are handled.
-    sys.path.insert(0, str(HERE / "phase2"))
-    from metal_codes import composite_key as _ckey, candidate_code as _cand
+    keys = build_indexes(rows)
+    matcher = MetalMatcher(rows)
+    code_registry = CatalogueCodeRegistry()
 
     # Catalogue
     wb = openpyxl.load_workbook(METALS_CAT, data_only=True)
@@ -381,6 +381,7 @@ def build_metals_products():
         if not is_data_sheet(ws): continue
 
         cat = category_from_metal_sheet(sheet_name)
+        occurrences = defaultdict(int)
 
         for row_idx in range(2, ws.max_row + 1):
             shape = strip_str(ws.cell(row_idx, 1).value)
@@ -392,11 +393,30 @@ def build_metals_products():
 
             if not size and not metal: continue
 
-            matched_key, confidence = find_match(metal, spec, size, shape, keys, by_metal_size, by_metal_spec_size)
+            base = make_catalogue_base(
+                sheet_name, shape, metal, spec, size, unit
+            )
+            occurrences[base] += 1
+            link_id = make_catalogue_link_id(
+                sheet_name, shape, metal, spec, size, unit, occurrences[base]
+            )
+            result = matcher.match(
+                {
+                    "shape": shape,
+                    "metal": metal,
+                    "spec": spec,
+                    "size": size,
+                    "unit": unit,
+                },
+                link_id,
+                existing_price=existing_price,
+            )
+            matched_key = result.lookup_key
+            confidence = result.confidence
 
             price_ex = None
             poa = False
-            if matched_key and confidence in HIGH_CONFIDENCE:
+            if matched_key:
                 master_price = keys[matched_key]["priceEx"]
                 if isinstance(master_price, (int, float)):
                     price_ex = master_price
@@ -425,10 +445,7 @@ def build_metals_products():
             #   Anything else             → use candidate-code from this row's
             #                                own text (so spec=HE30 produces
             #                                "HE30-..." not "Aluminium-...")
-            if matched_key and confidence in HIGH_CONFIDENCE and matched_key in code_by_master_key:
-                code = code_by_master_key[matched_key] or _cand(metal, spec, size)
-            else:
-                code = _cand(metal, spec, size)
+            code = code_registry.get(link_id, metal, spec, size, shape)
 
             # Always "in" — real stock tracking comes in Phase 3. Pricing
             # state is communicated via priceExVat (null = "POA" badge in UI).
@@ -452,7 +469,11 @@ def build_metals_products():
             })
             next_id += 1
 
+    matcher.save()
+    code_registry.save()
     print(f"  OK Metals products: {len(out)}  (auto-linked {auto_linked}, hardcoded fallback {fallback})")
+    if matcher.broken_links:
+        print(f"  WARNING: {len(matcher.broken_links)} saved metal links pointed to removed master rows")
     return out
 
 

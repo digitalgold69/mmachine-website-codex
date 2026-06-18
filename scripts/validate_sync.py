@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Validate every generated sync output before Git is allowed to publish it."""
+
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+import openpyxl
+
+
+HERE = Path(__file__).resolve().parent
+PROJECT_ROOT = HERE.parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE / "phase2"))
+
+from regen_website_data import (  # noqa: E402
+    _find_code_desc_columns,
+    _looks_like_part_code,
+    build_metals_products,
+    build_mini_products,
+    read_partsbook_prices,
+)
+from build_lookup import build_lookup_rows  # noqa: E402
+from metal_matching import MetalMatcher  # noqa: E402
+from wire_catalogue import build_indexes, is_data_sheet  # noqa: E402
+
+
+MINI_TS = PROJECT_ROOT / "lib" / "mini-data.ts"
+METALS_TS = PROJECT_ROOT / "lib" / "metals-data.ts"
+MINI_BOOK = PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.xlsm"
+METALS_BOOK = PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx"
+MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf"
+METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf"
+
+
+def close_enough(left, right) -> bool:
+    if left is None or right is None:
+        return left is right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return math.isclose(float(left), float(right), rel_tol=0, abs_tol=0.001)
+    return str(left).strip() == str(right).strip()
+
+
+def read_exported_array(path: Path, marker: str):
+    source = path.read_text(encoding="utf-8")
+    start = source.find(marker)
+    if start < 0:
+        raise ValueError(f"{path.name}: missing marker {marker!r}")
+    start = source.find("=", start + len(marker))
+    start = source.find("[", start + 1)
+    if start < 0:
+        raise ValueError(f"{path.name}: missing generated JSON array")
+    return json.JSONDecoder().raw_decode(source[start:])[0]
+
+
+def validate_website_data(failures: list[str]) -> None:
+    expected_mini = build_mini_products()
+    actual_mini = read_exported_array(MINI_TS, "export const products")
+    if len(actual_mini) != len(expected_mini):
+        failures.append(
+            f"website mini count is {len(actual_mini)}, expected {len(expected_mini)}"
+        )
+    for index, (expected, actual) in enumerate(zip(expected_mini, actual_mini), 1):
+        for field in ("code", "name", "section", "priceExVat", "priceIncVat"):
+            if not close_enough(expected.get(field), actual.get(field)):
+                failures.append(
+                    f"website mini row {index} {field}: "
+                    f"{actual.get(field)!r} != {expected.get(field)!r}"
+                )
+                break
+
+    expected_metals = build_metals_products()
+    actual_metals = read_exported_array(METALS_TS, "export const metals")
+    if len(actual_metals) != len(expected_metals):
+        failures.append(
+            f"website metals count is {len(actual_metals)}, expected {len(expected_metals)}"
+        )
+    for index, (expected, actual) in enumerate(zip(expected_metals, actual_metals), 1):
+        for field in (
+            "sourceSheet",
+            "metal",
+            "form",
+            "spec",
+            "size",
+            "unit",
+            "priceExVat",
+            "priceIncVat",
+        ):
+            if not close_enough(expected.get(field), actual.get(field)):
+                failures.append(
+                    f"website metals row {index} {field}: "
+                    f"{actual.get(field)!r} != {expected.get(field)!r}"
+                )
+                break
+
+
+def validate_mini_workbook(failures: list[str]) -> int:
+    prices = read_partsbook_prices()
+    wb = openpyxl.load_workbook(MINI_BOOK, data_only=True, keep_vba=True)
+    lookup = wb["_PriceLookup"]
+    embedded = {}
+    for row in lookup.iter_rows(min_row=2, max_col=2, values_only=True):
+        code, price = row
+        if code is not None:
+            embedded[str(code).strip()] = price
+
+    for code, expected in prices.items():
+        if code not in embedded or not close_enough(embedded[code], expected):
+            failures.append(
+                f"mini workbook lookup {code}: {embedded.get(code)!r} != {expected!r}"
+            )
+
+    checked = 0
+    for sheet_name in wb.sheetnames:
+        if not (
+            (sheet_name.endswith("B") and sheet_name[:-1].isdigit())
+            or sheet_name in {"APX1", "APX2"}
+        ):
+            continue
+        ws = wb[sheet_name]
+        header = [ws.cell(1, col).value for col in range(1, ws.max_column + 1)]
+        for code_col, _desc_col in _find_code_desc_columns(header):
+            price_col = code_col + 2
+            for row_idx in range(2, ws.max_row + 1):
+                raw_code = ws.cell(row_idx, code_col).value
+                code = str(raw_code).strip() if raw_code is not None else ""
+                if not _looks_like_part_code(code):
+                    continue
+                expected = prices.get(code)
+                if not isinstance(expected, (int, float)):
+                    continue
+                actual = ws.cell(row_idx, price_col).value
+                checked += 1
+                if not close_enough(actual, expected):
+                    failures.append(
+                        f"mini workbook {sheet_name}!{ws.cell(row_idx, price_col).coordinate} "
+                        f"for {code}: {actual!r} != {expected!r}"
+                    )
+    wb.close()
+    return checked
+
+
+def validate_metals_workbook(failures: list[str]) -> int:
+    rows, _collisions = build_lookup_rows()
+    keys = build_indexes(rows)
+    matcher = MetalMatcher(rows)
+    missing_targets = sorted(
+        link_id
+        for link_id in matcher.links.values()
+        if link_id not in matcher.by_link_id
+    )
+    if missing_targets:
+        failures.append(
+            f"{len(missing_targets)} saved metal links point to removed master rows"
+        )
+
+    wb = openpyxl.load_workbook(METALS_BOOK, data_only=True)
+    linked = 0
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        if not is_data_sheet(ws):
+            continue
+        for row_idx in range(2, ws.max_row + 1):
+            lookup_key = ws.cell(row_idx, 11).value
+            if not lookup_key:
+                continue
+            linked += 1
+            master = keys.get(str(lookup_key))
+            if not master:
+                failures.append(
+                    f"metals workbook {sheet_name}!K{row_idx} has an unknown lookup key"
+                )
+                continue
+            actual = ws.cell(row_idx, 5).value
+            expected = master["priceEx"]
+            if not close_enough(actual, expected):
+                failures.append(
+                    f"metals workbook {sheet_name}!E{row_idx}: "
+                    f"{actual!r} != {expected!r} from {master['src']}"
+                )
+    wb.close()
+
+    if linked != len(matcher.links):
+        failures.append(
+            f"metals workbook has {linked} linked rows, saved map has {len(matcher.links)}"
+        )
+    return linked
+
+
+def validate_pdfs(failures: list[str]) -> None:
+    for path in (MINI_PDF, METALS_PDF):
+        if not path.exists() or path.stat().st_size < 10_000:
+            failures.append(f"{path.name} was not generated correctly")
+            continue
+        if path.stat().st_mtime < min(MINI_BOOK.stat().st_mtime, METALS_BOOK.stat().st_mtime) - 5:
+            failures.append(f"{path.name} is older than the generated customer workbooks")
+
+
+def main() -> None:
+    failures: list[str] = []
+    print("Validating generated website data and customer files")
+    validate_website_data(failures)
+    mini_checked = validate_mini_workbook(failures)
+    metals_checked = validate_metals_workbook(failures)
+    validate_pdfs(failures)
+
+    if failures:
+        print()
+        print(f"VALIDATION FAILED ({len(failures)} problems)")
+        for failure in failures[:40]:
+            print(f"  - {failure}")
+        if len(failures) > 40:
+            print(f"  - ... plus {len(failures) - 40} more")
+        sys.exit(1)
+
+    print(
+        f"  OK {mini_checked} calculated Mini prices, "
+        f"{metals_checked} linked metals prices, website data, and both PDFs"
+    )
+
+
+if __name__ == "__main__":
+    main()

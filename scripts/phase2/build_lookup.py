@@ -21,6 +21,11 @@ import sys
 import os
 from pathlib import Path
 from openpyxl.styles import Font, PatternFill, Alignment
+from metal_matching import (
+    assign_master_link_ids,
+    canonical_shape,
+    is_shape_heading,
+)
 
 # Resolve paths relative to the project root (parent of scripts/phase2/)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -71,25 +76,56 @@ def parse_master():
         ws = wb[sheet_name]
         # Header row 1: Shape | Metal | Spec. | Size | £ ex VAT | Unit | £ Inc VAT | Notes ...
         current_shape = ""
+        current_grade = ""
+        current_metal = ""
+        legacy_shape = ""
         for row_idx in range(2, ws.max_row + 1):
-            shape = s(ws.cell(row_idx, 1).value)
+            column_a = s(ws.cell(row_idx, 1).value)
             metal_cell = s(ws.cell(row_idx, 2).value)
             spec  = s(ws.cell(row_idx, 3).value)
             size  = s(ws.cell(row_idx, 4).value)
             priceEx = n(ws.cell(row_idx, 5).value)
             unit  = s(ws.cell(row_idx, 6).value)
 
-            # Shape-only rows ("Rounds", "Sheet", "Eq Angle") are headings
-            if shape and not metal_cell and not size and priceEx is None:
-                current_shape = shape
+            if not any((column_a, metal_cell, spec, size, priceEx is not None, unit)):
+                current_grade = ""
+                current_metal = ""
                 continue
-            eff_shape = shape or current_shape
+
+            legacy_row_shape = column_a or legacy_shape
+
+            # Column A is overloaded. Shape-only rows are section headings,
+            # while values on priced rows are normally grades/alloys such as
+            # 6082T6, CZ126, or 1.4305.
+            if column_a and not metal_cell and not spec and not size and priceEx is None:
+                if is_shape_heading(column_a):
+                    current_shape = canonical_shape(column_a)
+                    current_grade = ""
+                    current_metal = ""
+                else:
+                    current_grade = column_a
+                legacy_shape = column_a
+                continue
+
             if not metal_cell and not size: continue
             if priceEx is None: continue
 
+            row_shape = canonical_shape(column_a) if is_shape_heading(column_a) else ""
+            if row_shape:
+                current_shape = row_shape
+                current_grade = ""
+            elif column_a:
+                current_grade = column_a
+
+            if metal_cell:
+                current_metal = metal_cell
+
             rows.append({
-                "shape": eff_shape,
-                "metal": metal_cell or metal,
+                "shape": row_shape or current_shape,
+                "legacyShape": legacy_row_shape,
+                "metal": metal_cell or current_metal or metal,
+                "legacyMetal": metal_cell or metal,
+                "grade": current_grade,
                 "spec": spec,
                 "size": size,
                 "priceEx": priceEx,
@@ -97,6 +133,7 @@ def parse_master():
                 "sourceSheet": sheet_name,
                 "sourceRow": row_idx,
             })
+    assign_master_link_ids(rows)
     return rows
 
 def make_key(metal, spec, size, shape=""):
@@ -108,7 +145,7 @@ def make_key(metal, spec, size, shape=""):
     ])
 
 def build_lookup_rows():
-    """Pure in-memory build. Returns a list of 10-tuples:
+    """Pure in-memory build. Returns a list of 12-tuples.
     (Key, Shape, Metal, Spec, Size, £ ex VAT, Unit, Source Sheet, Source Row, Code).
 
     Used by wire_catalogue.py, wire_invoice.py, regen_website_data.py.
@@ -130,7 +167,12 @@ def build_lookup_rows():
 
     # Build the input for the code assigner (one entry per master row)
     code_inputs = [
-        {"metal": r["metal"], "spec": r["spec"], "size": r["size"], "shape": r["shape"]}
+        {
+            "metal": r["legacyMetal"],
+            "spec": r["spec"],
+            "size": r["size"],
+            "shape": r["legacyShape"],
+        }
         for r in rows
     ]
 
@@ -149,11 +191,13 @@ def build_lookup_rows():
             collisions += 1
             k = k + "#" + r["sourceSheet"] + ":" + str(r["sourceRow"])
         seen[k] = r
-        ckey = composite_key(r["metal"], r["spec"], r["size"], r["shape"])
+        ckey = composite_key(
+            r["legacyMetal"], r["spec"], r["size"], r["legacyShape"]
+        )
         code = code_map.get(ckey, "")
         out.append((k, r["shape"], r["metal"], r["spec"], r["size"],
                     r["priceEx"], r["unit"], r["sourceSheet"], r["sourceRow"],
-                    code))
+                    code, r["grade"], r["linkId"]))
     return out, collisions
 
 def main():
