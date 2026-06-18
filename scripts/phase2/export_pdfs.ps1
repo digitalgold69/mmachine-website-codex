@@ -41,8 +41,9 @@ function Export-CatalogueToPdf {
     }
 
     Write-Host "Exporting $SourcePath -> $OutputPath ..."
-    $wb = $Excel.Workbooks.Open($SourcePath, 0, $true)
+    $wb = $Excel.Workbooks.Open($SourcePath, 0, $false)
     $originalStates = @{}
+    $exportSucceeded = $false
 
     try {
         foreach ($sn in $SheetsToHide) {
@@ -141,6 +142,7 @@ function Export-CatalogueToPdf {
             $false
         )
         Write-Host "  PDF written"
+        $exportSucceeded = $true
     } finally {
         foreach ($sn in $originalStates.Keys) {
             try {
@@ -148,6 +150,10 @@ function Export-CatalogueToPdf {
             } catch {
                 Write-Host "  warning: could not restore visibility for $sn" -ForegroundColor Yellow
             }
+        }
+        if ($exportSucceeded) {
+            $wb.Save()
+            Write-Host "  calculated catalogue workbook saved"
         }
         $wb.Close($false)
     }
