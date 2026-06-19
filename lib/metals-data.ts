@@ -47234,14 +47234,14 @@ export const metals: MetalProduct[] = [
     "metal": "Steel",
     "form": "Angle",
     "stock": "in",
-    "priceExVat": 30.0,
-    "priceIncVat": 36.0,
+    "priceExVat": 3.0,
+    "priceIncVat": 3.6,
     "unit": "foot/300mm",
     "spec": "Bright",
     "size": "16mm x 16mm x 3mm",
     "notes": "",
     "sourceSheet": "Steel Angle n box",
-    "pricePerKg": 30.0,
+    "pricePerKg": 3.0,
     "description": "Bright"
   },
   {
