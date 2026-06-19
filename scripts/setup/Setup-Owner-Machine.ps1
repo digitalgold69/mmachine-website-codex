@@ -278,10 +278,22 @@ function Invoke-LoggedCommand {
     )
 
     Write-Log `$Name
-    & `$Command >> `$Log 2>&1
-    if (`$LASTEXITCODE -ne 0) {
-        Write-Log "`$Name failed with exit code `$LASTEXITCODE"
-        exit `$LASTEXITCODE
+    # Windows PowerShell 5 can treat harmless native stderr output, including
+    # Git progress messages, as a terminating error. Log every line and use
+    # the actual process exit code as the source of truth.
+    `$PreviousErrorActionPreference = `$ErrorActionPreference
+    `$ErrorActionPreference = "Continue"
+    try {
+        & `$Command 2>&1 | ForEach-Object {
+            Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+        }
+        `$CommandExitCode = `$LASTEXITCODE
+    } finally {
+        `$ErrorActionPreference = `$PreviousErrorActionPreference
+    }
+    if (`$CommandExitCode -ne 0) {
+        Write-Log "`$Name failed with exit code `$CommandExitCode"
+        exit `$CommandExitCode
     }
 }
 
@@ -315,11 +327,24 @@ Set-Content -Path $SyncScriptPath -Value $SyncScriptContent -Encoding ASCII
 
 $CompatBatPath = Join-Path $InstallPath "scripts\setup\daily-sync.bat"
 $HiddenLauncherPath = Join-Path $InstallPath "scripts\setup\daily-sync.vbs"
+$ManualLauncherPath = Join-Path $InstallPath "scripts\setup\manual-sync.vbs"
 $HiddenLauncherContent = @"
 Set shell = CreateObject("WScript.Shell")
 shell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath""", 0, False
 "@
 Set-Content -Path $HiddenLauncherPath -Value $HiddenLauncherContent -Encoding ASCII
+
+$ManualLauncherContent = @"
+Set shell = CreateObject("WScript.Shell")
+shell.Popup "M-Machine sync has started. You can carry on using the computer.", 4, "M-Machine Sync", 64
+exitCode = shell.Run("powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath""", 0, True)
+If exitCode = 0 Then
+    shell.Popup "M-Machine sync finished successfully. Customer files and the website update have been prepared.", 8, "M-Machine Sync", 64
+Else
+    shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
+End If
+"@
+Set-Content -Path $ManualLauncherPath -Value $ManualLauncherContent -Encoding ASCII
 
 $CompatBatContent = @"
 @echo off
@@ -334,10 +359,10 @@ Remove-Item -Path $oldManualBat -Force -ErrorAction SilentlyContinue
 $shortcutShell = New-Object -ComObject WScript.Shell
 $shortcut = $shortcutShell.CreateShortcut($manualSyncButton)
 $shortcut.TargetPath = "wscript.exe"
-$shortcut.Arguments = "//B //Nologo `"$HiddenLauncherPath`""
+$shortcut.Arguments = "//B //Nologo `"$ManualLauncherPath`""
 $shortcut.WorkingDirectory = $InstallPath
 $shortcut.WindowStyle = 7
-$shortcut.Description = "Run the M-Machine website and catalogue sync in the background"
+$shortcut.Description = "Run the M-Machine website and catalogue sync"
 $shortcut.Save()
 
 $OwnerInstructionsContent = @"
