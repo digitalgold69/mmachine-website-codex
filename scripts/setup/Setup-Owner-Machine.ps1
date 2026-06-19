@@ -204,10 +204,27 @@ Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 Write-Host "  Checking Microsoft Excel PDF export ..."
-if (-not (Test-ExcelPdfExport)) {
-    Exit-WithMessage "Microsoft Excel desktop is missing or not activated. The M-Machine system needs an active Excel license to recalculate and export the customer catalogue PDFs."
+if (Test-ExcelPdfExport) {
+    Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
+} else {
+    Write-Host "  Excel PDF export is unavailable. Installing LibreOffice fallback ..." -ForegroundColor Yellow
+    $libreOfficePath = Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"
+    if (-not (Test-Path $libreOfficePath)) {
+        winget install `
+            --id "TheDocumentFoundation.LibreOffice" `
+            --silent `
+            --accept-source-agreements `
+            --accept-package-agreements `
+            --scope machine
+        if ($LASTEXITCODE -ne 0) {
+            Exit-WithMessage "Excel cannot export PDFs and the LibreOffice fallback could not be installed."
+        }
+    }
+    if (-not (Test-Path $libreOfficePath)) {
+        Exit-WithMessage "Excel cannot export PDFs and LibreOffice was not found after installation."
+    }
+    Write-Host "  LibreOffice PDF fallback is ready" -ForegroundColor Green
 }
-Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
@@ -393,8 +410,8 @@ Else
         logText = logFile.ReadAll
         logFile.Close
     End If
-    If InStr(1, logText, "license to use this application has expired", 1) > 0 Or InStr(1, logText, "Excel is installed but not activated", 1) > 0 Then
-        shell.Popup "Microsoft Excel is not activated. Activate desktop Excel, close it, then run the M-Machine sync again.", 15, "M-Machine Sync", 16
+    If InStr(1, logText, "LibreOffice is not installed", 1) > 0 Then
+        shell.Popup "PDF export needs Microsoft Excel or LibreOffice. Please ask Guy to install the PDF fallback.", 15, "M-Machine Sync", 16
     Else
         shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
     End If

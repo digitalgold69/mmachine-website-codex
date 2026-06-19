@@ -1,8 +1,8 @@
 # Export-PDFs.ps1
 #
-# Converts refreshed catalogue workbooks to PDFs using Microsoft Excel.
-# Excel is used because it preserves the owner's existing logo, page layout,
-# headers, footers, and print areas more reliably than headless converters.
+# Converts refreshed catalogue workbooks to PDFs.
+# Microsoft Excel is preferred on the owner's machine. LibreOffice is used as
+# a tested fallback on machines where Excel is missing or not activated.
 #
 # Run:
 #   powershell -ExecutionPolicy Bypass -File scripts\phase2\export_pdfs.ps1
@@ -14,13 +14,104 @@ param(
 
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
     [string]$Output2 = "public\catalogue\mini-catalogue.pdf",
-    [string[]]$HideSheets2 = @("_PriceLookup")
+    [string[]]$HideSheets2 = @("_PriceLookup"),
+
+    [switch]$ForceLibreOffice
 )
 
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+$excelExportSucceeded = $false
+$excelFailure = $null
+if ($env:MMACHINE_FORCE_LIBREOFFICE -eq "1") {
+    $ForceLibreOffice = $true
+}
+
+function Get-LibreOfficeProgram {
+    $roots = @(
+        (Join-Path $env:ProgramFiles "LibreOffice\program"),
+        (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+    )
+    foreach ($root in $roots) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        $soffice = Join-Path $root "soffice.exe"
+        $python = Join-Path $root "python.exe"
+        if ((Test-Path $soffice) -and (Test-Path $python)) {
+            return @{
+                Soffice = $soffice
+                Python = $python
+            }
+        }
+    }
+    return $null
+}
+
+function Export-CataloguesWithLibreOffice {
+    $program = Get-LibreOfficeProgram
+    if (-not $program) {
+        throw "Microsoft Excel could not export the catalogue PDFs and LibreOffice is not installed. Install LibreOffice, then run M-Machine Sync again."
+    }
+
+    $metalsSource = Join-Path $projectRoot $Source
+    $metalsOutput = Join-Path $projectRoot $Output
+    $miniSource = Join-Path $projectRoot $Source2
+    $miniOutput = Join-Path $projectRoot $Output2
+    $fallbackScript = Join-Path $scriptDir "export_pdfs_libreoffice.py"
+    $profilePath = Join-Path $env:TEMP ("m-machine-libreoffice-" + [Guid]::NewGuid().ToString("N"))
+    $profileUri = ([Uri]$profilePath).AbsoluteUri
+    $process = $null
+
+    Write-Host "Microsoft Excel PDF export is unavailable; using LibreOffice fallback" -ForegroundColor Yellow
+    try {
+        $process = Start-Process `
+            -FilePath $program.Soffice `
+            -ArgumentList @(
+                "--headless",
+                "-env:UserInstallation=$profileUri",
+                "--accept=socket,host=localhost,port=2002;urp;StarOffice.ServiceManager",
+                "--norestore",
+                "--nodefault",
+                "--nofirststartwizard"
+            ) `
+            -WindowStyle Hidden `
+            -PassThru
+
+        $exported = $false
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Start-Sleep -Seconds 2
+            & $program.Python `
+                $fallbackScript `
+                $metalsSource `
+                $metalsOutput `
+                $miniSource `
+                $miniOutput
+            if ($LASTEXITCODE -eq 0) {
+                $exported = $true
+                break
+            }
+        }
+
+        if (-not $exported) {
+            throw "LibreOffice could not export the catalogue PDFs."
+        }
+        foreach ($pdf in @($metalsOutput, $miniOutput)) {
+            if (-not (Test-Path $pdf)) {
+                throw "LibreOffice did not create the expected PDF: $pdf"
+            }
+            if ((Get-Item $pdf).Length -lt 10000) {
+                throw "LibreOffice created an incomplete PDF: $pdf"
+            }
+        }
+        Write-Host "LibreOffice fallback wrote both catalogue PDFs" -ForegroundColor Green
+    } finally {
+        if ($process -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath $profilePath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 function Export-CatalogueToPdf {
     param(
@@ -159,22 +250,23 @@ function Export-CatalogueToPdf {
     }
 }
 
-try {
-    $excel = New-Object -ComObject Excel.Application
-} catch {
-    throw "Microsoft Excel desktop could not be started. Install and activate Microsoft Excel before running the M-Machine sync. $($_.Exception.Message)"
+if ($ForceLibreOffice) {
+    Export-CataloguesWithLibreOffice
+    exit 0
 }
-$excel.Visible = $false
-$excel.DisplayAlerts = $false
-$excel.AskToUpdateLinks = $false
-$excel.ScreenUpdating = $false
-$excel.DisplayStatusBar = $false
-$excel.EnableEvents = $false
-$excel.Interactive = $false
-$excel.UserControl = $false
 
 try {
     try {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $false
+        $excel.DisplayAlerts = $false
+        $excel.AskToUpdateLinks = $false
+        $excel.ScreenUpdating = $false
+        $excel.DisplayStatusBar = $false
+        $excel.EnableEvents = $false
+        $excel.Interactive = $false
+        $excel.UserControl = $false
+
         Export-CatalogueToPdf -Excel $excel `
             -SourcePath (Join-Path $projectRoot $Source) `
             -OutputPath (Join-Path $projectRoot $Output) `
@@ -186,15 +278,22 @@ try {
                 -OutputPath (Join-Path $projectRoot $Output2) `
                 -SheetsToHide $HideSheets2
         }
+        $excelExportSucceeded = $true
     } catch {
-        if ($_.Exception.Message -match "license|activation|expired") {
-            throw "Microsoft Excel is installed but not activated. An active desktop Excel license is required to recalculate and export the two catalogue PDFs. Activate Excel, close it, then run M-Machine Sync again."
-        }
-        throw
+        $excelFailure = $_
     }
 } finally {
-    $excel.Quit()
-    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-    [System.GC]::Collect()
-    [System.GC]::WaitForPendingFinalizers()
+    if ($excel) {
+        try { $excel.Quit() } catch {}
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+    }
+}
+
+if (-not $excelExportSucceeded) {
+    if ($excelFailure) {
+        Write-Host "Excel export unavailable: $($excelFailure.Exception.Message)" -ForegroundColor Yellow
+    }
+    Export-CataloguesWithLibreOffice
 }

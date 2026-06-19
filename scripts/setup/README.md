@@ -29,6 +29,10 @@ The goal is deliberately simple:
   - Runs hidden and uses the supplied GitHub token directly, so no GitHub
     account picker should appear
 
+The catalogue PDFs are normally exported with Microsoft Excel. If Excel is
+missing or not activated, setup installs LibreOffice as a tested background
+fallback. The owner does not need to choose which program is used.
+
 ## Files to copy into "M-Machine Master Files"
 
 Required:
