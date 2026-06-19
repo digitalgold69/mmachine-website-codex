@@ -8,6 +8,8 @@ import hashlib
 import math
 import re
 import sys
+import zipfile
+from itertools import zip_longest
 from pathlib import Path
 
 import openpyxl
@@ -34,9 +36,22 @@ MINI_TS = PROJECT_ROOT / "lib" / "mini-data.ts"
 METALS_TS = PROJECT_ROOT / "lib" / "metals-data.ts"
 MINI_BOOK = PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.xlsm"
 METALS_BOOK = PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx"
+MINI_INVOICE = PROJECT_ROOT / "final-deliverables" / "Mini Invoice Template.xlsm"
+METALS_INVOICE = PROJECT_ROOT / "final-deliverables" / "Metals Invoice.xlsm"
+MINI_INVOICE_SOURCE = PROJECT_ROOT / "data-source" / "Mini Invoice Template.xlsm"
+METALS_INVOICE_SOURCE = PROJECT_ROOT / "data-source" / "Metals Invoice.xlsm"
+PARTSBOOK = PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx"
 MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf"
 METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf"
 CATALOGUE_VERSIONS = PROJECT_ROOT / "lib" / "catalogue-versions.ts"
+
+INVOICE_PRICE_SHEETS = {
+    "Parts Data": "_PriceLookup",
+    "KDMSPC": "_KDMSPC",
+    "MSPORT": "_MSPORT",
+    "Magnum": "_Magnum",
+    "Somerford": "_Somerford",
+}
 
 
 def close_enough(left, right) -> bool:
@@ -193,6 +208,89 @@ def validate_metals_workbook(failures: list[str]) -> int:
     return linked
 
 
+def validate_invoices(failures: list[str]) -> int:
+    if not MINI_INVOICE.exists():
+        failures.append("Mini Invoice Template.xlsm was not generated")
+        return 0
+    if not METALS_INVOICE.exists():
+        failures.append("Metals Invoice.xlsm was not copied")
+    elif METALS_INVOICE_SOURCE.exists():
+        if hashlib.sha256(METALS_INVOICE.read_bytes()).digest() != hashlib.sha256(
+            METALS_INVOICE_SOURCE.read_bytes()
+        ).digest():
+            failures.append("Metals Invoice.xlsm is not an unchanged source copy")
+
+    checked = 0
+    partsbook = openpyxl.load_workbook(PARTSBOOK, data_only=True, read_only=True)
+    invoice = openpyxl.load_workbook(
+        MINI_INVOICE, data_only=True, keep_vba=True, read_only=True
+    )
+    for source_name, embedded_name in INVOICE_PRICE_SHEETS.items():
+        if embedded_name not in invoice.sheetnames:
+            failures.append(f"Mini invoice is missing hidden sheet {embedded_name}")
+            continue
+        embedded = invoice[embedded_name]
+        if embedded.sheet_state != "hidden":
+            failures.append(f"Mini invoice sheet {embedded_name} is not hidden")
+        source = partsbook[source_name]
+        source_rows = source.iter_rows(values_only=True)
+        embedded_rows = embedded.iter_rows(values_only=True)
+        for row_idx, (source_row, embedded_row) in enumerate(
+            zip_longest(source_rows, embedded_rows, fillvalue=()), 1
+        ):
+            for col_idx, expected in enumerate(source_row, 1):
+                if expected is None or expected == "":
+                    continue
+                checked += 1
+                actual = (
+                    embedded_row[col_idx - 1]
+                    if col_idx <= len(embedded_row)
+                    else None
+                )
+                if not close_enough(actual, expected):
+                    failures.append(
+                        f"Mini invoice {embedded_name} row {row_idx}, col {col_idx}: "
+                        f"{actual!r} != {expected!r} from Partsbook {source_name}"
+                    )
+                    if len(failures) >= 40:
+                        break
+            if len(failures) >= 40:
+                break
+    invoice.close()
+    partsbook.close()
+
+    with zipfile.ZipFile(MINI_INVOICE) as archive:
+        names = archive.namelist()
+        if "xl/vbaProject.bin" not in names:
+            failures.append("Mini invoice lost its VBA project")
+        external_files = [
+            name for name in names if name.startswith("xl/externalLinks/")
+        ]
+        if external_files:
+            failures.append("Mini invoice still contains external workbook links")
+        external_formulas = 0
+        internal_formulas = 0
+        for name in names:
+            if not (
+                name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+            ):
+                continue
+            source = archive.read(name).decode("utf-8")
+            external_formulas += source.count("[1]")
+            internal_formulas += sum(
+                source.count(sheet_name)
+                for sheet_name in INVOICE_PRICE_SHEETS.values()
+            )
+        if external_formulas:
+            failures.append(
+                f"Mini invoice still has {external_formulas} external formula references"
+            )
+        if internal_formulas == 0:
+            failures.append("Mini invoice has no formulas using embedded prices")
+
+    return checked
+
+
 def validate_pdfs(failures: list[str]) -> None:
     for path in (MINI_PDF, METALS_PDF):
         if not path.exists() or path.stat().st_size < 10_000:
@@ -228,6 +326,7 @@ def main() -> None:
     validate_website_data(failures)
     mini_checked = validate_mini_workbook(failures)
     metals_checked = validate_metals_workbook(failures)
+    invoice_checked = validate_invoices(failures)
     validate_pdfs(failures)
     validate_catalogue_versions(failures)
 
@@ -242,7 +341,8 @@ def main() -> None:
 
     print(
         f"  OK {mini_checked} calculated Mini prices, "
-        f"{metals_checked} linked metals prices, website data, and both PDFs"
+        f"{metals_checked} linked metals prices, {invoice_checked} embedded "
+        "Mini invoice cells, website data, customer workbooks, and both PDFs"
     )
 
 

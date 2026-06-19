@@ -212,8 +212,8 @@ def wire_mini_invoice():
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    print(f"  ✓ Tiered pricing preserved (AA14 = 1..5 still selects price list)")
-    print(f"  ✓ VBA, address book, images, print settings — preserved byte-for-byte")
+    print("  OK Tiered pricing preserved (AA14 = 1..5 still selects price list)")
+    print("  OK VBA, address book, images, and print settings preserved")
 
 
 if __name__ == "__main__":
