@@ -159,7 +159,11 @@ function Export-CatalogueToPdf {
     }
 }
 
-$excel = New-Object -ComObject Excel.Application
+try {
+    $excel = New-Object -ComObject Excel.Application
+} catch {
+    throw "Microsoft Excel desktop could not be started. Install and activate Microsoft Excel before running the M-Machine sync. $($_.Exception.Message)"
+}
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 $excel.AskToUpdateLinks = $false
@@ -170,16 +174,23 @@ $excel.Interactive = $false
 $excel.UserControl = $false
 
 try {
-    Export-CatalogueToPdf -Excel $excel `
-        -SourcePath (Join-Path $projectRoot $Source) `
-        -OutputPath (Join-Path $projectRoot $Output) `
-        -SheetsToHide $HideSheets
-
-    if ($Source2 -ne "") {
+    try {
         Export-CatalogueToPdf -Excel $excel `
-            -SourcePath (Join-Path $projectRoot $Source2) `
-            -OutputPath (Join-Path $projectRoot $Output2) `
-            -SheetsToHide $HideSheets2
+            -SourcePath (Join-Path $projectRoot $Source) `
+            -OutputPath (Join-Path $projectRoot $Output) `
+            -SheetsToHide $HideSheets
+
+        if ($Source2 -ne "") {
+            Export-CatalogueToPdf -Excel $excel `
+                -SourcePath (Join-Path $projectRoot $Source2) `
+                -OutputPath (Join-Path $projectRoot $Output2) `
+                -SheetsToHide $HideSheets2
+        }
+    } catch {
+        if ($_.Exception.Message -match "license|activation|expired") {
+            throw "Microsoft Excel is installed but not activated. An active desktop Excel license is required to recalculate and export the two catalogue PDFs. Activate Excel, close it, then run M-Machine Sync again."
+        }
+        throw
     }
 } finally {
     $excel.Quit()

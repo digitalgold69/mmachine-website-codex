@@ -99,6 +99,43 @@ function Test-RequiredExcelFilesPresent {
     return $missing
 }
 
+function Test-ExcelPdfExport {
+    $excel = $null
+    $workbook = $null
+    $testRoot = Join-Path $env:TEMP "m-machine-excel-test"
+    $testWorkbook = Join-Path $testRoot "license-test.xlsx"
+    $testPdf = Join-Path $testRoot "license-test.pdf"
+
+    Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
+
+    try {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $false
+        $excel.DisplayAlerts = $false
+        $workbook = $excel.Workbooks.Add()
+        $workbook.Worksheets.Item(1).Range("A1").Value2 = "M-Machine Excel test"
+        $workbook.SaveAs($testWorkbook, 51)
+        $workbook.ExportAsFixedFormat(0, $testPdf)
+        return (Test-Path $testPdf)
+    } catch {
+        Write-Host "  Excel PDF test failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    } finally {
+        if ($workbook) {
+            try { $workbook.Close($false) } catch {}
+            [Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
+        }
+        if ($excel) {
+            try { $excel.Quit() } catch {}
+            [Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+        }
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+        Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Create-FolderLink {
     param([string]$LinkPath, [string]$TargetPath, [string]$Purpose)
     if (-not (Test-Path $TargetPath)) {
@@ -165,6 +202,12 @@ Install-IfMissing -Command "python" -WingetId "Python.Python.3.12" -FriendlyName
 Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+Write-Host "  Checking Microsoft Excel PDF export ..."
+if (-not (Test-ExcelPdfExport)) {
+    Exit-WithMessage "Microsoft Excel desktop is missing or not activated. The M-Machine system needs an active Excel license to recalculate and export the customer catalogue PDFs."
+}
+Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
@@ -343,7 +386,18 @@ If exitCode = 0 Then
 ElseIf exitCode = 2 Then
     shell.Popup "An M-Machine sync is already running. Please wait for it to finish.", 8, "M-Machine Sync", 48
 Else
-    shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    logText = ""
+    If fileSystem.FileExists("C:\mmachine\daily-sync.log") Then
+        Set logFile = fileSystem.OpenTextFile("C:\mmachine\daily-sync.log", 1, False)
+        logText = logFile.ReadAll
+        logFile.Close
+    End If
+    If InStr(1, logText, "license to use this application has expired", 1) > 0 Or InStr(1, logText, "Excel is installed but not activated", 1) > 0 Then
+        shell.Popup "Microsoft Excel is not activated. Activate desktop Excel, close it, then run the M-Machine sync again.", 15, "M-Machine Sync", 16
+    Else
+        shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
+    End If
 End If
 "@
 Set-Content -Path $ManualLauncherPath -Value $ManualLauncherContent -Encoding ASCII
