@@ -43,6 +43,8 @@ __pycache__/
 scripts/setup/daily-sync.ps1
 scripts/setup/daily-sync.vbs
 scripts/setup/daily-sync.bat
+scripts/setup/manual-sync.vbs
+daily-sync.lock
 
 # Office lock files left behind when Excel/LibreOffice has the file open
 .~lock.*
