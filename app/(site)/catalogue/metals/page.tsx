@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { OrderButton } from "@/components/QuoteCart";
 import { metals, metalCategories, type MetalProduct } from "@/lib/metals-data";
+import { metalsCatalogueUrl } from "@/lib/catalogue-versions";
 
 const formatPrice = (value: number | null) =>
   value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
@@ -100,7 +101,7 @@ export default function MetalsCataloguePage() {
           {cat !== "all" && ` in ${categoryLabel(cat)}`}
         </p>
         <a
-          href="/catalogue/metals-catalogue.pdf"
+          href={metalsCatalogueUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-secondary text-sm"

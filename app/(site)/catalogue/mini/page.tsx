@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
 import { products, sections, getSection } from "@/lib/mini-data";
+import { miniCatalogueUrl } from "@/lib/catalogue-versions";
 
 const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
   ssr: false,
@@ -306,7 +307,7 @@ export default function MiniCataloguePage() {
           Enquire about parts
         </Link>
         <a
-          href="/catalogue/mini-catalogue.pdf"
+          href={miniCatalogueUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-secondary"

@@ -305,7 +305,7 @@ Add-Content -Path `$Log -Value "=============================================="
 
 Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autostash }
 Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
-Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue }
+Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts lib/catalogue-versions.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue }
 
 git diff --cached --quiet >> `$Log 2>&1
 `$diffExit = `$LASTEXITCODE

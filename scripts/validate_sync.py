@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -34,6 +36,7 @@ MINI_BOOK = PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.
 METALS_BOOK = PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx"
 MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf"
 METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf"
+CATALOGUE_VERSIONS = PROJECT_ROOT / "lib" / "catalogue-versions.ts"
 
 
 def close_enough(left, right) -> bool:
@@ -199,6 +202,26 @@ def validate_pdfs(failures: list[str]) -> None:
             failures.append(f"{path.name} is older than the generated customer workbooks")
 
 
+def validate_catalogue_versions(failures: list[str]) -> None:
+    if not CATALOGUE_VERSIONS.exists():
+        failures.append("catalogue-versions.ts was not generated")
+        return
+
+    source = CATALOGUE_VERSIONS.read_text(encoding="utf-8")
+    expected = {
+        "miniCatalogueVersion": hashlib.sha256(MINI_PDF.read_bytes()).hexdigest()[:16],
+        "metalsCatalogueVersion": hashlib.sha256(METALS_PDF.read_bytes()).hexdigest()[:16],
+    }
+    for name, digest in expected.items():
+        match = re.search(rf'export const {name} = "([a-f0-9]+)";', source)
+        if not match:
+            failures.append(f"catalogue-versions.ts is missing {name}")
+        elif match.group(1) != digest:
+            failures.append(
+                f"{name} is {match.group(1)}, expected current PDF hash {digest}"
+            )
+
+
 def main() -> None:
     failures: list[str] = []
     print("Validating generated website data and customer files")
@@ -206,6 +229,7 @@ def main() -> None:
     mini_checked = validate_mini_workbook(failures)
     metals_checked = validate_metals_workbook(failures)
     validate_pdfs(failures)
+    validate_catalogue_versions(failures)
 
     if failures:
         print()

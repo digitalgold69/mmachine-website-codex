@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  metalsCatalogueUrl,
+  miniCatalogueUrl,
+} from "@/lib/catalogue-versions";
 import { products, sections } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
@@ -93,7 +97,7 @@ export default async function HomePage() {
                 Browse catalogue →
               </Link>
               <a
-                href="/catalogue/mini-catalogue.pdf"
+                href={miniCatalogueUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1"
@@ -125,7 +129,7 @@ export default async function HomePage() {
                 Browse catalogue →
               </Link>
               <a
-                href="/catalogue/metals-catalogue.pdf"
+                href={metalsCatalogueUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm font-medium text-racing hover:text-gold inline-flex items-center gap-1"
