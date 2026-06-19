@@ -268,7 +268,7 @@ try {
     )
 } catch {
     Write-Log "Sync skipped because another M-Machine sync is already running"
-    exit 0
+    exit 2
 }
 
 function Invoke-LoggedCommand {
@@ -340,6 +340,8 @@ shell.Popup "M-Machine sync has started. You can carry on using the computer.", 
 exitCode = shell.Run("powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath""", 0, True)
 If exitCode = 0 Then
     shell.Popup "M-Machine sync finished successfully. Customer files and the website update have been prepared.", 8, "M-Machine Sync", 64
+ElseIf exitCode = 2 Then
+    shell.Popup "An M-Machine sync is already running. Please wait for it to finish.", 8, "M-Machine Sync", 48
 Else
     shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
 End If
@@ -359,7 +361,7 @@ Remove-Item -Path $oldManualBat -Force -ErrorAction SilentlyContinue
 $shortcutShell = New-Object -ComObject WScript.Shell
 $shortcut = $shortcutShell.CreateShortcut($manualSyncButton)
 $shortcut.TargetPath = "wscript.exe"
-$shortcut.Arguments = "//B //Nologo `"$ManualLauncherPath`""
+$shortcut.Arguments = "//Nologo `"$ManualLauncherPath`""
 $shortcut.WorkingDirectory = $InstallPath
 $shortcut.WindowStyle = 7
 $shortcut.Description = "Run the M-Machine website and catalogue sync"
