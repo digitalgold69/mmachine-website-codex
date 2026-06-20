@@ -7,6 +7,86 @@ $localSetupRoot = Join-Path $env:TEMP (
 )
 $localSetupScript = Join-Path $localSetupRoot "Setup-Owner-Machine.ps1"
 
+function Read-GitHubToken {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "M-Machine GitHub access"
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ClientSize = New-Object System.Drawing.Size(540, 170)
+    $form.TopMost = $true
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Location = New-Object System.Drawing.Point(18, 16)
+    $label.Size = New-Object System.Drawing.Size(500, 42)
+    $label.Text = (
+        "Paste the GitHub token below. It will be hidden and checked before " +
+        "the installation changes any stored GitHub credentials."
+    )
+    $form.Controls.Add($label)
+
+    $textBox = New-Object System.Windows.Forms.TextBox
+    $textBox.Location = New-Object System.Drawing.Point(20, 66)
+    $textBox.Size = New-Object System.Drawing.Size(500, 24)
+    $textBox.UseSystemPasswordChar = $true
+    $form.Controls.Add($textBox)
+
+    $status = New-Object System.Windows.Forms.Label
+    $status.Location = New-Object System.Drawing.Point(20, 96)
+    $status.Size = New-Object System.Drawing.Size(330, 34)
+    $status.ForeColor = [System.Drawing.Color]::Firebrick
+    $form.Controls.Add($status)
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "Continue"
+    $okButton.Location = New-Object System.Drawing.Point(350, 112)
+    $okButton.Size = New-Object System.Drawing.Size(80, 30)
+    $form.Controls.Add($okButton)
+
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text = "Cancel"
+    $cancelButton.Location = New-Object System.Drawing.Point(440, 112)
+    $cancelButton.Size = New-Object System.Drawing.Size(80, 30)
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $form.Controls.Add($cancelButton)
+
+    $form.CancelButton = $cancelButton
+    $script:acceptedToken = $null
+    $okButton.Add_Click({
+        $candidate = $textBox.Text.Trim()
+        if (
+            $candidate.Length -lt 30 -or
+            $candidate -notmatch "^(github_pat_|ghp_)[A-Za-z0-9_]+$"
+        ) {
+            $status.Text = (
+                "That does not look like a complete GitHub token. " +
+                "Copy the full token and paste it again."
+            )
+            $textBox.SelectAll()
+            $textBox.Focus()
+            return
+        }
+        $script:acceptedToken = $candidate
+        $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $form.Close()
+    })
+
+    $form.Add_Shown({
+        $textBox.Focus()
+    })
+    $result = $form.ShowDialog()
+    $form.Dispose()
+
+    if ($result -ne [System.Windows.Forms.DialogResult]::OK) {
+        throw "Setup was cancelled before a GitHub token was entered."
+    }
+    return $script:acceptedToken
+}
+
 Write-Host ""
 Write-Host "M-Machine owner setup" -ForegroundColor Cyan
 Write-Host "This installs the website sync system to C:\mmachine."
@@ -14,14 +94,8 @@ Write-Host ""
 Write-Host "This installs from the separate Codex GitHub repo, leaving Claude's original repo alone."
 Write-Host ""
 
-$secureToken = Read-Host "Paste the NEW GitHub token, then press Enter" -AsSecureString
-$tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
-
 try {
-    $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
-    if ([string]::IsNullOrWhiteSpace($token)) {
-        throw "No token was entered."
-    }
+    $token = Read-GitHubToken
 
     New-Item -ItemType Directory -Path $localSetupRoot -Force | Out-Null
     Copy-Item -LiteralPath $sourceSetupScript -Destination $localSetupScript -Force
@@ -40,9 +114,7 @@ try {
     Write-Host ""
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
-    if ($tokenPointer -ne [IntPtr]::Zero) {
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
-    }
+    $script:acceptedToken = $null
     $token = $null
     Remove-Item -LiteralPath $localSetupRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

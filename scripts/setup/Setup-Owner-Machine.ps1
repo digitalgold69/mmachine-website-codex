@@ -232,6 +232,50 @@ function Set-GitNonInteractiveAuth {
     git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $basicAuth"
 }
 
+function Test-GitHubTokenAccess {
+    param(
+        [string]$Url,
+        [string]$Token
+    )
+
+    $basicAuth = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes("x-access-token:$Token")
+    )
+    $previousCount = $env:GIT_CONFIG_COUNT
+    $previousKey = $env:GIT_CONFIG_KEY_0
+    $previousValue = $env:GIT_CONFIG_VALUE_0
+    $originalLocation = Get-Location
+
+    try {
+        # Run outside every local repository so an existing repo-specific
+        # Authorization header cannot be inherited and duplicated.
+        Set-Location $env:TEMP
+        $env:GIT_CONFIG_COUNT = "1"
+        $env:GIT_CONFIG_KEY_0 = "http.https://github.com/.extraheader"
+        $env:GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic $basicAuth"
+        $null = git ls-remote $Url HEAD 2>&1
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        Set-Location $originalLocation
+        if ($null -eq $previousCount) {
+            Remove-Item Env:\GIT_CONFIG_COUNT -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_COUNT = $previousCount
+        }
+        if ($null -eq $previousKey) {
+            Remove-Item Env:\GIT_CONFIG_KEY_0 -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_KEY_0 = $previousKey
+        }
+        if ($null -eq $previousValue) {
+            Remove-Item Env:\GIT_CONFIG_VALUE_0 -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_VALUE_0 = $previousValue
+        }
+        $basicAuth = $null
+    }
+}
+
 function Invoke-GitCloneWithToken {
     param(
         [string]$Url,
@@ -245,16 +289,19 @@ function Invoke-GitCloneWithToken {
     $previousCount = $env:GIT_CONFIG_COUNT
     $previousKey = $env:GIT_CONFIG_KEY_0
     $previousValue = $env:GIT_CONFIG_VALUE_0
+    $originalLocation = Get-Location
 
     try {
         # Pass authentication through the child process environment so the
         # token is not embedded in the clone URL or exposed in the command line.
+        Set-Location $env:TEMP
         $env:GIT_CONFIG_COUNT = "1"
         $env:GIT_CONFIG_KEY_0 = "http.https://github.com/.extraheader"
         $env:GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic $basicAuth"
         git clone $Url $Destination
         return $LASTEXITCODE
     } finally {
+        Set-Location $originalLocation
         if ($null -eq $previousCount) {
             Remove-Item Env:\GIT_CONFIG_COUNT -ErrorAction SilentlyContinue
         } else {
@@ -389,6 +436,15 @@ Write-Host (
 # ------------------------------------------------------------------------------
 
 Write-Step "Step 2 of 5 - Clone or update the repo"
+
+Write-Host "  Validating GitHub token ..."
+if (-not (Test-GitHubTokenAccess -Url $RepoUrl -Token $GitHubToken)) {
+    Exit-WithMessage (
+        "GitHub rejected the token before any stored credential was changed. " +
+        "Copy the complete token and run setup again."
+    )
+}
+Write-Host "  GitHub token is valid" -ForegroundColor Green
 
 if (Test-Path $InstallPath) {
     if (-not (Test-Path (Join-Path $InstallPath ".git"))) {

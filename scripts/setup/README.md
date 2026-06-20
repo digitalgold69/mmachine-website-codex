@@ -49,8 +49,10 @@ installations are discovered through the Python launcher, registry, standard
 install folders, or `PATH`; the working interpreter is then added to the
 owner's user `PATH` for future scheduled syncs.
 
-The GitHub token prompt is masked. If a token is ever visible in a photograph
-or screenshot, revoke it immediately and create a replacement token.
+The GitHub token is entered through a masked Windows dialog. The dialog rejects
+obviously incomplete pasted values, and setup validates repository access
+before replacing any stored Git credential. If a token is ever visible in a
+photograph or screenshot, revoke it immediately and create a replacement token.
 
 ## Files to copy into "M-Machine Master Files"
 
