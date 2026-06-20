@@ -293,6 +293,10 @@ Create-FolderLink -LinkPath $customerFolder -TargetPath $finalPath -Purpose "ope
 
 $SyncScriptPath = Join-Path $InstallPath "scripts\setup\daily-sync.ps1"
 $SyncScriptContent = @"
+param(
+    [switch]`$Manual
+)
+
 `$ErrorActionPreference = "Stop"
 `$InstallPath = "$InstallPath"
 `$Log = "$InstallPath\daily-sync.log"
@@ -317,6 +321,19 @@ try {
 } catch {
     Write-Log "Sync skipped because another M-Machine sync is already running"
     exit 2
+}
+
+if (`$Manual) {
+    try {
+        `$PopupShell = New-Object -ComObject WScript.Shell
+        `$null = `$PopupShell.Popup(
+            "M-Machine sync has started. You can carry on using the computer.",
+            4,
+            "M-Machine Sync",
+            64
+        )
+        [Runtime.InteropServices.Marshal]::ReleaseComObject(`$PopupShell) | Out-Null
+    } catch {}
 }
 
 function Invoke-LoggedCommand {
@@ -384,12 +401,11 @@ Set-Content -Path $HiddenLauncherPath -Value $HiddenLauncherContent -Encoding AS
 
 $ManualLauncherContent = @"
 Set shell = CreateObject("WScript.Shell")
-shell.Popup "M-Machine sync has started. You can carry on using the computer.", 4, "M-Machine Sync", 64
-exitCode = shell.Run("powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath""", 0, True)
+exitCode = shell.Run("powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SyncScriptPath"" -Manual", 0, True)
 If exitCode = 0 Then
     shell.Popup "M-Machine sync finished successfully. Customer files and the website update have been prepared.", 8, "M-Machine Sync", 64
 ElseIf exitCode = 2 Then
-    shell.Popup "An M-Machine sync is already running. Please wait for it to finish.", 8, "M-Machine Sync", 48
+    shell.Popup "An M-Machine sync is already running. Wait for it to finish before starting a separate manual test.", 12, "M-Machine Sync", 48
 Else
     Set fileSystem = CreateObject("Scripting.FileSystemObject")
     logText = ""
