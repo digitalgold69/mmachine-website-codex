@@ -117,19 +117,25 @@ def validate_website_data(failures: list[str]) -> None:
 
 def validate_mini_workbook(failures: list[str]) -> int:
     prices = read_partsbook_prices()
-    wb = openpyxl.load_workbook(MINI_BOOK, data_only=True, keep_vba=True)
-    lookup = wb["_PriceLookup"]
-    embedded = {}
-    for row in lookup.iter_rows(min_row=2, max_col=2, values_only=True):
-        code, price = row
-        if code is not None:
-            embedded[str(code).strip()] = price
 
-    for code, expected in prices.items():
-        if code not in embedded or not close_enough(embedded[code], expected):
-            failures.append(
-                f"mini workbook lookup {code}: {embedded.get(code)!r} != {expected!r}"
-            )
+    with zipfile.ZipFile(MINI_BOOK) as archive:
+        names = set(archive.namelist())
+        if any(name.startswith("xl/externalLinks/") for name in names):
+            failures.append("mini workbook still contains external-link files")
+        if "xl/calcChain.xml" in names:
+            failures.append("mini workbook still contains a stale calculation chain")
+        for name in names:
+            if not re.fullmatch(r"xl/worksheets/sheet\d+\.xml", name):
+                continue
+            if b"[1]Parts Data" in archive.read(name):
+                failures.append(
+                    f"mini workbook still contains a Partsbook formula in {name}"
+                )
+                break
+
+    wb = openpyxl.load_workbook(MINI_BOOK, data_only=True, keep_vba=True)
+    if "_PriceLookup" in wb.sheetnames:
+        failures.append("mini workbook unexpectedly contains _PriceLookup")
 
     checked = 0
     for sheet_name in wb.sheetnames:
@@ -148,7 +154,7 @@ def validate_mini_workbook(failures: list[str]) -> int:
                 if not _looks_like_part_code(code):
                     continue
                 expected = prices.get(code)
-                if not isinstance(expected, (int, float)):
+                if expected is None:
                     continue
                 actual = ws.cell(row_idx, price_col).value
                 checked += 1

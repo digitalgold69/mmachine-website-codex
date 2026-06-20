@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
-Phase 2b — Wire Mini Catalogue Self Updating to a self-contained _PriceLookup.
+Phase 2b - Refresh the Mini customer catalogue from Partsbook prices.
 
 The Mini Catalogue currently uses external-link VLOOKUPs into
 PartsbookBenji2014.xlsx — that's the fragile pattern that breaks when the
-files move or get emailed around. This script converts it to an internal
-_PriceLookup table refreshed on each sync.
+files move or get emailed around. The generated customer catalogue instead
+contains current displayed prices and no external workbook dependency.
 
 Strategy:
   1. Read PartsbookBenji2014.xlsx → 'Parts Data'. Extract (code, price) rows.
-  2. Surgically:
-     a. Add a hidden _PriceLookup sheet with columns A=code, B=price
-     b. Find every formula referencing  '[1]Parts Data'!$A$3:$E$2700  in
-        the B-sheets (120B, 130B, ..., 510B, APX1, APX2) and rewrite the
-        target to  _PriceLookup!$A:$B
-     c. Update the external-link rels so Excel doesn't prompt about a
-        missing external file
-  3. Repack as .xlsm (preserve VBA, images, print settings, etc.)
+  2. Write current ex-VAT and inc-VAT values into the existing price cells.
+  3. Remove the old external link and stale calculation chain.
+  4. Repack as .xlsm (preserve VBA, images, print settings, etc.)
+
+The output does not add worksheets or alter the workbook relationship layout,
+which keeps this old macro workbook compatible with Excel 2007.
 """
 import openpyxl
 import re
@@ -41,19 +39,12 @@ MINI_CAT_SRC = str(PROJECT_ROOT / "data-source" / "Mini Catalogue Self Updating.
 MINI_CAT = str(PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.xlsm")
 
 from surgical_xlsx import (
-    open_for_surgery, repack_zip, add_sheet, remove_sheet_if_present,
+    open_for_surgery, repack_zip, remove_sheet_if_present,
     remove_calc_chain_if_present, map_sheet_names_to_xml_files, edit_sheet_xml,
-    cell_str, cell_num, cell_formula, col_letter, _read, _write,
+    cell_str, cell_num, col_letter, _read, _write,
 )
 
 
-# Old (fragile) external reference patterns — there are a few variants
-EXTERNAL_PATTERNS = [
-    r"'\[1\]Parts Data'!\$A\$3:\$E\$2700",
-    r"'\[1\]Parts Data'!\$A\$3:\$E\$2400",  # older variant just in case
-    r"'\[1\]Parts Data'!\$A:\$E",
-]
-INTERNAL_REPLACEMENT = "_PriceLookup!$A:$B"
 PART_CODE_REGEX = re.compile(r"^[\d.]+\.\d{2}\.\d{2}\.\d{2}[A-Z]?$|^[A-Z0-9-]{4,}$")
 
 
@@ -75,7 +66,13 @@ def code_description_columns(ws):
     return pairs
 
 
-def build_internal_formula_edits(ws, prices):
+def value_cell(ref, value):
+    if isinstance(value, (int, float)):
+        return cell_num(ref, value)
+    return cell_str(ref, " " if value is None else str(value))
+
+
+def build_price_value_edits(ws, prices):
     edits = {}
     for code_col, _description_col in code_description_columns(ws):
         price_col = code_col + 2
@@ -85,7 +82,6 @@ def build_internal_formula_edits(ws, prices):
             if not looks_like_part_code(raw_code):
                 continue
             code = str(raw_code).strip()
-            code_ref = f"{col_letter(code_col)}{row}"
             price_ref = f"{col_letter(price_col)}{row}"
             inc_ref = f"{col_letter(inc_vat_col)}{row}"
             current_price = prices.get(code)
@@ -95,16 +91,34 @@ def build_internal_formula_edits(ws, prices):
                 if isinstance(current_price, (int, float))
                 else " "
             )
-            price_formula = (
-                f'IFERROR(VLOOKUP({code_ref},_PriceLookup!$A:$B,2,FALSE)," ")'
+            edits.setdefault(row, []).append(
+                (price_ref, value_cell(price_ref, cached_price))
             )
             edits.setdefault(row, []).append(
-                (price_ref, cell_formula(price_ref, price_formula, cached_price))
+                (inc_ref, value_cell(inc_ref, cached_inc_vat))
             )
-            inc_formula = f'IFERROR(({price_ref}/100*20)+{price_ref}," ")'
-            edits.setdefault(row, []).append(
-                (inc_ref, cell_formula(inc_ref, inc_formula, cached_inc_vat))
-            )
+
+    # The legacy catalogue pre-fills some empty future rows with external
+    # VLOOKUP formulas even though their part-code cell is blank. They are not
+    # products, but leaving those formulas behind keeps a broken external
+    # workbook dependency. Blank only those unused lookup cells.
+    edited_refs = {
+        ref
+        for row_edits in edits.values()
+        for ref, _cell_xml in row_edits
+    }
+    for row in ws.iter_rows():
+        for cell in row:
+            value = cell.value
+            if (
+                cell.coordinate not in edited_refs
+                and isinstance(value, str)
+                and value.startswith("=")
+                and "[1]Parts Data" in value
+            ):
+                edits.setdefault(cell.row, []).append(
+                    (cell.coordinate, value_cell(cell.coordinate, " "))
+                )
     return edits
 
 
@@ -129,66 +143,6 @@ def load_partsbook_codes():
         # the catalogue to behave the same way.
         rows.append((code_s, price))
     return rows
-
-
-def build_pricelookup_xml(rows):
-    """Build an XML for the _PriceLookup sheet. Two columns: code | price."""
-    n_rows = len(rows) + 1
-    parts = [
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-        f'<dimension ref="A1:B{n_rows}"/>',
-        '<sheetViews><sheetView workbookViewId="0">'
-        '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
-        '</sheetView></sheetViews>',
-        '<sheetFormatPr defaultRowHeight="15"/>',
-        '<cols>',
-        '<col min="1" max="1" width="18" customWidth="1"/>',
-        '<col min="2" max="2" width="14" customWidth="1"/>',
-        '</cols>',
-        '<sheetData>',
-    ]
-    parts.append('<row r="1">')
-    parts.append(cell_str("A1", "Part No"))
-    parts.append(cell_str("B1", "Price ex VAT"))
-    parts.append('</row>')
-    for ri, (code, price) in enumerate(rows, start=2):
-        parts.append(f'<row r="{ri}">')
-        parts.append(cell_str(f"A{ri}", code))
-        if isinstance(price, (int, float)):
-            parts.append(cell_num(f"B{ri}", price))
-        elif price is not None and str(price).strip() != "":
-            # Text price like "POA" — preserve as a string cell
-            parts.append(cell_str(f"B{ri}", str(price)))
-        parts.append('</row>')
-    parts.append('</sheetData>')
-    parts.append('<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" '
-                 'header="0.3" footer="0.3"/>')
-    parts.append('</worksheet>')
-    return "\n".join(parts)
-
-
-def rewrite_external_references_in_sheet(sheet_xml_path):
-    """Replace every external 'Parts Data' reference with the internal
-    _PriceLookup. Returns the count of rewritten formulas."""
-    with open(sheet_xml_path, "r", encoding="utf-8") as f:
-        xml = f.read()
-
-    count = 0
-    # XML-escapes the apostrophes; the file may have either form
-    for pattern in EXTERNAL_PATTERNS:
-        # Match the literal pattern (with apostrophes possibly escaped to &apos;
-        # in some XML serializers). Build a regex that handles both.
-        regex_text = pattern.replace("'", "(?:'|&apos;)")
-        new_xml, n = re.subn(regex_text, INTERNAL_REPLACEMENT, xml)
-        if n > 0:
-            xml = new_xml
-            count += n
-
-    if count > 0:
-        with open(sheet_xml_path, "w", encoding="utf-8") as f:
-            f.write(xml)
-    return count
 
 
 def remove_external_link_rels(tempdir):
@@ -243,41 +197,43 @@ def wire_mini_catalogue():
     # Extract directly from the source (avoids permission error if destination is open)
     tempdir = open_for_surgery(MINI_CAT_SRC)
     try:
+        # A previous generated file should never be used as the source, but
+        # remove the old helper sheet if one is present so the build stays
+        # idempotent.
         remove_sheet_if_present(tempdir, "_PriceLookup")
-        add_sheet(tempdir, "_PriceLookup", build_pricelookup_xml(rows), hidden=True)
 
-        # Rewrite the existing formulas in place so all original formatting
-        # and legacy workbook structure stay untouched. If a newly-added row
-        # has no real formula, insert the two formulas just for that row.
+        # The customer catalogue is an output document. Embed current values in
+        # its existing cells instead of adding a worksheet and live formulas.
+        # This preserves the old workbook structure required by Excel 2007.
         sheet_path_map = map_sheet_names_to_xml_files(tempdir)
-        total_rewrites = 0
+        total_updates = 0
         sheets_touched = 0
         for sheet_name, xml_rel in sheet_path_map.items():
             if not (re.fullmatch(r"\d+B", sheet_name) or sheet_name in {"APX1", "APX2"}):
                 continue
             sheet_path = Path(tempdir) / xml_rel
-            rewritten = rewrite_external_references_in_sheet(str(sheet_path))
-            edits = build_internal_formula_edits(source_wb[sheet_name], prices)
+            edits = build_price_value_edits(source_wb[sheet_name], prices)
             if edits:
                 _applied, missing = edit_sheet_xml(str(sheet_path), edits)
                 if missing:
                     raise RuntimeError(
-                        f"{sheet_name}: could not update formula rows {missing[:12]}"
+                        f"{sheet_name}: could not update price rows {missing[:12]}"
                     )
             inserted = sum(len(row_edits) for row_edits in edits.values())
-            if rewritten or inserted:
+            if inserted:
                 sheets_touched += 1
-                total_rewrites += rewritten + inserted
+                total_updates += inserted
 
-        print(f"  Refreshed {total_rewrites} formulas across {sheets_touched} catalogue pages")
+        print(
+            f"  Embedded {total_updates} current price values across "
+            f"{sheets_touched} catalogue pages"
+        )
 
         # Strip the external-link metadata so Excel doesn't prompt
         remove_external_link_rels(tempdir)
 
-        # Every printable catalogue formula and the workbook sheet list have
-        # changed. The source workbook's cached dependency chain points at the
-        # old formulas/sheet layout; newer Excel rebuilds it, but Excel 2007 can
-        # refuse to open the workbook. Let Excel generate a fresh chain.
+        # Price formulas changed to values, so the source dependency chain is
+        # stale. Let Excel generate a fresh chain if the output is ever edited.
         remove_calc_chain_if_present(tempdir)
 
         repack_zip(tempdir, MINI_CAT)
@@ -287,7 +243,7 @@ def wire_mini_catalogue():
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    print("  OK External 'Parts Data' references replaced with internal _PriceLookup")
+    print("  OK Current Partsbook prices embedded without adding worksheets")
     print("  OK VBA, images, and print settings preserved")
 
 
