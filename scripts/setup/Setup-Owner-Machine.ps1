@@ -204,34 +204,11 @@ Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 Write-Host "  Checking Microsoft Excel PDF export ..."
-$UseLibreOfficeFallback = $false
 if (Test-ExcelPdfExport) {
-    Write-Host "  Microsoft Excel PDF export is working and will be preferred" -ForegroundColor Green
+    Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
 } else {
-    $UseLibreOfficeFallback = $true
-    Write-Host "  Excel PDF export is unavailable. LibreOffice will be used." -ForegroundColor Yellow
+    Exit-WithMessage "Microsoft Excel desktop is missing, unlicensed, or unable to export PDFs. Repair or activate Excel, then run setup again."
 }
-
-# Keep a second PDF exporter available even when Excel works today. If Office
-# later becomes unlicensed, busy, or damaged, the daily sync can automatically
-# fall back without requiring any action from the owner.
-$libreOfficePath = Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"
-if (-not (Test-Path $libreOfficePath)) {
-    Write-Host "  Installing LibreOffice PDF backup ..."
-    winget install `
-        --id "TheDocumentFoundation.LibreOffice" `
-        --silent `
-        --accept-source-agreements `
-        --accept-package-agreements `
-        --scope machine
-    if ($LASTEXITCODE -ne 0) {
-        Exit-WithMessage "The LibreOffice PDF backup could not be installed."
-    }
-}
-if (-not (Test-Path $libreOfficePath)) {
-    Exit-WithMessage "LibreOffice was not found after installation."
-}
-Write-Host "  LibreOffice PDF backup is ready" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
@@ -263,12 +240,10 @@ if (Test-Path $InstallPath) {
 
 Push-Location $InstallPath
 Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
-$libreOfficeMarker = Join-Path $InstallPath ".use-libreoffice-pdf"
-if ($UseLibreOfficeFallback) {
-    New-Item -ItemType File -Path $libreOfficeMarker -Force | Out-Null
-} else {
-    Remove-Item -LiteralPath $libreOfficeMarker -Force -ErrorAction SilentlyContinue
-}
+# Owner installations always use the activated Excel path. The optional
+# LibreOffice marker is only for separate test machines.
+Remove-Item -LiteralPath (Join-Path $InstallPath ".use-libreoffice-pdf") `
+    -Force -ErrorAction SilentlyContinue
 Write-Host "  Checking that the GitHub token can publish updates ..."
 git push --dry-run origin HEAD:main
 if ($LASTEXITCODE -ne 0) {
@@ -423,8 +398,8 @@ Else
         logText = logFile.ReadAll
         logFile.Close
     End If
-    If InStr(1, logText, "LibreOffice is not installed", 1) > 0 Then
-        shell.Popup "PDF export needs Microsoft Excel or LibreOffice. Please ask Guy to install the PDF fallback.", 15, "M-Machine Sync", 16
+    If InStr(1, logText, "LibreOffice is not installed", 1) > 0 Or InStr(1, logText, "Excel export unavailable", 1) > 0 Then
+        shell.Popup "Microsoft Excel could not export the catalogue PDFs. Close Excel and try once more. If it still fails, please ask Guy to check it.", 15, "M-Machine Sync", 16
     Else
         shell.Popup "M-Machine sync stopped before publishing. Please check C:\mmachine\daily-sync.log.", 12, "M-Machine Sync", 16
     End If

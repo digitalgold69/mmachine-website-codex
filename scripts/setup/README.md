@@ -29,10 +29,9 @@ The goal is deliberately simple:
   - Runs hidden and uses the supplied GitHub token directly, so no GitHub
     account picker should appear
 
-The catalogue PDFs are normally exported with Microsoft Excel. Setup also
-installs LibreOffice as a tested background fallback, even when Excel is
-working. If Excel later becomes unavailable, the sync switches automatically.
-The owner does not need to choose which program is used.
+The owner computer must have Microsoft Excel desktop installed and activated.
+Setup checks that Excel can perform a real PDF export before continuing.
+LibreOffice is not installed or configured by the owner setup.
 
 ## Files to copy into "M-Machine Master Files"
 
