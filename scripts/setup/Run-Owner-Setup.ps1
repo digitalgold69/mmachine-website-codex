@@ -14,15 +14,15 @@ Write-Host ""
 Write-Host "This installs from the separate Codex GitHub repo, leaving Claude's original repo alone."
 Write-Host ""
 
-$token = Read-Host "Paste the NEW GitHub token, then press Enter"
-
-if ([string]::IsNullOrWhiteSpace($token)) {
-    Write-Host "No token entered. Setup cancelled." -ForegroundColor Red
-    Read-Host "Press Enter to close"
-    exit 1
-}
+$secureToken = Read-Host "Paste the NEW GitHub token, then press Enter" -AsSecureString
+$tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
 
 try {
+    $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        throw "No token was entered."
+    }
+
     New-Item -ItemType Directory -Path $localSetupRoot -Force | Out-Null
     Copy-Item -LiteralPath $sourceSetupScript -Destination $localSetupScript -Force
 
@@ -30,11 +30,22 @@ try {
     # keeps removable-drive speed, permissions, and accidental disconnection
     # out of the installation once the launcher has started.
     & $localSetupScript -RepoUrl $repoUrl -GitHubToken $token
+    if ($LASTEXITCODE -ne 0) {
+        throw "Owner setup stopped with error code $LASTEXITCODE."
+    }
+
+    Write-Host ""
+    Write-Host "Setup completed successfully." -ForegroundColor Green
+} catch {
+    Write-Host ""
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
+    if ($tokenPointer -ne [IntPtr]::Zero) {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
+    }
     $token = $null
     Remove-Item -LiteralPath $localSetupRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ""
-Write-Host "Setup command finished." -ForegroundColor Green
 Read-Host "Press Enter to close"

@@ -43,6 +43,15 @@ main setup script to the computer's local Windows temporary folder before it
 runs. The test PDF also uses the local temporary folder, and the permanent
 installation is created at `C:\mmachine`.
 
+Setup verifies Python by running a real interpreter. It does not trust the
+Windows Microsoft Store `python.exe` App Execution Alias. Existing Python
+installations are discovered through the Python launcher, registry, standard
+install folders, or `PATH`; the working interpreter is then added to the
+owner's user `PATH` for future scheduled syncs.
+
+The GitHub token prompt is masked. If a token is ever visible in a photograph
+or screenshot, revoke it immediately and create a replacement token.
+
 ## Files to copy into "M-Machine Master Files"
 
 Required:

@@ -49,15 +49,169 @@ function Test-CommandExists {
     return $?
 }
 
+function Test-PythonExecutable {
+    param([string]$Executable)
+
+    if ([string]::IsNullOrWhiteSpace($Executable)) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $Executable)) {
+        return $null
+    }
+    if ($Executable -like "*\Microsoft\WindowsApps\*") {
+        return $null
+    }
+
+    try {
+        $output = @(
+            & $Executable -c (
+                "import os,sys; " +
+                "print(os.path.abspath(sys.executable)); " +
+                "print(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))"
+            ) 2>$null
+        )
+        if ($LASTEXITCODE -ne 0 -or $output.Count -lt 2) {
+            return $null
+        }
+
+        $resolvedExecutable = ([string]$output[0]).Trim()
+        $version = ([string]$output[1]).Trim()
+        if (
+            -not (Test-Path -LiteralPath $resolvedExecutable) -or
+            $resolvedExecutable -like "*\Microsoft\WindowsApps\*" -or
+            [int]($version.Split(".")[0]) -lt 3
+        ) {
+            return $null
+        }
+
+        return [pscustomobject]@{
+            Executable = $resolvedExecutable
+            Version = $version
+        }
+    } catch {
+        return $null
+    }
+}
+
+function Get-UsablePython {
+    $candidates = New-Object System.Collections.Generic.List[string]
+
+    $launcher = Get-Command "py.exe" -ErrorAction SilentlyContinue
+    if ($launcher -and $launcher.Source -notlike "*\Microsoft\WindowsApps\*") {
+        try {
+            $launcherResult = @(
+                & $launcher.Source -3 -c (
+                    "import os,sys; " +
+                    "print(os.path.abspath(sys.executable))"
+                ) 2>$null
+            )
+            if ($LASTEXITCODE -eq 0 -and $launcherResult.Count -ge 1) {
+                $candidates.Add(([string]$launcherResult[0]).Trim())
+            }
+        } catch {}
+    }
+
+    foreach ($commandName in @("python", "python3")) {
+        $command = Get-Command $commandName -ErrorAction SilentlyContinue
+        if ($command -and $command.Source) {
+            $candidates.Add([string]$command.Source)
+        }
+    }
+
+    foreach ($registryRoot in @(
+        "HKCU:\Software\Python\PythonCore",
+        "HKLM:\Software\Python\PythonCore",
+        "HKLM:\Software\WOW6432Node\Python\PythonCore"
+    )) {
+        if (-not (Test-Path $registryRoot)) {
+            continue
+        }
+        foreach ($versionKey in Get-ChildItem $registryRoot -ErrorAction SilentlyContinue) {
+            $installPathKey = Join-Path $versionKey.PSPath "InstallPath"
+            $installKey = Get-Item $installPathKey -ErrorAction SilentlyContinue
+            if (-not $installKey) {
+                continue
+            }
+            $executablePath = $installKey.GetValue("ExecutablePath")
+            if ($executablePath) {
+                $candidates.Add([string]$executablePath)
+            }
+            $installDirectory = $installKey.GetValue("")
+            if ($installDirectory) {
+                $candidates.Add((Join-Path ([string]$installDirectory) "python.exe"))
+            }
+        }
+    }
+
+    $searchPatterns = @(
+        (Join-Path $env:LocalAppData "Programs\Python\Python*\python.exe"),
+        (Join-Path $env:ProgramFiles "Python*\python.exe")
+    )
+    if (${env:ProgramFiles(x86)}) {
+        $searchPatterns += (
+            Join-Path ${env:ProgramFiles(x86)} "Python*\python.exe"
+        )
+    }
+    foreach ($pattern in $searchPatterns) {
+        Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $candidates.Add($_.FullName) }
+    }
+
+    $seen = @{}
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+        $key = $candidate.ToLowerInvariant()
+        if ($seen.ContainsKey($key)) {
+            continue
+        }
+        $seen[$key] = $true
+        $python = Test-PythonExecutable -Executable $candidate
+        if ($python) {
+            return $python
+        }
+    }
+
+    return $null
+}
+
+function Add-PythonToPath {
+    param([Parameter(Mandatory)] [string]$PythonExecutable)
+
+    $pythonDirectory = Split-Path -Parent $PythonExecutable
+    $scriptsDirectory = Join-Path $pythonDirectory "Scripts"
+    $directories = @($pythonDirectory)
+    if (Test-Path -LiteralPath $scriptsDirectory) {
+        $directories += $scriptsDirectory
+    }
+
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $userParts = @(
+        $userPath -split ";" |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    foreach ($directory in $directories) {
+        if ($userParts -notcontains $directory) {
+            $userParts += $directory
+        }
+        if (($env:Path -split ";") -notcontains $directory) {
+            $env:Path = "$directory;$env:Path"
+        }
+    }
+    [Environment]::SetEnvironmentVariable(
+        "Path",
+        ($userParts -join ";"),
+        "User"
+    )
+
+    return ($directories -join ";")
+}
+
 function Exit-WithMessage {
     param([string]$Message)
     Write-Host "ERROR: $Message" -ForegroundColor Red
     exit 1
-}
-
-function Get-RepoUrlWithToken {
-    param([string]$Url, [string]$Token)
-    return $Url -replace "^https://", "https://x-access-token:${Token}@"
 }
 
 function Set-GitNonInteractiveAuth {
@@ -76,6 +230,48 @@ function Set-GitNonInteractiveAuth {
     git config --local core.askPass ""
     git config --local --unset-all http.https://github.com/.extraheader 2>$null
     git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $basicAuth"
+}
+
+function Invoke-GitCloneWithToken {
+    param(
+        [string]$Url,
+        [string]$Destination,
+        [string]$Token
+    )
+
+    $basicAuth = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes("x-access-token:$Token")
+    )
+    $previousCount = $env:GIT_CONFIG_COUNT
+    $previousKey = $env:GIT_CONFIG_KEY_0
+    $previousValue = $env:GIT_CONFIG_VALUE_0
+
+    try {
+        # Pass authentication through the child process environment so the
+        # token is not embedded in the clone URL or exposed in the command line.
+        $env:GIT_CONFIG_COUNT = "1"
+        $env:GIT_CONFIG_KEY_0 = "http.https://github.com/.extraheader"
+        $env:GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic $basicAuth"
+        git clone $Url $Destination
+        return $LASTEXITCODE
+    } finally {
+        if ($null -eq $previousCount) {
+            Remove-Item Env:\GIT_CONFIG_COUNT -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_COUNT = $previousCount
+        }
+        if ($null -eq $previousKey) {
+            Remove-Item Env:\GIT_CONFIG_KEY_0 -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_KEY_0 = $previousKey
+        }
+        if ($null -eq $previousValue) {
+            Remove-Item Env:\GIT_CONFIG_VALUE_0 -ErrorAction SilentlyContinue
+        } else {
+            $env:GIT_CONFIG_VALUE_0 = $previousValue
+        }
+        $basicAuth = $null
+    }
 }
 
 function Get-RequiredExcelFiles {
@@ -161,18 +357,38 @@ function Install-IfMissing {
 }
 
 Install-IfMissing -Command "node" -WingetId "OpenJS.NodeJS.LTS" -FriendlyName "Node.js"
-Install-IfMissing -Command "python" -WingetId "Python.Python.3.12" -FriendlyName "Python 3.12"
 Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+$pythonRuntime = Get-UsablePython
+if (-not $pythonRuntime) {
+    Write-Host "  Installing Python 3.12 ..."
+    winget install --id Python.Python.3.12 --silent --accept-source-agreements --accept-package-agreements --scope machine
+    if ($LASTEXITCODE -ne 0) {
+        Exit-WithMessage "winget install of Python 3.12 failed."
+    }
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $pythonRuntime = Get-UsablePython
+}
+if (-not $pythonRuntime) {
+    Exit-WithMessage (
+        "A real Python installation could not be found. The Microsoft Store " +
+        "App Execution Alias does not count as Python. Install Python 3, then " +
+        "run setup again."
+    )
+}
+$pythonPathPrefix = Add-PythonToPath -PythonExecutable $pythonRuntime.Executable
+Write-Host (
+    "  Python $($pythonRuntime.Version) is working at " +
+    $pythonRuntime.Executable
+) -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
 # ------------------------------------------------------------------------------
 
 Write-Step "Step 2 of 5 - Clone or update the repo"
-
-$RepoWithToken = Get-RepoUrlWithToken -Url $RepoUrl -Token $GitHubToken
 
 if (Test-Path $InstallPath) {
     if (-not (Test-Path (Join-Path $InstallPath ".git"))) {
@@ -188,8 +404,11 @@ if (Test-Path $InstallPath) {
     }
     Pop-Location
 } else {
-    git clone $RepoWithToken $InstallPath
-    if ($LASTEXITCODE -ne 0) {
+    $cloneExitCode = Invoke-GitCloneWithToken `
+        -Url $RepoUrl `
+        -Destination $InstallPath `
+        -Token $GitHubToken
+    if ($cloneExitCode -ne 0) {
         Exit-WithMessage "git clone failed. Check the repo URL and token."
     }
 }
@@ -247,7 +466,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "  Installing Python package: openpyxl ..."
-python -m pip install --quiet openpyxl
+& $pythonRuntime.Executable -m pip install --quiet openpyxl
 if ($LASTEXITCODE -ne 0) {
     Pop-Location
     Exit-WithMessage "pip install openpyxl failed."
@@ -282,6 +501,7 @@ param(
 `$Log = "$InstallPath\daily-sync.log"
 
 `$env:PYTHONIOENCODING = "utf-8:replace"
+`$env:Path = "$pythonPathPrefix;" + `$env:Path
 `$env:GIT_TERMINAL_PROMPT = "0"
 `$env:GCM_INTERACTIVE = "never"
 `$env:GIT_ASKPASS = "echo"
