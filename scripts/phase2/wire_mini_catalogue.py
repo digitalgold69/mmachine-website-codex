@@ -274,6 +274,12 @@ def wire_mini_catalogue():
         # Strip the external-link metadata so Excel doesn't prompt
         remove_external_link_rels(tempdir)
 
+        # Every printable catalogue formula and the workbook sheet list have
+        # changed. The source workbook's cached dependency chain points at the
+        # old formulas/sheet layout; newer Excel rebuilds it, but Excel 2007 can
+        # refuse to open the workbook. Let Excel generate a fresh chain.
+        remove_calc_chain_if_present(tempdir)
+
         repack_zip(tempdir, MINI_CAT)
         tempdir = None
     finally:

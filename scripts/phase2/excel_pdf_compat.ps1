@@ -54,6 +54,93 @@ function Test-ExcelPdfFile {
     }
 }
 
+function Open-ExcelWorkbookCompatible {
+    param(
+        [Parameter(Mandatory)] $Excel,
+        [Parameter(Mandatory)] [string]$Path,
+        [bool]$ReadOnly = $false
+    )
+
+    $attempts = @(
+        @{
+            Name = "complete Workbooks.Open call"
+            Run = {
+                $Excel.Workbooks.Open(
+                    $Path,
+                    0,
+                    $ReadOnly,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    $true,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    $false,
+                    $false,
+                    [Type]::Missing,
+                    $false,
+                    $true,
+                    0
+                )
+            }
+        },
+        @{
+            Name = "legacy Workbooks.Open call"
+            Run = {
+                $Excel.Workbooks.Open(
+                    $Path,
+                    0,
+                    $ReadOnly,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    $true,
+                    [Type]::Missing,
+                    [Type]::Missing,
+                    $false,
+                    $false,
+                    [Type]::Missing,
+                    $false,
+                    $true
+                )
+            }
+        },
+        @{
+            Name = "short Workbooks.Open call"
+            Run = {
+                $Excel.Workbooks.Open($Path, 0, $ReadOnly)
+            }
+        },
+        @{
+            Name = "minimal Workbooks.Open call"
+            Run = {
+                $Excel.Workbooks.Open($Path)
+            }
+        }
+    )
+
+    $errors = @()
+    foreach ($attempt in $attempts) {
+        try {
+            $workbook = & $attempt.Run
+            if ($workbook) {
+                return [pscustomobject]@{
+                    Workbook = $workbook
+                    Method = $attempt.Name
+                }
+            }
+            $errors += "$($attempt.Name): Excel returned no workbook"
+        } catch {
+            $errors += "$($attempt.Name): $($_.Exception.Message)"
+        }
+    }
+
+    throw (
+        "Excel could not open '$Path' using any supported automation call. " +
+        ($errors -join " | ")
+    )
+}
+
 function Invoke-ExcelWorkbookPdfExport {
     param(
         [Parameter(Mandatory)] $Workbook,

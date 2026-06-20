@@ -150,7 +150,12 @@ function Export-CatalogueToPdf {
     }
 
     Write-Host "Exporting $SourcePath -> $OutputPath ..."
-    $wb = $Excel.Workbooks.Open($SourcePath, 0, $false)
+    $openResult = Open-ExcelWorkbookCompatible `
+        -Excel $Excel `
+        -Path $SourcePath `
+        -ReadOnly $false
+    $wb = $openResult.Workbook
+    Write-Host "  workbook opened ($($openResult.Method))"
     $originalStates = @{}
     $exportSucceeded = $false
 
@@ -267,18 +272,44 @@ if ($ForceLibreOffice) {
     exit 0
 }
 
-try {
+function Export-WithFreshExcel {
+    param(
+        [Parameter(Mandatory)] [string]$SourcePath,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string[]]$SheetsToHide = @()
+    )
+
+    $excel = $null
     try {
         $excel = New-Object -ComObject Excel.Application
         Set-ExcelAutomationOptions -Excel $excel
 
         Export-CatalogueToPdf -Excel $excel `
+            -SourcePath $SourcePath `
+            -OutputPath $OutputPath `
+            -SheetsToHide $SheetsToHide
+    } finally {
+        if ($excel) {
+            try { $excel.Quit() } catch {}
+            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        }
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+    }
+}
+
+try {
+    try {
+        # Old Excel editions can retain workbook-specific automation state.
+        # Give each catalogue a clean Excel process so one export cannot poison
+        # the next Workbooks.Open call.
+        Export-WithFreshExcel `
             -SourcePath (Join-Path $projectRoot $Source) `
             -OutputPath (Join-Path $projectRoot $Output) `
             -SheetsToHide $HideSheets
 
         if ($Source2 -ne "") {
-            Export-CatalogueToPdf -Excel $excel `
+            Export-WithFreshExcel `
                 -SourcePath (Join-Path $projectRoot $Source2) `
                 -OutputPath (Join-Path $projectRoot $Output2) `
                 -SheetsToHide $HideSheets2
@@ -288,12 +319,8 @@ try {
         $excelFailure = $_
     }
 } finally {
-    if ($excel) {
-        try { $excel.Quit() } catch {}
-        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-        [System.GC]::Collect()
-        [System.GC]::WaitForPendingFinalizers()
-    }
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
 }
 
 if (-not $excelExportSucceeded) {
