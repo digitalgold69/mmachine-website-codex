@@ -206,27 +206,32 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";
 Write-Host "  Checking Microsoft Excel PDF export ..."
 $UseLibreOfficeFallback = $false
 if (Test-ExcelPdfExport) {
-    Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
+    Write-Host "  Microsoft Excel PDF export is working and will be preferred" -ForegroundColor Green
 } else {
     $UseLibreOfficeFallback = $true
-    Write-Host "  Excel PDF export is unavailable. Installing LibreOffice fallback ..." -ForegroundColor Yellow
-    $libreOfficePath = Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"
-    if (-not (Test-Path $libreOfficePath)) {
-        winget install `
-            --id "TheDocumentFoundation.LibreOffice" `
-            --silent `
-            --accept-source-agreements `
-            --accept-package-agreements `
-            --scope machine
-        if ($LASTEXITCODE -ne 0) {
-            Exit-WithMessage "Excel cannot export PDFs and the LibreOffice fallback could not be installed."
-        }
-    }
-    if (-not (Test-Path $libreOfficePath)) {
-        Exit-WithMessage "Excel cannot export PDFs and LibreOffice was not found after installation."
-    }
-    Write-Host "  LibreOffice PDF fallback is ready" -ForegroundColor Green
+    Write-Host "  Excel PDF export is unavailable. LibreOffice will be used." -ForegroundColor Yellow
 }
+
+# Keep a second PDF exporter available even when Excel works today. If Office
+# later becomes unlicensed, busy, or damaged, the daily sync can automatically
+# fall back without requiring any action from the owner.
+$libreOfficePath = Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"
+if (-not (Test-Path $libreOfficePath)) {
+    Write-Host "  Installing LibreOffice PDF backup ..."
+    winget install `
+        --id "TheDocumentFoundation.LibreOffice" `
+        --silent `
+        --accept-source-agreements `
+        --accept-package-agreements `
+        --scope machine
+    if ($LASTEXITCODE -ne 0) {
+        Exit-WithMessage "The LibreOffice PDF backup could not be installed."
+    }
+}
+if (-not (Test-Path $libreOfficePath)) {
+    Exit-WithMessage "LibreOffice was not found after installation."
+}
+Write-Host "  LibreOffice PDF backup is ready" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
