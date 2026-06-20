@@ -204,9 +204,11 @@ Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 Write-Host "  Checking Microsoft Excel PDF export ..."
+$UseLibreOfficeFallback = $false
 if (Test-ExcelPdfExport) {
     Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
 } else {
+    $UseLibreOfficeFallback = $true
     Write-Host "  Excel PDF export is unavailable. Installing LibreOffice fallback ..." -ForegroundColor Yellow
     $libreOfficePath = Join-Path $env:ProgramFiles "LibreOffice\program\soffice.exe"
     if (-not (Test-Path $libreOfficePath)) {
@@ -256,6 +258,12 @@ if (Test-Path $InstallPath) {
 
 Push-Location $InstallPath
 Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
+$libreOfficeMarker = Join-Path $InstallPath ".use-libreoffice-pdf"
+if ($UseLibreOfficeFallback) {
+    New-Item -ItemType File -Path $libreOfficeMarker -Force | Out-Null
+} else {
+    Remove-Item -LiteralPath $libreOfficeMarker -Force -ErrorAction SilentlyContinue
+}
 Write-Host "  Checking that the GitHub token can publish updates ..."
 git push --dry-run origin HEAD:main
 if ($LASTEXITCODE -ne 0) {

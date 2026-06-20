@@ -45,6 +45,7 @@ scripts/setup/daily-sync.vbs
 scripts/setup/daily-sync.bat
 scripts/setup/manual-sync.vbs
 daily-sync.lock
+.use-libreoffice-pdf
 
 # Office lock files left behind when Excel/LibreOffice has the file open
 .~lock.*

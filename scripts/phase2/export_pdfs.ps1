@@ -23,9 +23,13 @@ $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+$libreOfficeMarker = Join-Path $projectRoot ".use-libreoffice-pdf"
 $excelExportSucceeded = $false
 $excelFailure = $null
-if ($env:MMACHINE_FORCE_LIBREOFFICE -eq "1") {
+if (
+    $env:MMACHINE_FORCE_LIBREOFFICE -eq "1" -or
+    (Test-Path $libreOfficeMarker)
+) {
     $ForceLibreOffice = $true
 }
 
@@ -37,10 +41,11 @@ function Get-LibreOfficeProgram {
     foreach ($root in $roots) {
         if ([string]::IsNullOrWhiteSpace($root)) { continue }
         $soffice = Join-Path $root "soffice.exe"
+        $sofficeConsole = Join-Path $root "soffice.com"
         $python = Join-Path $root "python.exe"
         if ((Test-Path $soffice) -and (Test-Path $python)) {
             return @{
-                Soffice = $soffice
+                Soffice = if (Test-Path $sofficeConsole) { $sofficeConsole } else { $soffice }
                 Python = $python
             }
         }
@@ -59,8 +64,15 @@ function Export-CataloguesWithLibreOffice {
     $miniSource = Join-Path $projectRoot $Source2
     $miniOutput = Join-Path $projectRoot $Output2
     $fallbackScript = Join-Path $scriptDir "export_pdfs_libreoffice.py"
-    $profilePath = Join-Path $env:TEMP ("m-machine-libreoffice-" + [Guid]::NewGuid().ToString("N"))
+    $profileId = [Guid]::NewGuid().ToString("N")
+    $profilePath = Join-Path $env:TEMP ("m-machine-libreoffice-" + $profileId)
+    New-Item -ItemType Directory -Path $profilePath -Force | Out-Null
     $profileUri = ([Uri]$profilePath).AbsoluteUri
+    $temporaryMetalsOutput = Join-Path $profilePath "metals-catalogue.pdf"
+    $temporaryMiniOutput = Join-Path $profilePath "mini-catalogue.pdf"
+    $stdoutPath = Join-Path $profilePath "soffice-stdout.log"
+    $stderrPath = Join-Path $profilePath "soffice-stderr.log"
+    $port = Get-Random -Minimum 20000 -Maximum 45000
     $process = $null
 
     Write-Host "Microsoft Excel PDF export is unavailable; using LibreOffice fallback" -ForegroundColor Yellow
@@ -70,33 +82,30 @@ function Export-CataloguesWithLibreOffice {
             -ArgumentList @(
                 "--headless",
                 "-env:UserInstallation=$profileUri",
-                "--accept=socket,host=localhost,port=2002;urp;StarOffice.ServiceManager",
+                "--accept=socket,host=127.0.0.1,port=$port;urp;StarOffice.ServiceManager",
                 "--norestore",
                 "--nodefault",
                 "--nofirststartwizard"
             ) `
             -WindowStyle Hidden `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
             -PassThru
 
-        $exported = $false
-        for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Start-Sleep -Seconds 2
-            & $program.Python `
-                $fallbackScript `
-                $metalsSource `
-                $metalsOutput `
-                $miniSource `
-                $miniOutput
-            if ($LASTEXITCODE -eq 0) {
-                $exported = $true
-                break
+        & $program.Python `
+            $fallbackScript `
+            $port `
+            $metalsSource `
+            $temporaryMetalsOutput `
+            $miniSource `
+            $temporaryMiniOutput
+        if ($LASTEXITCODE -ne 0) {
+            if (Test-Path $stderrPath) {
+                Get-Content $stderrPath | Write-Host
             }
-        }
-
-        if (-not $exported) {
             throw "LibreOffice could not export the catalogue PDFs."
         }
-        foreach ($pdf in @($metalsOutput, $miniOutput)) {
+        foreach ($pdf in @($temporaryMetalsOutput, $temporaryMiniOutput)) {
             if (-not (Test-Path $pdf)) {
                 throw "LibreOffice did not create the expected PDF: $pdf"
             }
@@ -104,11 +113,18 @@ function Export-CataloguesWithLibreOffice {
                 throw "LibreOffice created an incomplete PDF: $pdf"
             }
         }
+        Move-Item -LiteralPath $temporaryMetalsOutput -Destination $metalsOutput -Force
+        Move-Item -LiteralPath $temporaryMiniOutput -Destination $miniOutput -Force
         Write-Host "LibreOffice fallback wrote both catalogue PDFs" -ForegroundColor Green
     } finally {
         if ($process -and -not $process.HasExited) {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
         }
+        Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -like "*$profileId*" } |
+            ForEach-Object {
+                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            }
         Remove-Item -LiteralPath $profilePath -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -294,6 +310,9 @@ try {
 if (-not $excelExportSucceeded) {
     if ($excelFailure) {
         Write-Host "Excel export unavailable: $($excelFailure.Exception.Message)" -ForegroundColor Yellow
+        if ($excelFailure.Exception.Message -match "license|activation|expired") {
+            New-Item -ItemType File -Path $libreOfficeMarker -Force | Out-Null
+        }
     }
     Export-CataloguesWithLibreOffice
 }

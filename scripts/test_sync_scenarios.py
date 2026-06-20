@@ -88,6 +88,7 @@ def main():
             "-File",
             "scripts/phase2/export_pdfs.ps1",
         ], root)
+        run([sys.executable, "scripts/write_catalogue_versions.py"], root)
         run([sys.executable, "scripts/validate_sync.py"], root)
         verify(root, mini_info, metal_info)
         print("PASS: price changes, additions, and removals propagated end to end")

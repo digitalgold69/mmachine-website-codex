@@ -75,29 +75,36 @@ def code_description_columns(ws):
     return pairs
 
 
-def build_internal_formula_edits(ws):
+def build_internal_formula_edits(ws, prices):
     edits = {}
     for code_col, _description_col in code_description_columns(ws):
         price_col = code_col + 2
         inc_vat_col = code_col + 3
         for row in range(2, ws.max_row + 1):
-            if not looks_like_part_code(ws.cell(row, code_col).value):
+            raw_code = ws.cell(row, code_col).value
+            if not looks_like_part_code(raw_code):
                 continue
+            code = str(raw_code).strip()
             code_ref = f"{col_letter(code_col)}{row}"
             price_ref = f"{col_letter(price_col)}{row}"
             inc_ref = f"{col_letter(inc_vat_col)}{row}"
-            if ws.cell(row, price_col).data_type != "f":
-                price_formula = (
-                    f'IFERROR(VLOOKUP({code_ref},_PriceLookup!$A:$B,2,FALSE)," ")'
-                )
-                edits.setdefault(row, []).append(
-                    (price_ref, cell_formula(price_ref, price_formula))
-                )
-            if ws.cell(row, inc_vat_col).data_type != "f":
-                inc_formula = f'IFERROR(({price_ref}/100*20)+{price_ref}," ")'
-                edits.setdefault(row, []).append(
-                    (inc_ref, cell_formula(inc_ref, inc_formula))
-                )
+            current_price = prices.get(code)
+            cached_price = current_price if current_price is not None else " "
+            cached_inc_vat = (
+                round(float(current_price) * 1.2, 2)
+                if isinstance(current_price, (int, float))
+                else " "
+            )
+            price_formula = (
+                f'IFERROR(VLOOKUP({code_ref},_PriceLookup!$A:$B,2,FALSE)," ")'
+            )
+            edits.setdefault(row, []).append(
+                (price_ref, cell_formula(price_ref, price_formula, cached_price))
+            )
+            inc_formula = f'IFERROR(({price_ref}/100*20)+{price_ref}," ")'
+            edits.setdefault(row, []).append(
+                (inc_ref, cell_formula(inc_ref, inc_formula, cached_inc_vat))
+            )
     return edits
 
 
@@ -228,6 +235,7 @@ def wire_mini_catalogue():
     print(f"  Output:  {MINI_CAT}")
 
     rows = load_partsbook_codes()
+    prices = dict(rows)
     print(f"  PartsbookBenji codes: {len(rows)}")
     source_wb = openpyxl.load_workbook(MINI_CAT_SRC, data_only=False, keep_vba=True)
 
@@ -249,7 +257,7 @@ def wire_mini_catalogue():
                 continue
             sheet_path = Path(tempdir) / xml_rel
             rewritten = rewrite_external_references_in_sheet(str(sheet_path))
-            edits = build_internal_formula_edits(source_wb[sheet_name])
+            edits = build_internal_formula_edits(source_wb[sheet_name], prices)
             if edits:
                 _applied, missing = edit_sheet_xml(str(sheet_path), edits)
                 if missing:

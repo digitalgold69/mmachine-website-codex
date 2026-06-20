@@ -439,11 +439,23 @@ def extend_sheet_dimension(sheet_xml_path, last_col_letter):
         f.write(new_xml)
 
 
-def cell_formula(ref, formula):
-    """Build a <c> element holding a formula. Strips a leading '='."""
+def cell_formula(ref, formula, cached_value=None):
+    """Build a formula cell with an optional current cached result.
+
+    Cached values let customer workbooks display the latest synced prices even
+    before Excel or LibreOffice has recalculated the workbook.
+    """
     if formula.startswith("="):
         formula = formula[1:]
-    return f'<c r="{ref}"><f>{xml_escape(formula)}</f></c>'
+    formula_xml = f"<f>{xml_escape(formula)}</f>"
+    if cached_value is None:
+        return f'<c r="{ref}">{formula_xml}</c>'
+    if isinstance(cached_value, (int, float)):
+        return f'<c r="{ref}">{formula_xml}<v>{cached_value}</v></c>'
+    return (
+        f'<c r="{ref}" t="str">{formula_xml}'
+        f"<v>{xml_escape(str(cached_value))}</v></c>"
+    )
 
 
 def hide_column_in_sheet(sheet_xml_path, col_idx):

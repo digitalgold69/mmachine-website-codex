@@ -117,9 +117,8 @@ def validate_website_data(failures: list[str]) -> None:
 
 def validate_mini_workbook(failures: list[str]) -> int:
     prices = read_partsbook_prices()
-    wb_values = openpyxl.load_workbook(MINI_BOOK, data_only=True, keep_vba=True)
-    wb_formulas = openpyxl.load_workbook(MINI_BOOK, data_only=False, keep_vba=True)
-    lookup = wb_values["_PriceLookup"]
+    wb = openpyxl.load_workbook(MINI_BOOK, data_only=True, keep_vba=True)
+    lookup = wb["_PriceLookup"]
     embedded = {}
     for row in lookup.iter_rows(min_row=2, max_col=2, values_only=True):
         code, price = row
@@ -133,14 +132,13 @@ def validate_mini_workbook(failures: list[str]) -> int:
             )
 
     checked = 0
-    for sheet_name in wb_values.sheetnames:
+    for sheet_name in wb.sheetnames:
         if not (
             (sheet_name.endswith("B") and sheet_name[:-1].isdigit())
             or sheet_name in {"APX1", "APX2"}
         ):
             continue
-        ws = wb_values[sheet_name]
-        formula_ws = wb_formulas[sheet_name]
+        ws = wb[sheet_name]
         header = [ws.cell(1, col).value for col in range(1, ws.max_column + 1)]
         for code_col, _desc_col in _find_code_desc_columns(header):
             price_col = code_col + 2
@@ -155,22 +153,11 @@ def validate_mini_workbook(failures: list[str]) -> int:
                 actual = ws.cell(row_idx, price_col).value
                 checked += 1
                 if not close_enough(actual, expected):
-                    formula = formula_ws.cell(row_idx, price_col).value
-                    code_ref = formula_ws.cell(row_idx, code_col).coordinate
-                    formula_is_current = (
-                        isinstance(formula, str)
-                        and formula.startswith("=")
-                        and "_PriceLookup" in formula
-                        and code_ref in formula
-                    )
-                    if formula_is_current:
-                        continue
                     failures.append(
                         f"mini workbook {sheet_name}!{ws.cell(row_idx, price_col).coordinate} "
                         f"for {code}: {actual!r} != {expected!r}"
                     )
-    wb_values.close()
-    wb_formulas.close()
+    wb.close()
     return checked
 
 
@@ -188,12 +175,10 @@ def validate_metals_workbook(failures: list[str]) -> int:
             f"{len(missing_targets)} saved metal links point to removed master rows"
         )
 
-    wb_values = openpyxl.load_workbook(METALS_BOOK, data_only=True)
-    wb_formulas = openpyxl.load_workbook(METALS_BOOK, data_only=False)
+    wb = openpyxl.load_workbook(METALS_BOOK, data_only=True)
     linked = 0
-    for sheet_name in wb_values.sheetnames:
-        ws = wb_values[sheet_name]
-        formula_ws = wb_formulas[sheet_name]
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
         if not is_data_sheet(ws):
             continue
         for row_idx in range(2, ws.max_row + 1):
@@ -210,21 +195,11 @@ def validate_metals_workbook(failures: list[str]) -> int:
             actual = ws.cell(row_idx, 5).value
             expected = master["priceEx"]
             if not close_enough(actual, expected):
-                formula = formula_ws.cell(row_idx, 5).value
-                formula_is_current = (
-                    isinstance(formula, str)
-                    and formula.startswith("=")
-                    and "_PriceLookup" in formula
-                    and f"K{row_idx}" in formula
-                )
-                if formula_is_current:
-                    continue
                 failures.append(
                     f"metals workbook {sheet_name}!E{row_idx}: "
                     f"{actual!r} != {expected!r} from {master['src']}"
                 )
-    wb_values.close()
-    wb_formulas.close()
+    wb.close()
 
     if linked != len(matcher.links):
         failures.append(

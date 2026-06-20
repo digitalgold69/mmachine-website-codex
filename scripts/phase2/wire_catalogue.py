@@ -266,7 +266,28 @@ def wire_catalogue():
                 #   A=Key, B=Shape, C=Metal, D=Spec, E=Size, F=£ ex VAT, G=Unit,
                 #   H=Source Sheet, I=Source Row, J=Code
                 e_formula = f'IFERROR(VLOOKUP(K{row_idx},_PriceLookup!$A:$F,6,FALSE),0)'
-                row_edits.append((f"E{row_idx}", cell_formula(f"E{row_idx}", e_formula)))
+                current_price = keys[matched_key]["priceEx"]
+                row_edits.append(
+                    (
+                        f"E{row_idx}",
+                        cell_formula(f"E{row_idx}", e_formula, current_price),
+                    )
+                )
+                g_formula = f'IF(E{row_idx}="","",E{row_idx}*1.2)'
+                current_inc_vat = (
+                    round(float(current_price) * 1.2, 2)
+                    if isinstance(current_price, (int, float))
+                    else ""
+                )
+                row_edits = [
+                    edit for edit in row_edits if edit[0] != f"G{row_idx}"
+                ]
+                row_edits.append(
+                    (
+                        f"G{row_idx}",
+                        cell_formula(f"G{row_idx}", g_formula, current_inc_vat),
+                    )
+                )
                 row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", public_code)))
                 row_edits.append((f"K{row_idx}", cell_str(f"K{row_idx}", matched_key)))
                 counts["auto_linked"] += 1

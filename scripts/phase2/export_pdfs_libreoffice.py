@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -29,18 +30,29 @@ def set_header(page_style, value: str) -> None:
         page_style.setPropertyValue(property_name, content)
 
 
-def connect_to_libreoffice():
+def connect_to_libreoffice(port: int, timeout_seconds: int = 30):
     local_context = uno.getComponentContext()
     resolver = local_context.ServiceManager.createInstanceWithContext(
         "com.sun.star.bridge.UnoUrlResolver",
         local_context,
     )
-    context = resolver.resolve(
-        "uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
-    )
-    return context.ServiceManager.createInstanceWithContext(
-        "com.sun.star.frame.Desktop",
-        context,
+    deadline = time.monotonic() + timeout_seconds
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            context = resolver.resolve(
+                f"uno:socket,host=127.0.0.1,port={port};"
+                "urp;StarOffice.ComponentContext"
+            )
+            return context.ServiceManager.createInstanceWithContext(
+                "com.sun.star.frame.Desktop",
+                context,
+            )
+        except Exception as error:
+            last_error = error
+            time.sleep(0.5)
+    raise RuntimeError(
+        f"LibreOffice did not become ready on port {port}: {last_error}"
     )
 
 
@@ -132,23 +144,27 @@ def export_catalogue(desktop, source: Path, output: Path, is_metals: bool) -> No
 
 
 def main() -> int:
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         print(
             "Usage: export_pdfs_libreoffice.py "
-            "<metals-source> <metals-output> <mini-source> <mini-output>",
+            "<port> <metals-source> <metals-output> <mini-source> <mini-output>",
             file=sys.stderr,
         )
         return 2
 
-    metals_source = Path(sys.argv[1]).resolve()
-    metals_output = Path(sys.argv[2]).resolve()
-    mini_source = Path(sys.argv[3]).resolve()
-    mini_output = Path(sys.argv[4]).resolve()
+    port = int(sys.argv[1])
+    metals_source = Path(sys.argv[2]).resolve()
+    metals_output = Path(sys.argv[3]).resolve()
+    mini_source = Path(sys.argv[4]).resolve()
+    mini_output = Path(sys.argv[5]).resolve()
 
-    desktop = connect_to_libreoffice()
-    export_catalogue(desktop, metals_source, metals_output, is_metals=True)
-    export_catalogue(desktop, mini_source, mini_output, is_metals=False)
-    print("LibreOffice catalogue PDF export completed")
+    desktop = connect_to_libreoffice(port)
+    try:
+        export_catalogue(desktop, metals_source, metals_output, is_metals=True)
+        export_catalogue(desktop, mini_source, mini_output, is_metals=False)
+        print("LibreOffice catalogue PDF export completed")
+    finally:
+        desktop.terminate()
     return 0
 
 
