@@ -24,6 +24,8 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 $libreOfficeMarker = Join-Path $projectRoot ".use-libreoffice-pdf"
+$excelCompatibilityScript = Join-Path $scriptDir "excel_pdf_compat.ps1"
+. $excelCompatibilityScript
 $excelExportSucceeded = $false
 $excelFailure = $null
 if (
@@ -238,18 +240,11 @@ function Export-CatalogueToPdf {
             $sheet.Calculate()
         }
 
-        $wb.ExportAsFixedFormat(
-            0,
-            $OutputPath,
-            0,
-            $true,
-            $false,
-            [Type]::Missing,
-            [Type]::Missing,
-            $false,
-            [Type]::Missing
-        )
-        Write-Host "  PDF written"
+        $pdfMethod = Invoke-ExcelWorkbookPdfExport `
+            -Workbook $wb `
+            -OutputPath $OutputPath `
+            -MinimumBytes 10000
+        Write-Host "  PDF written ($pdfMethod)"
         $exportSucceeded = $true
     } finally {
         foreach ($sn in $originalStates.Keys) {
@@ -275,14 +270,7 @@ if ($ForceLibreOffice) {
 try {
     try {
         $excel = New-Object -ComObject Excel.Application
-        $excel.Visible = $false
-        $excel.DisplayAlerts = $false
-        $excel.AskToUpdateLinks = $false
-        $excel.ScreenUpdating = $false
-        $excel.DisplayStatusBar = $false
-        $excel.EnableEvents = $false
-        $excel.Interactive = $false
-        $excel.UserControl = $false
+        Set-ExcelAutomationOptions -Excel $excel
 
         Export-CatalogueToPdf -Excel $excel `
             -SourcePath (Join-Path $projectRoot $Source) `

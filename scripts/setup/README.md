@@ -30,12 +30,18 @@ The goal is deliberately simple:
     account picker should appear
 
 The owner computer must have Microsoft Excel desktop installed and activated.
-Setup checks that Excel can perform a real PDF export before continuing.
-LibreOffice is not installed or configured by the owner setup.
+Setup performs a capability test using the same shared automation layer as the
+daily PDF exporter. It does not rely on a hard-coded Excel version number.
 
-Excel 2007 is supported if its Microsoft Save as PDF/XPS feature is installed.
-The setup test exports an in-memory worksheet directly and does not depend on
-saving a temporary `.xlsx` file.
+The supported range is Excel 2007 through current Microsoft 365 desktop Excel,
+provided that the installed edition can open `.xlsx`/`.xlsm` workbooks and save
+as PDF. Excel 2007 also needs Microsoft's Save as PDF/XPS feature. LibreOffice
+is not installed or configured by the owner setup.
+
+The setup kit can be run directly from a USB drive. The launcher copies the
+main setup script to the computer's local Windows temporary folder before it
+runs. The test PDF also uses the local temporary folder, and the permanent
+installation is created at `C:\mmachine`.
 
 ## Files to copy into "M-Machine Master Files"
 

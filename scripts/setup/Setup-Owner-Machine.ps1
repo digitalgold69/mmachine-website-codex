@@ -99,80 +99,6 @@ function Test-RequiredExcelFilesPresent {
     return $missing
 }
 
-function Test-ExcelPdfExport {
-    $excel = $null
-    $workbook = $null
-    $worksheet = $null
-    $testRoot = Join-Path $env:TEMP (
-        "m-machine-excel-test-" + [Guid]::NewGuid().ToString("N")
-    )
-    $testPdf = Join-Path $testRoot "license-test.pdf"
-    $stage = "starting Microsoft Excel"
-    $script:ExcelPdfTestVersion = "unknown"
-    $script:ExcelPdfTestDetail = ""
-
-    New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
-
-    try {
-        $excel = New-Object -ComObject Excel.Application
-        $script:ExcelPdfTestVersion = [string]$excel.Version
-        $excel.Visible = $false
-        $excel.DisplayAlerts = $false
-
-        $stage = "creating a temporary workbook"
-        $workbook = $excel.Workbooks.Add()
-        $worksheet = $workbook.Worksheets.Item(1)
-        $worksheet.Range("A1").Value2 = "M-Machine Excel PDF test"
-
-        # Excel 2007's COM automation is less forgiving about omitted optional
-        # arguments. Use the complete ExportAsFixedFormat signature and avoid
-        # an unrelated SaveAs operation; the production sync exports existing
-        # workbooks directly and does not need this test workbook saved.
-        $stage = "exporting a PDF"
-        $workbook.ExportAsFixedFormat(
-            0,
-            $testPdf,
-            0,
-            $true,
-            $false,
-            [Type]::Missing,
-            [Type]::Missing,
-            $false,
-            [Type]::Missing
-        )
-
-        if (-not (Test-Path $testPdf)) {
-            $script:ExcelPdfTestDetail = (
-                "Excel $($script:ExcelPdfTestVersion) returned without creating the test PDF."
-            )
-            return $false
-        }
-        return ((Get-Item $testPdf).Length -gt 0)
-    } catch {
-        $script:ExcelPdfTestDetail = (
-            "$stage failed in Excel $($script:ExcelPdfTestVersion): " +
-            $_.Exception.Message
-        )
-        Write-Host "  Excel PDF test failed: $($script:ExcelPdfTestDetail)" -ForegroundColor Red
-        return $false
-    } finally {
-        if ($worksheet) {
-            [Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null
-        }
-        if ($workbook) {
-            try { $workbook.Close($false) } catch {}
-            [Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
-        }
-        if ($excel) {
-            try { $excel.Quit() } catch {}
-            [Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
-        }
-        [System.GC]::Collect()
-        [System.GC]::WaitForPendingFinalizers()
-        Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
 function Create-FolderLink {
     param([string]$LinkPath, [string]$TargetPath, [string]$Purpose)
     if (-not (Test-Path $TargetPath)) {
@@ -240,19 +166,6 @@ Install-IfMissing -Command "git" -WingetId "Git.Git" -FriendlyName "Git"
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
-Write-Host "  Checking Microsoft Excel PDF export ..."
-if (Test-ExcelPdfExport) {
-    Write-Host (
-        "  Microsoft Excel $ExcelPdfTestVersion PDF export is working"
-    ) -ForegroundColor Green
-} else {
-    Exit-WithMessage (
-        "Microsoft Excel could not complete the PDF test. " +
-        "$ExcelPdfTestDetail " +
-        "Excel 2007 is supported when its Save as PDF/XPS feature is installed."
-    )
-}
-
 # ------------------------------------------------------------------------------
 # Step 2 - clone or update repo
 # ------------------------------------------------------------------------------
@@ -287,6 +200,30 @@ Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
 # LibreOffice marker is only for separate test machines.
 Remove-Item -LiteralPath (Join-Path $InstallPath ".use-libreoffice-pdf") `
     -Force -ErrorAction SilentlyContinue
+
+Write-Host "  Checking Microsoft Excel workbook and PDF automation ..."
+$excelCompatibilityScript = Join-Path $InstallPath "scripts\phase2\excel_pdf_compat.ps1"
+if (-not (Test-Path -LiteralPath $excelCompatibilityScript)) {
+    Pop-Location
+    Exit-WithMessage "The Excel compatibility helper is missing from the installation."
+}
+. $excelCompatibilityScript
+$excelCapability = Test-ExcelPdfCapability
+if ($excelCapability.Success) {
+    Write-Host (
+        "  Microsoft Excel $($excelCapability.Version) automation is working " +
+        "($($excelCapability.Method))"
+    ) -ForegroundColor Green
+} else {
+    Pop-Location
+    Exit-WithMessage (
+        "Microsoft Excel desktop could not generate a local test PDF. " +
+        "$($excelCapability.Detail) " +
+        "Open Excel once to finish activation or first-run setup, then check " +
+        "that Excel can save a workbook as PDF before running setup again."
+    )
+}
+
 Write-Host "  Checking that the GitHub token can publish updates ..."
 git push --dry-run origin HEAD:main
 if ($LASTEXITCODE -ne 0) {
