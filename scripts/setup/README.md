@@ -33,6 +33,10 @@ The owner computer must have Microsoft Excel desktop installed and activated.
 Setup checks that Excel can perform a real PDF export before continuing.
 LibreOffice is not installed or configured by the owner setup.
 
+Excel 2007 is supported if its Microsoft Save as PDF/XPS feature is installed.
+The setup test exports an in-memory worksheet directly and does not depend on
+saving a temporary `.xlsx` file.
+
 ## Files to copy into "M-Machine Master Files"
 
 Required:

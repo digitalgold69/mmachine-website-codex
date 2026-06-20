@@ -102,26 +102,63 @@ function Test-RequiredExcelFilesPresent {
 function Test-ExcelPdfExport {
     $excel = $null
     $workbook = $null
-    $testRoot = Join-Path $env:TEMP "m-machine-excel-test"
-    $testWorkbook = Join-Path $testRoot "license-test.xlsx"
+    $worksheet = $null
+    $testRoot = Join-Path $env:TEMP (
+        "m-machine-excel-test-" + [Guid]::NewGuid().ToString("N")
+    )
     $testPdf = Join-Path $testRoot "license-test.pdf"
+    $stage = "starting Microsoft Excel"
+    $script:ExcelPdfTestVersion = "unknown"
+    $script:ExcelPdfTestDetail = ""
 
-    Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 
     try {
         $excel = New-Object -ComObject Excel.Application
+        $script:ExcelPdfTestVersion = [string]$excel.Version
         $excel.Visible = $false
         $excel.DisplayAlerts = $false
+
+        $stage = "creating a temporary workbook"
         $workbook = $excel.Workbooks.Add()
-        $workbook.Worksheets.Item(1).Range("A1").Value2 = "M-Machine Excel test"
-        $workbook.SaveAs($testWorkbook, 51)
-        $workbook.ExportAsFixedFormat(0, $testPdf)
-        return (Test-Path $testPdf)
+        $worksheet = $workbook.Worksheets.Item(1)
+        $worksheet.Range("A1").Value2 = "M-Machine Excel PDF test"
+
+        # Excel 2007's COM automation is less forgiving about omitted optional
+        # arguments. Use the complete ExportAsFixedFormat signature and avoid
+        # an unrelated SaveAs operation; the production sync exports existing
+        # workbooks directly and does not need this test workbook saved.
+        $stage = "exporting a PDF"
+        $workbook.ExportAsFixedFormat(
+            0,
+            $testPdf,
+            0,
+            $true,
+            $false,
+            [Type]::Missing,
+            [Type]::Missing,
+            $false,
+            [Type]::Missing
+        )
+
+        if (-not (Test-Path $testPdf)) {
+            $script:ExcelPdfTestDetail = (
+                "Excel $($script:ExcelPdfTestVersion) returned without creating the test PDF."
+            )
+            return $false
+        }
+        return ((Get-Item $testPdf).Length -gt 0)
     } catch {
-        Write-Host "  Excel PDF test failed: $($_.Exception.Message)" -ForegroundColor Red
+        $script:ExcelPdfTestDetail = (
+            "$stage failed in Excel $($script:ExcelPdfTestVersion): " +
+            $_.Exception.Message
+        )
+        Write-Host "  Excel PDF test failed: $($script:ExcelPdfTestDetail)" -ForegroundColor Red
         return $false
     } finally {
+        if ($worksheet) {
+            [Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null
+        }
         if ($workbook) {
             try { $workbook.Close($false) } catch {}
             [Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
@@ -205,9 +242,15 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";
 
 Write-Host "  Checking Microsoft Excel PDF export ..."
 if (Test-ExcelPdfExport) {
-    Write-Host "  Microsoft Excel PDF export is working" -ForegroundColor Green
+    Write-Host (
+        "  Microsoft Excel $ExcelPdfTestVersion PDF export is working"
+    ) -ForegroundColor Green
 } else {
-    Exit-WithMessage "Microsoft Excel desktop is missing, unlicensed, or unable to export PDFs. Repair or activate Excel, then run setup again."
+    Exit-WithMessage (
+        "Microsoft Excel could not complete the PDF test. " +
+        "$ExcelPdfTestDetail " +
+        "Excel 2007 is supported when its Save as PDF/XPS feature is installed."
+    )
 }
 
 # ------------------------------------------------------------------------------

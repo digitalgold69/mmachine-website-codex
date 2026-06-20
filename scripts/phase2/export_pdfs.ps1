@@ -246,7 +246,8 @@ function Export-CatalogueToPdf {
             $false,
             [Type]::Missing,
             [Type]::Missing,
-            $false
+            $false,
+            [Type]::Missing
         )
         Write-Host "  PDF written"
         $exportSucceeded = $true
