@@ -17,6 +17,7 @@ The output does not add worksheets or alter the workbook relationship layout,
 which keeps this old macro workbook compatible with Excel 2007.
 """
 import openpyxl
+import json
 import re
 import shutil
 import sys
@@ -37,6 +38,7 @@ PROJECT_ROOT = HERE.parent.parent
 PARTSBOOK = str(PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx")
 MINI_CAT_SRC = str(PROJECT_ROOT / "data-source" / "Mini Catalogue Self Updating.xlsm")
 MINI_CAT = str(PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.xlsm")
+MINI_MANIFEST = str(PROJECT_ROOT / "final-deliverables" / "mini-catalogue-updates.json")
 
 from surgical_xlsx import (
     open_for_surgery, repack_zip, remove_sheet_if_present,
@@ -72,7 +74,7 @@ def value_cell(ref, value):
     return cell_str(ref, " " if value is None else str(value))
 
 
-def build_price_value_edits(ws, prices):
+def build_price_value_edits(ws, prices, manifest_updates):
     edits = {}
     for code_col, _description_col in code_description_columns(ws):
         price_col = code_col + 2
@@ -94,8 +96,14 @@ def build_price_value_edits(ws, prices):
             edits.setdefault(row, []).append(
                 (price_ref, value_cell(price_ref, cached_price))
             )
+            manifest_updates.append(
+                {"sheet": ws.title, "cell": price_ref, "value": cached_price}
+            )
             edits.setdefault(row, []).append(
                 (inc_ref, value_cell(inc_ref, cached_inc_vat))
+            )
+            manifest_updates.append(
+                {"sheet": ws.title, "cell": inc_ref, "value": cached_inc_vat}
             )
 
     # The legacy catalogue pre-fills some empty future rows with external
@@ -118,6 +126,9 @@ def build_price_value_edits(ws, prices):
             ):
                 edits.setdefault(cell.row, []).append(
                     (cell.coordinate, value_cell(cell.coordinate, " "))
+                )
+                manifest_updates.append(
+                    {"sheet": ws.title, "cell": cell.coordinate, "value": " "}
                 )
     return edits
 
@@ -192,6 +203,7 @@ def wire_mini_catalogue():
     prices = dict(rows)
     print(f"  PartsbookBenji codes: {len(rows)}")
     source_wb = openpyxl.load_workbook(MINI_CAT_SRC, data_only=False, keep_vba=True)
+    manifest_updates = []
 
     Path(MINI_CAT).parent.mkdir(parents=True, exist_ok=True)
     # Extract directly from the source (avoids permission error if destination is open)
@@ -212,7 +224,9 @@ def wire_mini_catalogue():
             if not (re.fullmatch(r"\d+B", sheet_name) or sheet_name in {"APX1", "APX2"}):
                 continue
             sheet_path = Path(tempdir) / xml_rel
-            edits = build_price_value_edits(source_wb[sheet_name], prices)
+            edits = build_price_value_edits(
+                source_wb[sheet_name], prices, manifest_updates
+            )
             if edits:
                 _applied, missing = edit_sheet_xml(str(sheet_path), edits)
                 if missing:
@@ -238,12 +252,26 @@ def wire_mini_catalogue():
 
         repack_zip(tempdir, MINI_CAT)
         tempdir = None
+
+        Path(MINI_MANIFEST).write_text(
+            json.dumps(
+                {
+                    "source": Path(MINI_CAT_SRC).name,
+                    "customerFile": Path(MINI_CAT).name,
+                    "updates": manifest_updates,
+                },
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
     finally:
         source_wb.close()
         if tempdir:
             shutil.rmtree(tempdir, ignore_errors=True)
 
     print("  OK Current Partsbook prices embedded without adding worksheets")
+    print(f"  OK Excel update manifest written ({len(manifest_updates)} cells)")
     print("  OK VBA, images, and print settings preserved")
 
 

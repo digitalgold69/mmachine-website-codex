@@ -122,8 +122,6 @@ def validate_mini_workbook(failures: list[str]) -> int:
         names = set(archive.namelist())
         if any(name.startswith("xl/externalLinks/") for name in names):
             failures.append("mini workbook still contains external-link files")
-        if "xl/calcChain.xml" in names:
-            failures.append("mini workbook still contains a stale calculation chain")
         for name in names:
             if not re.fullmatch(r"xl/worksheets/sheet\d+\.xml", name):
                 continue

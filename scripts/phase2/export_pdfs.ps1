@@ -15,6 +15,8 @@ param(
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
     [string]$Output2 = "public\catalogue\mini-catalogue.pdf",
     [string[]]$HideSheets2 = @("_PriceLookup"),
+    [string]$MiniMasterSource = "data-source\Mini Catalogue Self Updating.xlsm",
+    [string]$MiniUpdateManifest = "final-deliverables\mini-catalogue-updates.json",
 
     [switch]$ForceLibreOffice
 )
@@ -298,6 +300,147 @@ function Export-WithFreshExcel {
     }
 }
 
+function Export-MiniCatalogueWithExcel {
+    param(
+        [Parameter(Mandatory)] [string]$MasterSourcePath,
+        [Parameter(Mandatory)] [string]$CustomerOutputPath,
+        [Parameter(Mandatory)] [string]$ManifestPath,
+        [Parameter(Mandatory)] [string]$PdfOutputPath
+    )
+
+    foreach ($requiredPath in @($MasterSourcePath, $ManifestPath)) {
+        if (-not (Test-Path -LiteralPath $requiredPath)) {
+            throw "Mini catalogue export needs this file: $requiredPath"
+        }
+    }
+
+    $customerDirectory = Split-Path -Parent $CustomerOutputPath
+    $pdfDirectory = Split-Path -Parent $PdfOutputPath
+    New-Item -ItemType Directory -Path $customerDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $pdfDirectory -Force | Out-Null
+
+    $temporaryCustomer = Join-Path $customerDirectory (
+        ".mini-catalogue-" + [Guid]::NewGuid().ToString("N") + ".xlsm"
+    )
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw |
+        ConvertFrom-Json
+    $excel = $null
+    $workbook = $null
+    $sheetCache = @{}
+    $originalStates = @{}
+    $completed = $false
+
+    Write-Host (
+        "Exporting $MasterSourcePath -> $PdfOutputPath " +
+        "and $CustomerOutputPath ..."
+    )
+
+    try {
+        $excel = New-Object -ComObject Excel.Application
+        Set-ExcelAutomationOptions -Excel $excel
+        $openResult = Open-ExcelWorkbookCompatible `
+            -Excel $excel `
+            -Path $MasterSourcePath `
+            -ReadOnly $true
+        $workbook = $openResult.Workbook
+        Write-Host "  original Mini workbook opened ($($openResult.Method))"
+
+        foreach ($update in $manifest.updates) {
+            $sheetName = [string]$update.sheet
+            if (-not $sheetCache.ContainsKey($sheetName)) {
+                $sheetCache[$sheetName] = $workbook.Worksheets.Item($sheetName)
+            }
+            $sheetCache[$sheetName].Range([string]$update.cell).Value2 = $update.value
+        }
+        Write-Host "  applied $($manifest.updates.Count) current price cells"
+
+        try {
+            $links = $workbook.LinkSources(1) # xlLinkTypeExcelLinks
+            if ($links) {
+                foreach ($link in @($links)) {
+                    $workbook.BreakLink([string]$link, 1)
+                }
+                Write-Host "  removed external Partsbook link"
+            }
+        } catch {
+            Write-Host (
+                "  warning: Excel could not enumerate external links: " +
+                $_.Exception.Message
+            ) -ForegroundColor Yellow
+        }
+
+        # SaveCopyAs lets Excel itself write the macro workbook while the
+        # original master remains read-only and untouched.
+        $workbook.SaveCopyAs($temporaryCustomer)
+        if (
+            -not (Test-Path -LiteralPath $temporaryCustomer) -or
+            (Get-Item -LiteralPath $temporaryCustomer).Length -lt 100000
+        ) {
+            throw "Excel did not create a valid Mini customer workbook."
+        }
+        Write-Host "  Excel-native Mini customer workbook prepared"
+
+        foreach ($sheet in @($workbook.Worksheets)) {
+            try {
+                if ($sheet.Visible -eq 0) { continue }
+                $printArea = [string]$sheet.PageSetup.PrintArea
+                if ([string]::IsNullOrWhiteSpace($printArea)) {
+                    $originalStates[$sheet.Name] = $sheet.Visible
+                    $sheet.Visible = 0
+                }
+            } catch {}
+        }
+
+        $pdfMethod = Invoke-ExcelWorkbookPdfExport `
+            -Workbook $workbook `
+            -OutputPath $PdfOutputPath `
+            -MinimumBytes 10000
+        Write-Host "  Mini PDF written ($pdfMethod)"
+        $completed = $true
+    } finally {
+        if ($workbook) {
+            foreach ($sheetName in $originalStates.Keys) {
+                try {
+                    $workbook.Worksheets.Item($sheetName).Visible = (
+                        $originalStates[$sheetName]
+                    )
+                } catch {}
+            }
+        }
+        foreach ($sheet in $sheetCache.Values) {
+            try {
+                [Runtime.InteropServices.Marshal]::ReleaseComObject($sheet) |
+                    Out-Null
+            } catch {}
+        }
+        if ($workbook) {
+            try { $workbook.Close($false) } catch {}
+            try {
+                [Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) |
+                    Out-Null
+            } catch {}
+        }
+        if ($excel) {
+            try { $excel.Quit() } catch {}
+            try {
+                [Runtime.InteropServices.Marshal]::ReleaseComObject($excel) |
+                    Out-Null
+            } catch {}
+        }
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+
+        if ($completed) {
+            Move-Item -LiteralPath $temporaryCustomer `
+                -Destination $CustomerOutputPath -Force
+            Write-Host "  Mini customer workbook updated"
+        } else {
+            Remove-Item -LiteralPath $temporaryCustomer `
+                -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 try {
     try {
         # Old Excel editions can retain workbook-specific automation state.
@@ -309,10 +452,11 @@ try {
             -SheetsToHide $HideSheets
 
         if ($Source2 -ne "") {
-            Export-WithFreshExcel `
-                -SourcePath (Join-Path $projectRoot $Source2) `
-                -OutputPath (Join-Path $projectRoot $Output2) `
-                -SheetsToHide $HideSheets2
+            Export-MiniCatalogueWithExcel `
+                -MasterSourcePath (Join-Path $projectRoot $MiniMasterSource) `
+                -CustomerOutputPath (Join-Path $projectRoot $Source2) `
+                -ManifestPath (Join-Path $projectRoot $MiniUpdateManifest) `
+                -PdfOutputPath (Join-Path $projectRoot $Output2)
         }
         $excelExportSucceeded = $true
     } catch {
