@@ -300,6 +300,28 @@ function Export-WithFreshExcel {
     }
 }
 
+function Convert-MiniManifestValueForExcel {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return ""
+    }
+
+    if (
+        $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [int] -or
+        $Value -is [long] -or
+        $Value -is [single] -or
+        $Value -is [double] -or
+        $Value -is [decimal]
+    ) {
+        return [double]$Value
+    }
+
+    return [string]$Value
+}
+
 function Export-MiniCatalogueWithExcel {
     param(
         [Parameter(Mandatory)] [string]$MasterSourcePath,
@@ -347,10 +369,28 @@ function Export-MiniCatalogueWithExcel {
 
         foreach ($update in $manifest.updates) {
             $sheetName = [string]$update.sheet
+            $cellAddress = [string]$update.cell
             if (-not $sheetCache.ContainsKey($sheetName)) {
                 $sheetCache[$sheetName] = $workbook.Worksheets.Item($sheetName)
             }
-            $sheetCache[$sheetName].Range([string]$update.cell).Value2 = $update.value
+            $range = $null
+            try {
+                $range = $sheetCache[$sheetName].Range($cellAddress)
+                $range.Value2 = Convert-MiniManifestValueForExcel $update.value
+            } catch {
+                throw (
+                    "Could not write Mini catalogue value at '" +
+                    $sheetName + "'!" + $cellAddress + ": " +
+                    $_.Exception.Message
+                )
+            } finally {
+                if ($range) {
+                    try {
+                        [Runtime.InteropServices.Marshal]::ReleaseComObject($range) |
+                            Out-Null
+                    } catch {}
+                }
+            }
         }
         Write-Host "  applied $($manifest.updates.Count) current price cells"
 
