@@ -32294,14 +32294,14 @@ export const metals: MetalProduct[] = [
     "metal": "Phos. Bronze",
     "form": "Diameter",
     "stock": "in",
-    "priceExVat": 4.0,
-    "priceIncVat": 4.8,
+    "priceExVat": 17.0,
+    "priceIncVat": 20.4,
     "unit": "foot/300mm",
     "spec": "PB102",
     "size": "1/8\" D",
     "notes": "",
     "sourceSheet": "PB102 Diameter n hex",
-    "pricePerKg": 4.0,
+    "pricePerKg": 17.0,
     "description": "PB102"
   },
   {
