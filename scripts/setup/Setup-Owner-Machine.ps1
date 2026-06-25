@@ -321,6 +321,58 @@ function Invoke-GitCloneWithToken {
     }
 }
 
+function Reset-GeneratedGitOutputs {
+    param([string]$RepositoryPath)
+
+    $generatedPaths = @(
+        "lib/mini-data.ts",
+        "lib/metals-data.ts",
+        "lib/catalogue-versions.ts",
+        "data-source/.metal-codes.json",
+        "data-source/.metal-links.json",
+        "data-source/.metal-catalogue-codes.json",
+        "public/catalogue"
+    )
+
+    Push-Location $RepositoryPath
+    try {
+        $statusLines = @(git status --porcelain 2>$null)
+        $unmergedLines = @(
+            $statusLines | Where-Object {
+                $_ -match "^(DD|AU|UD|UA|DU|AA|UU)"
+            }
+        )
+
+        if ($unmergedLines.Count -gt 0) {
+            Write-Host (
+                "  Existing repo has an unfinished Git conflict - " +
+                "recovering tracked repo files"
+            ) -ForegroundColor Yellow
+            git rebase --abort 2>$null
+            git merge --abort 2>$null
+
+            $remainingUnmerged = @(
+                git status --porcelain 2>$null | Where-Object {
+                    $_ -match "^(DD|AU|UD|UA|DU|AA|UU)"
+                }
+            )
+            if ($remainingUnmerged.Count -gt 0) {
+                git reset --hard HEAD
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Could not recover the Git working tree."
+                }
+            }
+        }
+
+        git checkout -- $generatedPaths 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not reset generated website outputs."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Get-RequiredExcelFiles {
     param([string]$Root)
     return @(
@@ -453,6 +505,9 @@ if (Test-Path $InstallPath) {
     Write-Host "  $InstallPath already exists - pulling latest changes"
     Push-Location $InstallPath
     Set-GitNonInteractiveAuth -Url $RepoUrl -Token $GitHubToken
+    Pop-Location
+    Reset-GeneratedGitOutputs -RepositoryPath $InstallPath
+    Push-Location $InstallPath
     git pull --rebase --autostash
     if ($LASTEXITCODE -ne 0) {
         Pop-Location
@@ -618,12 +673,69 @@ function Invoke-LoggedCommand {
     }
 }
 
+function Reset-GeneratedGitOutputs {
+    `$generatedPaths = @(
+        "lib/mini-data.ts",
+        "lib/metals-data.ts",
+        "lib/catalogue-versions.ts",
+        "data-source/.metal-codes.json",
+        "data-source/.metal-links.json",
+        "data-source/.metal-catalogue-codes.json",
+        "public/catalogue"
+    )
+
+    Write-Log "Preparing repository before pull"
+    `$statusLines = @(git status --porcelain 2>`$null)
+    `$unmergedLines = @(
+        `$statusLines | Where-Object {
+            `$_ -match "^(DD|AU|UD|UA|DU|AA|UU)"
+        }
+    )
+
+    if (`$unmergedLines.Count -gt 0) {
+        Write-Log (
+            "Unfinished Git conflict found; recovering tracked repo files. " +
+            "Master Excel files are not touched."
+        )
+        git rebase --abort 2>&1 | ForEach-Object {
+            Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+        }
+        git merge --abort 2>&1 | ForEach-Object {
+            Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+        }
+
+        `$remainingUnmerged = @(
+            git status --porcelain 2>`$null | Where-Object {
+                `$_ -match "^(DD|AU|UD|UA|DU|AA|UU)"
+            }
+        )
+        if (`$remainingUnmerged.Count -gt 0) {
+            git reset --hard HEAD 2>&1 | ForEach-Object {
+                Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+            }
+            if (`$LASTEXITCODE -ne 0) {
+                Write-Log "Could not recover the Git working tree"
+                exit `$LASTEXITCODE
+            }
+        }
+    }
+
+    git checkout -- `$generatedPaths 2>&1 | ForEach-Object {
+        Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+    }
+    if (`$LASTEXITCODE -ne 0) {
+        Write-Log "Could not reset regenerated website outputs"
+        exit `$LASTEXITCODE
+    }
+}
+
 Set-Location `$InstallPath
 Add-Content -Path `$Log -Value ""
 Add-Content -Path `$Log -Value "=============================================="
 Write-Log "Starting daily sync"
 Add-Content -Path `$Log -Value "=============================================="
 
+Reset-GeneratedGitOutputs
 Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autostash }
 Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
 Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts lib/catalogue-versions.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue }
