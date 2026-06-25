@@ -300,7 +300,7 @@ function Export-WithFreshExcel {
     }
 }
 
-function Convert-MiniManifestValueForExcel {
+function Convert-MiniManifestValueForExcelFormula {
     param($Value)
 
     if ($null -eq $Value) {
@@ -316,7 +316,10 @@ function Convert-MiniManifestValueForExcel {
         $Value -is [double] -or
         $Value -is [decimal]
     ) {
-        return [double]$Value
+        return ([double]$Value).ToString(
+            "0.###############",
+            [System.Globalization.CultureInfo]::InvariantCulture
+        )
     }
 
     return [string]$Value
@@ -376,7 +379,10 @@ function Export-MiniCatalogueWithExcel {
             $range = $null
             try {
                 $range = $sheetCache[$sheetName].Range($cellAddress)
-                $range.Value2 = Convert-MiniManifestValueForExcel $update.value
+                # Excel 2007's COM bridge is picky about Value2 variant
+                # types. Formula accepts string constants and lets Excel keep
+                # numeric prices as real numbers in the workbook.
+                $range.Formula = Convert-MiniManifestValueForExcelFormula $update.value
             } catch {
                 throw (
                     "Could not write Mini catalogue value at '" +
