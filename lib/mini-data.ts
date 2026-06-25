@@ -10311,8 +10311,8 @@ export const products: Product[] = [
     "bodyType": null,
     "mark": "Mark 1-3",
     "hand": "unhanded",
-    "priceExVat": 99,
-    "priceIncVat": 118.8,
+    "priceExVat": 80,
+    "priceIncVat": 96.0,
     "stock": "in",
     "stockQty": 0,
     "category": "mini"
