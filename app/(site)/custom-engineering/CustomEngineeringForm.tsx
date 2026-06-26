@@ -167,8 +167,8 @@ export default function CustomEngineeringForm() {
         </div>
         <h2 className="text-center font-display text-3xl text-racing">Thanks for your request</h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-sm leading-6 text-ink-muted">
-          We will review your drawing or project details, then get in touch to confirm the job,
-          delivery or collection, and payment.
+          We will check your drawing or project details, then get in touch with price, timing,
+          delivery or collection, and payment details.
         </p>
         <div className="mx-auto mt-5 max-w-sm rounded-lg bg-cream-dark p-3 text-center text-sm text-racing">
           Reference: <strong>{success.quoteId}</strong>
@@ -396,7 +396,7 @@ export default function CustomEngineeringForm() {
           />
           <span>
             I will arrange delivery / collection
-            <span className="block text-xs text-ink-muted">Tick this if you do not need M-Machine to quote carriage.</span>
+            <span className="block text-xs text-ink-muted">Tick this if you do not need us to quote carriage.</span>
           </span>
         </label>
       </div>
@@ -409,7 +409,7 @@ export default function CustomEngineeringForm() {
 
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-ink-muted">
-          Your request goes straight to the owner dashboard for review.
+          DXF, DWG, AI, EPS, STEP and STP files are accepted.
         </p>
         <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
           {submitting ? "Submitting..." : "Submit custom request"}

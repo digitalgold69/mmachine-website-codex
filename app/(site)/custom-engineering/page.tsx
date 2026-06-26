@@ -5,17 +5,17 @@ import CustomEngineeringForm from "./CustomEngineeringForm";
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Custom Metal Cutting, Folding & Fabrication Quotes",
+  title: "Upload a Design for Custom Metal Parts",
   description:
-    "A UK workshop for SendCutSend-style custom parts: upload DXF, DWG, AI, EPS, STEP or STP files for cutting, folding, machining, finishing and fabrication quotes.",
+    "Upload a CAD file, sketch or photo. We cut, fold, machine, finish and send custom metal parts from our Darlington workshop.",
   alternates: { canonical: absoluteUrl("/custom-engineering") },
   openGraph: {
-    title: "Custom Metal Cutting & Fabrication Quotes | M-Machine",
+    title: "Upload a Design for Custom Metal Parts | M-Machine",
     description:
-      "Upload CAD files or describe a part for custom cutting, folding, machining and fabrication quotes from M-Machine in Darlington.",
+      "Send CAD files, sketches or photos for cutting, folding, machining and fabrication from our Darlington workshop.",
     url: absoluteUrl("/custom-engineering"),
     type: "website",
-    images: [absoluteUrl("/about/mini-outside-factory.jpg")],
+    images: [absoluteUrl("/custom-engineering/custom-fabrication-cam.jpg")],
   },
 };
 
@@ -43,7 +43,7 @@ const capabilities = [
   },
   {
     title: "Folds, bends and formed work",
-    body: "Folded sheet metal, bent brackets and formed panels quoted from CAD files, drawings or clear dimensions.",
+    body: "Folded sheet metal, bent brackets and formed panels made from CAD files, drawings or clear dimensions.",
   },
   {
     title: "Holes, threads and inserts",
@@ -58,28 +58,49 @@ const capabilities = [
 const steps = [
   {
     number: "01",
-    title: "Upload files or describe the part",
-    body: "Send a CAD file, drawing, photo, sketch or a clear description of what you need made.",
+    title: "Send the design",
+    body: "Upload a CAD file, drawing, photo or sketch, or describe the part you need made.",
   },
   {
     number: "02",
-    title: "Add material and finish notes",
-    body: "Choose from M-Machine's stock materials, add thickness, quantity, folds, finishes and delivery details.",
+    title: "Choose the material",
+    body: "Tell us the material, thickness, quantity, finish and any folds or machining details.",
   },
   {
     number: "03",
-    title: "We review and quote properly",
-    body: "The job appears in the owner dashboard, then M-Machine confirms the invoice before payment is arranged.",
+    title: "We make the part",
+    body: "Once the quote is agreed, we cut, fold, machine or fabricate it and send it to you.",
   },
 ];
 
 const fileTypes = [".DXF", ".DWG", ".AI", ".EPS", ".STEP", ".STP"];
 
+const workshopImages = [
+  {
+    src: "/custom-engineering/cnc-machining.jpg",
+    alt: "CNC machining work in the M-Machine workshop",
+    title: "CNC machining",
+    body: "Machined components, tooling, accurate holes, profiles and secondary operations.",
+  },
+  {
+    src: "/custom-engineering/press-brake-folding.jpg",
+    alt: "Press brake folding machine in the M-Machine workshop",
+    title: "Folding and forming",
+    body: "Brackets, folded sheet, channels, panels and formed parts made to your drawing.",
+  },
+  {
+    src: "/custom-engineering/cut-sheet-parts.jpg",
+    alt: "Flat cut metal parts ready for folding and finishing",
+    title: "Cut parts",
+    body: "Flat patterns, plates and blanks cut from the right stock and ready for the next step.",
+  },
+];
+
 const faqs = [
   {
     question: "Is this a SendCutSend alternative in the UK?",
     answer:
-      "It is a similar upload-and-quote route for custom metal parts, handled by M-Machine's Darlington workshop. The difference is that the job is reviewed by the owner before an invoice is sent, so unusual materials, carriage and workshop notes can be handled properly.",
+      "Yes. If you are looking for a UK SendCutSend-style service, upload your file here. We quote it, make it in Darlington, and send the finished part to you.",
   },
   {
     question: "Can I upload DXF, DWG, AI, EPS, STEP or STP files?",
@@ -87,9 +108,9 @@ const faqs = [
       "Yes. The custom request form accepts DXF, DWG, AI, EPS, STEP and STP files. If you do not have CAD, you can still start with a sketch, photo or detailed description.",
   },
   {
-    question: "Can M-Machine supply the material as well as make the part?",
+    question: "Can you supply the material as well as make the part?",
     answer:
-      "Yes. The request form includes the main materials from the M-Machine metals catalogue, including aluminium, brass, bronze, copper, plastics, stainless steel, steel and steel tube.",
+      "Yes. We stock aluminium, brass, bronze, copper, plastics, stainless steel, steel, steel tube and more. You can choose a material from the form or describe the grade you need.",
   },
 ];
 
@@ -159,12 +180,11 @@ export default function CustomEngineeringPage() {
               CUSTOM WORKSHOP QUOTES
             </p>
             <h1 className="font-display text-4xl leading-tight text-racing sm:text-5xl">
-              Upload a design for custom cutting, folding and fabrication
+              Upload the design. We make the part.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-ink-muted">
-              A practical UK route for SendCutSend-style custom parts, with M-Machine reviewing the
-              job before anything is invoiced. Upload CAD files, choose a material, explain the finish
-              and we will come back with a proper quote.
+              Send a CAD file, sketch, photo or drawing. Tell us the material, quantity and finish.
+              We quote it, make it in our Darlington workshop, and send the finished part to you.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="#quote-form" className="btn-primary">
@@ -179,12 +199,12 @@ export default function CustomEngineeringPage() {
           <aside className="rounded-2xl border border-racing/10 bg-white p-5 shadow-sm">
             <div className="overflow-hidden rounded-xl bg-racing">
               <Image
-                src="/about/mini-outside-factory.jpg"
-                alt="M-Machine workshop and Classic Mini body work from the company's manufacturing history"
-                width={1366}
-                height={300}
+                src="/custom-engineering/custom-fabrication-cam.jpg"
+                alt="Custom machined cam part made from a technical drawing"
+                width={1600}
+                height={1200}
                 priority
-                className="h-auto w-full object-cover"
+                className="aspect-[4/3] h-auto w-full object-cover"
               />
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -222,9 +242,8 @@ export default function CustomEngineeringPage() {
             </p>
             <h2 className="font-display text-3xl text-racing">Custom parts without a maze of checkout steps</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">
-              Online instant pricing is useful for simple jobs, but real workshop work often needs
-              a human check. M-Machine keeps the upload process simple, then reviews the job before
-              carriage, material and finishing are confirmed.
+              Upload the file, add the details, and we will come back with a clear quote. We can cut,
+              fold, machine, finish and fabricate one-offs or small batches from our own workshop stock.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -237,6 +256,24 @@ export default function CustomEngineeringPage() {
           </div>
         </section>
 
+        <section className="mt-12 grid gap-4 md:grid-cols-3">
+          {workshopImages.map((item) => (
+            <article key={item.title} className="overflow-hidden rounded-xl border border-racing/10 bg-white">
+              <Image
+                src={item.src}
+                alt={item.alt}
+                width={1600}
+                height={1200}
+                className="aspect-[4/3] w-full object-cover"
+              />
+              <div className="p-5">
+                <h3 className="font-display text-xl text-racing">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{item.body}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+
         <section className="mt-12 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
@@ -244,9 +281,8 @@ export default function CustomEngineeringPage() {
             </p>
             <h2 className="font-display text-3xl text-racing">Use our stock, or tell us your exact spec</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">
-              Our metals catalogue gives customers a practical starting point for custom parts. If you
-              already know the grade, thickness or finish, include it in the request. If not, describe
-              what the part needs to do and we can advise before quoting.
+              Choose from the metal and plastic stock we already hold, or tell us the grade you need.
+              If you are not sure, describe what the part needs to do and we will help you choose.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/catalogue/metals" className="btn-secondary">
@@ -278,9 +314,9 @@ export default function CustomEngineeringPage() {
               </p>
               <h2 className="font-display text-3xl">A UK workshop route for upload-and-quote parts</h2>
               <p className="mt-3 text-sm leading-7 text-cream/85">
-                If you have been searching for a SendCutSend-style service in the UK, this is the
-                M-Machine version: upload the drawing, add the workshop notes, and let a real person
-                check the job before the invoice is sent.
+                Looking for a SendCutSend-style service in the UK? The idea is simple: upload the file,
+                get the part made. Our version is built for UK customers who want custom metalwork from
+                a real workshop, with help choosing material, finish and delivery.
               </p>
             </div>
             <div className="grid gap-3">
@@ -301,9 +337,8 @@ export default function CustomEngineeringPage() {
             </p>
             <h2 className="font-display text-3xl text-racing">Send the drawing and the details</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">
-              This form sends the request into the owner dashboard with the uploaded files attached.
-              M-Machine can then review it, add carriage or any extra work, and email the completed
-              invoice back to the customer.
+              Tell us what to make. Add files, material, finish, quantity and delivery details, then
+              we will come back with a quote.
             </p>
           </div>
           <CustomEngineeringForm />
@@ -318,7 +353,7 @@ export default function CustomEngineeringPage() {
               <h2 className="font-display text-3xl text-racing">A sketch, photo or clear description is enough to start.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">
                 Upload a drawing if you have one. If you do not, describe the part, material, rough size,
-                quantity and what it needs to fit. We will come back with sensible next steps.
+                quantity and what it needs to fit. We will tell you what to send next.
               </p>
             </div>
             <Link href="/contact" className="btn-secondary justify-center">

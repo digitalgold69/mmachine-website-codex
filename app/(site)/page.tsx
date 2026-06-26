@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   metalsCatalogueUrl,
   miniCatalogueUrl,
@@ -150,11 +151,11 @@ export default async function HomePage() {
                 CUSTOM ENGINEERING QUOTES
               </p>
               <h2 className="font-display text-3xl sm:text-4xl leading-tight mb-4">
-                Upload a design. Tell us the material. We review the job properly.
+                Upload a design. Choose the material. We make the part.
               </h2>
               <p className="text-sm leading-7 text-cream/85">
                 Need a one-off bracket, folded panel, cut plate, machined part or finished fabrication?
-                Send DXF, DWG, AI, EPS, STEP or STP files, or start with a sketch and description.
+                Send CAD files, a sketch or a photo. We quote it, make it, and send it to you.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href="/custom-engineering" className="btn-gold">
@@ -168,18 +169,29 @@ export default async function HomePage() {
                 </Link>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ["01", "Upload", "CAD file, sketch or description"],
-                ["02", "Specify", "Material, thickness, finish and quantity"],
-                ["03", "Quote", "Reviewed invoice before payment"],
-              ].map(([number, title, body]) => (
-                <div key={number} className="rounded-xl bg-cream p-4 text-racing">
-                  <div className="font-mono text-sm font-bold text-gold">{number}</div>
-                  <h3 className="mt-2 font-display text-xl">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-ink-muted">{body}</p>
-                </div>
-              ))}
+            <div>
+              <div className="overflow-hidden rounded-xl border border-cream/20">
+                <Image
+                  src="/custom-engineering/fabricated-frame.jpg"
+                  alt="Custom fabricated metal frame in the M-Machine workshop"
+                  width={1600}
+                  height={1200}
+                  className="aspect-[16/9] w-full object-cover"
+                />
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["01", "Upload", "CAD file, sketch or photo"],
+                  ["02", "Choose", "Material, finish and quantity"],
+                  ["03", "Receive", "Finished part sent to you"],
+                ].map(([number, title, body]) => (
+                  <div key={number} className="rounded-xl bg-cream p-4 text-racing">
+                    <div className="font-mono text-sm font-bold text-gold">{number}</div>
+                    <h3 className="mt-2 font-display text-xl">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-ink-muted">{body}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
