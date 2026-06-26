@@ -141,6 +141,50 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* CUSTOM ENGINEERING */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="rounded-2xl bg-racing p-6 text-cream md:p-9">
+          <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div>
+              <p className="text-xs tracking-[3px] font-semibold text-gold mb-3">
+                CUSTOM ENGINEERING QUOTES
+              </p>
+              <h2 className="font-display text-3xl sm:text-4xl leading-tight mb-4">
+                Upload a design. Tell us the material. We review the job properly.
+              </h2>
+              <p className="text-sm leading-7 text-cream/85">
+                Need a one-off bracket, folded panel, cut plate, machined part or finished fabrication?
+                Send DXF, DWG, AI, EPS, STEP or STP files, or start with a sketch and description.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/custom-engineering" className="btn-gold">
+                  Start a custom quote
+                </Link>
+                <Link
+                  href="/catalogue/metals"
+                  className="inline-flex items-center justify-center rounded-lg border border-cream/40 px-5 py-3 text-sm font-semibold text-cream hover:bg-cream hover:text-racing"
+                >
+                  View materials
+                </Link>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["01", "Upload", "CAD file, sketch or description"],
+                ["02", "Specify", "Material, thickness, finish and quantity"],
+                ["03", "Quote", "Reviewed invoice before payment"],
+              ].map(([number, title, body]) => (
+                <div key={number} className="rounded-xl bg-cream p-4 text-racing">
+                  <div className="font-mono text-sm font-bold text-gold">{number}</div>
+                  <h3 className="mt-2 font-display text-xl">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-ink-muted">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURED */}
       <section className="bg-cream-dark py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -209,8 +253,8 @@ export default async function HomePage() {
             We take on bespoke fabrication, restoration machining and one-off custom jobs.
             Tell us what you need and one of our engineers will get back to you.
           </p>
-          <Link href="/contact" className="btn-gold">
-            Get in touch →
+          <Link href="/custom-engineering" className="btn-gold">
+            Start a custom quote →
           </Link>
         </div>
       </section>
