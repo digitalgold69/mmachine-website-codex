@@ -1,6 +1,7 @@
 import type { QuoteItem, QuoteRequest } from "./quote-types";
 
 const GBP = "\u00a3";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -13,6 +14,9 @@ const escapeHtml = (value: string | number | null | undefined) =>
     .replace(/"/g, "&quot;");
 
 const itemName = (item: QuoteItem) => {
+  if (item.catalogue === "custom") {
+    return item.custom?.projectName || item.description || "Custom fabrication request";
+  }
   if (item.catalogue === "metals") {
     return [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ");
   }
@@ -24,6 +28,40 @@ const lineExVat = (item: QuoteItem) =>
 
 const numericTotal = (items: QuoteItem[]) =>
   items.reduce((sum, item) => sum + (lineExVat(item) ?? 0), 0);
+
+function fileDownloadUrl(key: string) {
+  return `${SITE_URL}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function customSummary(item: QuoteItem, includeFileLinks = false) {
+  const custom = item.custom;
+  if (!custom) return "";
+  const files = custom.files || [];
+  return `
+    <div style="margin-top:10px;font-size:13px;line-height:1.5;color:#4d3f31">
+      ${custom.material ? `<div><strong>Material:</strong> ${escapeHtml(custom.material)}</div>` : ""}
+      ${custom.thickness ? `<div><strong>Thickness/spec:</strong> ${escapeHtml(custom.thickness)}</div>` : ""}
+      ${custom.services?.length ? `<div><strong>Services:</strong> ${escapeHtml(custom.services.join(", "))}</div>` : ""}
+      ${custom.finish ? `<div><strong>Finish:</strong> ${escapeHtml(custom.finish)}</div>` : ""}
+      ${custom.tolerance ? `<div><strong>Tolerance:</strong> ${escapeHtml(custom.tolerance)}</div>` : ""}
+      ${custom.deadline ? `<div><strong>Needed by:</strong> ${escapeHtml(custom.deadline)}</div>` : ""}
+      ${custom.budget ? `<div><strong>Budget:</strong> ${escapeHtml(custom.budget)}</div>` : ""}
+      <div><strong>Drawing status:</strong> ${custom.drawingStatus === "help" ? "Customer needs help from a sketch/description" : "CAD file supplied"}</div>
+      ${
+        includeFileLinks && files.length
+          ? `<div style="margin-top:8px"><strong>Uploaded files:</strong><br>${files
+              .map(
+                (file) =>
+                  `<a href="${escapeHtml(fileDownloadUrl(file.key))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
+              )
+              .join("<br>")}</div>`
+          : files.length
+            ? `<div><strong>Uploaded files:</strong> ${files.length}</div>`
+          : ""
+      }
+    </div>
+  `;
+}
 
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = numericTotal(quote.items);
@@ -41,8 +79,8 @@ function quoteRows(items: QuoteItem[]) {
       (item) => `
         <tr>
           <td>${escapeHtml(item.qty)}</td>
-          <td>${escapeHtml(item.catalogue === "mini" ? item.code : item.shape)}</td>
-          <td>${escapeHtml(itemName(item))}</td>
+          <td>${escapeHtml(item.catalogue === "mini" ? item.code : item.catalogue === "custom" ? "Custom" : item.shape)}</td>
+          <td>${escapeHtml(itemName(item))}${item.catalogue === "custom" ? customSummary(item, true) : ""}</td>
           <td>${escapeHtml(item.unit || "")}</td>
           <td style="text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
           <td style="text-align:right">${escapeHtml(money(lineExVat(item)))}</td>
@@ -90,10 +128,11 @@ function invoiceRows(items: QuoteItem[]) {
       return `
         <tr>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:center">${escapeHtml(item.qty)}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;font-family:monospace;color:#0f3d2e">${escapeHtml(item.catalogue === "mini" ? item.code : item.shape)}</td>
+          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;font-family:monospace;color:#0f3d2e">${escapeHtml(item.catalogue === "mini" ? item.code : item.catalogue === "custom" ? "Custom" : item.shape)}</td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca">
             <strong style="color:#0f3d2e">${escapeHtml(item.description)}</strong>
             <div style="color:#6b5a46;font-size:12px;margin-top:3px">${escapeHtml(itemName(item))}</div>
+            ${item.catalogue === "custom" ? customSummary(item, false) : ""}
           </td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca">${escapeHtml(item.unit || "")}</td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>

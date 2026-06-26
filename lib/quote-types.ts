@@ -1,4 +1,28 @@
-export type QuoteCatalogue = "mini" | "metals";
+export type QuoteCatalogue = "mini" | "metals" | "custom";
+
+export type QuoteFile = {
+  key: string;
+  name: string;
+  size: number;
+  type: string;
+  extension: string;
+  uploadedAt: string;
+};
+
+export type CustomQuoteDetails = {
+  projectName?: string;
+  material?: string;
+  thickness?: string;
+  services?: string[];
+  finish?: string;
+  quantity?: string;
+  units?: string;
+  tolerance?: string;
+  deadline?: string;
+  budget?: string;
+  drawingStatus?: "cad" | "help";
+  files?: QuoteFile[];
+};
 
 export type QuoteItem = {
   key: string;
@@ -14,6 +38,7 @@ export type QuoteItem = {
   qty: number;
   unitPriceExVat: number | null;
   unitPriceIncVat: number | null;
+  custom?: CustomQuoteDetails;
 };
 
 export type QuoteCustomer = {

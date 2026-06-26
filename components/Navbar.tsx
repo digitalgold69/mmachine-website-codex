@@ -9,6 +9,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/catalogue/mini", label: "Mini panels" },
   { href: "/catalogue/metals", label: "Metals" },
+  { href: "/custom-engineering", label: "Custom work" },
   { href: "/featured", label: "Featured work" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

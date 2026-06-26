@@ -34,6 +34,7 @@ export type R2BucketBinding = {
 export type MMachineCloudflareEnv = {
   DB?: D1DatabaseBinding;
   FEATURED_IMAGES?: R2BucketBinding;
+  QUOTE_FILES?: R2BucketBinding;
 };
 
 export async function getCloudflareEnv(): Promise<MMachineCloudflareEnv> {
@@ -55,4 +56,12 @@ export async function getFeaturedImagesBucket(): Promise<R2BucketBinding> {
     throw new Error("Cloudflare R2 binding FEATURED_IMAGES is missing.");
   }
   return env.FEATURED_IMAGES;
+}
+
+export async function getQuoteFilesBucket(): Promise<R2BucketBinding> {
+  const env = await getCloudflareEnv();
+  if (!env.QUOTE_FILES) {
+    throw new Error("Cloudflare R2 binding QUOTE_FILES is missing.");
+  }
+  return env.QUOTE_FILES;
 }

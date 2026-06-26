@@ -314,7 +314,12 @@ function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
       const label = itemLabel(item);
       const current = map.get(label) || {
         label,
-        detail: item.catalogue === "metals" ? "Metals" : item.code || "Mini panels",
+        detail:
+          item.catalogue === "custom"
+            ? "Custom fabrication"
+            : item.catalogue === "metals"
+              ? "Metals"
+              : item.code || "Mini panels",
         qty: 0,
         value: 0,
       };
@@ -385,7 +390,9 @@ function lineExVat(item: QuoteItem) {
 }
 
 function itemLabel(item: QuoteItem) {
-  return item.catalogue === "metals"
+  return item.catalogue === "custom"
+    ? item.custom?.projectName || item.description || "Custom fabrication request"
+    : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
 }

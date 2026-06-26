@@ -49,9 +49,55 @@ const totals = (quote: QuoteRequest) => {
 };
 
 const itemName = (item: QuoteItem) =>
-  item.catalogue === "metals"
+  item.catalogue === "custom"
+    ? item.custom?.projectName || item.description || "Custom fabrication request"
+    : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
+
+function itemDetails(item: QuoteItem) {
+  if (item.catalogue !== "custom") return itemName(item);
+  const custom = item.custom;
+  return [
+    custom?.material,
+    custom?.thickness,
+    custom?.services?.length ? custom.services.join(", ") : "",
+    custom?.finish,
+    custom?.files?.length ? `${custom.files.length} uploaded ${custom.files.length === 1 ? "file" : "files"}` : "",
+  ].filter(Boolean).join(" / ");
+}
+
+type QuoteKind = "mini" | "metals" | "custom" | "mixed";
+
+const KIND_STYLES: Record<QuoteKind, string> = {
+  mini: "bg-racing/10 text-racing",
+  metals: "bg-cream-dark text-racing",
+  custom: "bg-gold/15 text-gold",
+  mixed: "bg-stone-100 text-stone-700",
+};
+
+const KIND_LABELS: Record<QuoteKind, string> = {
+  mini: "Mini parts",
+  metals: "Metals",
+  custom: "Custom fab",
+  mixed: "Mixed order",
+};
+
+function quoteKind(quote: QuoteRequest): QuoteKind {
+  const kinds = new Set(quote.items.map((item) => item.catalogue));
+  if (kinds.size > 1) return "mixed";
+  if (kinds.has("custom")) return "custom";
+  if (kinds.has("metals")) return "metals";
+  return "mini";
+}
+
+function customFiles(quote: QuoteRequest) {
+  return quote.items.flatMap((item) => item.custom?.files || []);
+}
+
+function fileHref(key: string) {
+  return `/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
 
 function cloneQuote(quote: QuoteRequest): QuoteRequest {
   return JSON.parse(JSON.stringify(quote));
@@ -144,6 +190,15 @@ function quoteSearchText(quote: QuoteRequest) {
       item.spec,
       item.size,
       item.unit,
+      item.custom?.projectName,
+      item.custom?.material,
+      item.custom?.thickness,
+      item.custom?.finish,
+      item.custom?.tolerance,
+      item.custom?.deadline,
+      item.custom?.budget,
+      ...(item.custom?.services || []),
+      ...(item.custom?.files || []).map((file) => file.name),
     ]),
   ]
     .filter(Boolean)
@@ -155,6 +210,15 @@ function StatusPill({ status }: { status: QuoteStatus }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLES[status]}`}>
       {statusLabel(status)}
+    </span>
+  );
+}
+
+function OrderTypePill({ quote }: { quote: QuoteRequest }) {
+  const kind = quoteKind(quote);
+  return (
+    <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${KIND_STYLES[kind]}`}>
+      {KIND_LABELS[kind]}
     </span>
   );
 }
@@ -254,6 +318,7 @@ function OrderCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
+            <OrderTypePill quote={quote} />
             <div className="truncate font-semibold text-racing">{quote.id}</div>
             <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
           </div>
@@ -510,6 +575,7 @@ export default function OrdersClient({
   }
 
   const draftTotals = draft ? totals(draft) : null;
+  const draftFiles = draft ? customFiles(draft) : [];
   const isSaving = Boolean(savingAction);
   const showingFrom = filteredHistoryQuotes.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const showingTo = Math.min(currentPage * PAGE_SIZE, filteredHistoryQuotes.length);
@@ -671,6 +737,9 @@ export default function OrdersClient({
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
                 <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice editor</div>
+                <div className="mt-1">
+                  <OrderTypePill quote={draft} />
+                </div>
                 <h2 className="font-display text-2xl text-racing">{draft.customer.name}</h2>
                 <div className="text-sm text-ink-muted">
                   {draft.id} / submitted {formatDateTime(draft.submittedAt)}
@@ -745,6 +814,28 @@ export default function OrdersClient({
               </div>
             )}
 
+            {draftFiles.length > 0 && (
+              <div className="mb-5 rounded-lg bg-cream-dark p-4 text-sm">
+                <div className="label mb-2">Uploaded design files</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {draftFiles.map((file) => (
+                    <a
+                      key={file.key}
+                      href={fileHref(file.key)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 rounded-lg bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
+                    >
+                      <span className="block truncate">{file.name}</span>
+                      <span className="block text-xs font-normal text-ink-muted">
+                        {Math.ceil(file.size / 1024)} KB
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto border border-racing/10 rounded-lg">
               <table className="w-full min-w-[930px] table-fixed">
                 <colgroup>
@@ -786,7 +877,13 @@ export default function OrdersClient({
                           value={item.code || ""}
                           onChange={(e) => patchItem(index, { code: e.target.value })}
                           className="input h-9 font-mono text-xs"
-                          placeholder={item.catalogue === "mini" ? "Mini part no." : "Metal code"}
+                          placeholder={
+                            item.catalogue === "custom"
+                              ? "Custom ref"
+                              : item.catalogue === "mini"
+                                ? "Mini part no."
+                                : "Metal code"
+                          }
                         />
                       </td>
                       <td className="px-3 py-2 align-top">
@@ -795,7 +892,7 @@ export default function OrdersClient({
                           onChange={(e) => patchItem(index, { description: e.target.value })}
                           className="input"
                         />
-                        <div className="mt-1 text-xs text-ink-muted">{itemName(item)}</div>
+                        <div className="mt-1 text-xs text-ink-muted">{itemDetails(item)}</div>
                       </td>
                       <td className="px-3 py-2 align-top">
                         <input

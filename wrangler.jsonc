@@ -24,6 +24,10 @@
     {
       "binding": "FEATURED_IMAGES",
       "bucket_name": "mmachine-featured-images"
+    },
+    {
+      "binding": "QUOTE_FILES",
+      "bucket_name": "mmachine-quote-files"
     }
   ],
   "observability": {

@@ -27,6 +27,7 @@ export default function Footer() {
               <li><Link href="/parts/engineering-metals" className="hover:text-gold">Metal categories</Link></li>
               <li><Link href="/catalogue/mini" className="hover:text-gold">Classic Mini panels</Link></li>
               <li><Link href="/catalogue/metals" className="hover:text-gold">Engineering metals</Link></li>
+              <li><Link href="/custom-engineering" className="hover:text-gold">Custom engineering quotes</Link></li>
               <li><Link href="/featured" className="hover:text-gold">Featured custom work</Link></li>
             </ul>
           </div>

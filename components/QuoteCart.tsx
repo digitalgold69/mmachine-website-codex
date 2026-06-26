@@ -28,7 +28,9 @@ const money = (value: number | null) =>
   value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
 
 const itemLabel = (item: QuoteItem | PendingItem) =>
-  item.catalogue === "metals"
+  item.catalogue === "custom"
+    ? item.custom?.projectName || item.description
+    : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
 
