@@ -73,6 +73,68 @@ function customSummary(item: QuoteItem, includeFileLinks = false) {
   `;
 }
 
+function ownerCustomJobDetails(quote: QuoteRequest) {
+  const customItems = quote.items.filter((item) => item.catalogue === "custom" && item.custom);
+  if (customItems.length === 0) return "";
+
+  return customItems
+    .map((item) => {
+      const custom = item.custom;
+      if (!custom) return "";
+      const files = custom.files || [];
+      const rows = [
+        ["Project", custom.projectName || item.description],
+        ["Material", custom.material || "Not sure / advise me"],
+        ["Thickness/spec", custom.thickness],
+        ["Quantity", [custom.quantity, custom.units].filter(Boolean).join(" ")],
+        ["Finish", custom.finish],
+        ["Tolerance", custom.tolerance],
+        ["Needed by", custom.deadline],
+        ["Budget", custom.budget],
+        [
+          "Drawing status",
+          custom.drawingStatus === "help"
+            ? "Customer needs help from a sketch/description"
+            : files.length
+              ? "Files supplied"
+              : "No file supplied",
+        ],
+      ].filter(([, value]) => value);
+
+      return `
+        <div style="margin:18px 0;padding:16px;border:1px solid #eadfca;border-radius:12px;background:#fbf8f1">
+          <h3 style="margin:0 0 10px;color:#0f3d2e">Custom job details</h3>
+          <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px">
+            <tbody>
+              ${rows
+                .map(
+                  ([label, value]) =>
+                    `<tr><td style="width:150px;color:#6b5a46"><strong>${escapeHtml(label)}</strong></td><td>${escapeHtml(value)}</td></tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+          ${
+            quote.customer.message
+              ? `<div style="margin-top:12px"><strong style="color:#6b5a46">Job details from customer:</strong><br>${escapeHtml(quote.customer.message).replace(/\n/g, "<br>")}</div>`
+              : ""
+          }
+          ${
+            files.length
+              ? `<div style="margin-top:12px"><strong style="color:#6b5a46">Uploaded files:</strong><br>${files
+                  .map(
+                    (file) =>
+                      `<a href="${escapeHtml(fileDownloadUrl(file.key))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
+                  )
+                  .join("<br>")}</div>`
+              : `<div style="margin-top:12px;color:#6b5a46"><strong>No files uploaded.</strong></div>`
+          }
+        </div>
+      `;
+    })
+    .join("");
+}
+
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = numericTotal(quote.items);
   const carriageExVat = quote.carriageExVat ?? 0;
@@ -113,7 +175,12 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
         ? ""
         : `<p><strong>Delivery address:</strong><br>${escapeHtml(quote.customer.address || "").replace(/\n/g, "<br>")}</p>`
     }
-    <p><strong>Customer note:</strong><br>${escapeHtml(quote.customer.message || "").replace(/\n/g, "<br>")}</p>
+    ${
+      quote.items.some((item) => item.catalogue === "custom")
+        ? ""
+        : `<p><strong>Customer note:</strong><br>${escapeHtml(quote.customer.message || "").replace(/\n/g, "<br>")}</p>`
+    }
+    ${ownerCustomJobDetails(quote)}
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
       <thead>
         <tr><th>Qty</th><th>Code / Shape</th><th>Description</th><th>Unit</th><th>Each ex VAT</th><th>Line ex VAT</th></tr>

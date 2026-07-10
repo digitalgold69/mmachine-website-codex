@@ -1,6 +1,6 @@
 "use client";
 
-import { DragEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 const MAX_FILES = 10;
@@ -60,6 +60,7 @@ function mergeFiles(current: File[], incoming: File[]) {
 export default function CustomEngineeringForm() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const successRef = useRef<HTMLDivElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [drawingStatus, setDrawingStatus] = useState<"cad" | "help">("cad");
@@ -73,6 +74,15 @@ export default function CustomEngineeringForm() {
     () => files.reduce((sum, file) => sum + file.size, 0),
     [files]
   );
+
+  useEffect(() => {
+    if (!success) return;
+    const timeout = window.setTimeout(() => {
+      successRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+
+    return () => window.clearTimeout(timeout);
+  }, [success]);
 
   function addFiles(incoming: File[]) {
     const next = mergeFiles(files, incoming);
@@ -158,7 +168,7 @@ export default function CustomEngineeringForm() {
 
   if (success) {
     return (
-      <div className="rounded-2xl border border-racing/10 bg-white p-6 shadow-sm">
+      <div ref={successRef} className="scroll-mt-28 rounded-2xl border border-racing/10 bg-white p-6 shadow-sm">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-racing text-sm font-bold text-cream">
           OK
         </div>

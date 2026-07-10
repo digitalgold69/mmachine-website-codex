@@ -67,6 +67,41 @@ function itemDetails(item: QuoteItem) {
   ].filter(Boolean).join(" / ");
 }
 
+function firstCustomItem(quote: QuoteRequest) {
+  return quote.items.find((item) => item.catalogue === "custom" && item.custom);
+}
+
+function customJobRows(quote: QuoteRequest) {
+  const custom = firstCustomItem(quote)?.custom;
+  if (!custom) return [];
+
+  return [
+    { label: "Project", value: custom.projectName },
+    { label: "Material", value: custom.material || "Not sure / advise me" },
+    { label: "Thickness/spec", value: custom.thickness },
+    { label: "Quantity", value: [custom.quantity, custom.units].filter(Boolean).join(" ") },
+    { label: "Finish", value: custom.finish },
+    { label: "Tolerance", value: custom.tolerance },
+    { label: "Needed by", value: custom.deadline },
+    { label: "Budget", value: custom.budget },
+    {
+      label: "Drawing status",
+      value: custom.drawingStatus === "help" ? "Needs help from sketch/description" : "CAD/files route",
+    },
+  ].filter((row) => row.value);
+}
+
+function orderCardSummary(quote: QuoteRequest) {
+  const firstItem = quote.items[0];
+  if (!firstItem) return "";
+
+  if (quoteKind(quote) === "custom") {
+    return firstItem.custom?.projectName || quote.customer.message || "Custom fabrication request";
+  }
+
+  return itemName(firstItem);
+}
+
 type QuoteKind = "mini" | "metals" | "custom" | "mixed";
 
 const KIND_STYLES: Record<QuoteKind, string> = {
@@ -327,6 +362,11 @@ function OrderCard({
         <div className="mt-3 text-xs text-ink-muted">
           {dateLabel}: {formatDateTime(dateValue)}
         </div>
+        {orderCardSummary(quote) && (
+          <div className="mt-3 max-h-10 overflow-hidden text-sm leading-5 text-ink">
+            {orderCardSummary(quote)}
+          </div>
+        )}
         <div className="mt-4 flex items-end justify-between gap-3">
           <div className="text-xs text-ink-muted">
             {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
@@ -379,6 +419,7 @@ export default function OrdersClient({
   const [page, setPage] = useState(1);
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
+  const [actionNotice, setActionNotice] = useState<{ quoteId: string; tone: "success" | "error"; text: string } | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
   const invoiceRef = useRef<HTMLDivElement | null>(null);
 
@@ -493,6 +534,7 @@ export default function OrdersClient({
     setSelectedId(id);
     setDraft(quote ? cloneQuote(quote) : null);
     setMessage("");
+    setActionNotice(null);
   }
 
   function patchDraft(patch: Partial<QuoteRequest>) {
@@ -536,6 +578,7 @@ export default function OrdersClient({
   ) {
     setSavingAction(`${quote.id}:${options.label}`);
     setMessage("");
+    setActionNotice(null);
     try {
       const res = await fetch("/api/quote-requests", {
         method: "PATCH",
@@ -551,15 +594,24 @@ export default function OrdersClient({
 
       const updated = data.quote as QuoteRequest;
       updateQuote(updated);
-      setMessage(
-        options.markPaid
-          ? "Order marked as paid."
-          : options.emailCustomer
-            ? "Invoice emailed to customer and marked as invoice sent."
-            : "Order saved."
-      );
+      const text = options.markPaid
+        ? "Order marked as paid."
+        : options.emailCustomer
+          ? "Invoice emailed to customer and marked as invoice sent."
+          : "Order saved.";
+
+      if (selectedId === updated.id) {
+        setActionNotice({ quoteId: updated.id, tone: "success", text });
+      } else {
+        setMessage(text);
+      }
     } catch (err) {
-      setMessage((err as Error).message || "Save failed");
+      const text = (err as Error).message || "Save failed";
+      if (options.emailCustomer || selectedId === quote.id) {
+        setActionNotice({ quoteId: quote.id, tone: "error", text });
+      } else {
+        setMessage(text);
+      }
     } finally {
       setSavingAction("");
     }
@@ -807,7 +859,41 @@ export default function OrdersClient({
               </div>
             </div>
 
-            {draft.customer.message && (
+            {quoteKind(draft) === "custom" && (
+              <div className="mb-5 rounded-xl border border-racing/10 bg-cream-dark p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-ink-muted">Custom job details</div>
+                    <h3 className="font-display text-xl text-racing">
+                      {firstCustomItem(draft)?.custom?.projectName || "Custom fabrication request"}
+                    </h3>
+                  </div>
+                  {draftFiles.length > 0 && (
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-racing">
+                      {draftFiles.length} {draftFiles.length === 1 ? "file" : "files"} attached
+                    </span>
+                  )}
+                </div>
+                {customJobRows(draft).length > 0 && (
+                  <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {customJobRows(draft).map((row) => (
+                      <div key={row.label} className="rounded-lg bg-white p-3">
+                        <dt className="text-xs uppercase tracking-wider text-ink-muted">{row.label}</dt>
+                        <dd className="mt-1 text-sm font-semibold text-racing">{row.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {draft.customer.message && (
+                  <div className="mt-4 rounded-lg bg-white p-3 text-sm">
+                    <div className="text-xs uppercase tracking-wider text-ink-muted">Job details from customer</div>
+                    <p className="mt-2 whitespace-pre-wrap leading-6 text-ink">{draft.customer.message}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {draft.customer.message && quoteKind(draft) !== "custom" && (
               <div className="mb-5 rounded-lg bg-cream-dark p-4 text-sm">
                 <div className="label mb-1">Customer note</div>
                 <p className="whitespace-pre-wrap">{draft.customer.message}</p>
@@ -979,6 +1065,18 @@ export default function OrdersClient({
                 <div className="flex justify-between text-racing"><span>Total inc VAT</span><strong>{money(draftTotals?.totalInc)}</strong></div>
               </div>
             </div>
+
+            {actionNotice && actionNotice.quoteId === draft.id && (
+              <div
+                className={`mt-5 rounded-lg border p-3 text-sm ${
+                  actionNotice.tone === "error"
+                    ? "border-red-200 bg-red-50 text-red-800"
+                    : "border-racing/10 bg-cream-dark text-racing"
+                }`}
+              >
+                {actionNotice.text}
+              </div>
+            )}
 
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-5">
               {draft.status !== "paid" && (
