@@ -68,9 +68,20 @@ export default function ContactForm() {
           <a href="mailto:sales@m-machine.co.uk" className="text-sm text-racing hover:text-gold">sales@m-machine.co.uk</a>
         </div>
         <div>
+          <h2 className="font-display text-lg text-racing mb-2">Facebook</h2>
+          <a
+            href="https://www.facebook.com/p/M-Machine-61568650964800/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-racing hover:text-gold"
+          >
+            Follow M-Machine on Facebook
+          </a>
+        </div>
+        <div>
           <h2 className="font-display text-lg text-racing mb-2">Address</h2>
           <address className="not-italic text-sm text-ink-muted leading-relaxed">
-            Unit 3-7 Forge Way<br />
+            Unit 6 Forge Way<br />
             Cleveland Trading Estate<br />
             Darlington<br />
             County Durham DL1 2PJ

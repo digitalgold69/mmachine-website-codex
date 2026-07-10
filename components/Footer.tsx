@@ -37,6 +37,16 @@ export default function Footer() {
             <ul className="space-y-2 text-sm opacity-80">
               <li><Link href="/about" className="hover:text-gold">About us</Link></li>
               <li><Link href="/contact" className="hover:text-gold">Get in touch</Link></li>
+              <li>
+                <a
+                  href="https://www.facebook.com/p/M-Machine-61568650964800/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-gold"
+                >
+                  Facebook
+                </a>
+              </li>
               <li><a href="#" className="hover:text-gold">Privacy policy</a></li>
             </ul>
           </div>
@@ -44,17 +54,18 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-gold mb-3 text-sm">Contact</h4>
             <address className="not-italic text-sm opacity-80 leading-relaxed">
-              Unit 3–7 Forge Way<br />
+              Unit 6 Forge Way<br />
               Cleveland Trading Estate<br />
               Darlington, DL1 2PJ<br /><br />
-              <a href="tel:01325381302" className="hover:text-gold">01325 381302</a><br />
+              Metals &amp; Engineering: <a href="tel:01325381302" className="hover:text-gold">01325 381302</a><br />
+              Mini Pressings &amp; Accounts: <a href="tel:01325381300" className="hover:text-gold">01325 381300</a><br />
               <a href="mailto:sales@m-machine.co.uk" className="hover:text-gold">sales@m-machine.co.uk</a>
             </address>
           </div>
         </div>
 
         <div className="border-t border-racing-light pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <p>© {new Date().getFullYear()} M-Machine · Craftgrange Limited · Company no. 01476185</p>
+          <p>&copy; {new Date().getFullYear()} M-Machine &middot; Craftgrange Limited &middot; Company no. 01476185</p>
           <p>Proudly British engineering since 1980</p>
         </div>
       </div>

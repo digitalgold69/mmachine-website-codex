@@ -125,7 +125,7 @@ export default function AboutPage() {
             </div>
             <div>
               <dt className="text-ink-muted">Location</dt>
-              <dd className="text-racing">Unit 3-7 Forge Way, Cleveland Trading Estate, Darlington, DL1 2PJ</dd>
+              <dd className="text-racing">Unit 6 Forge Way, Cleveland Trading Estate, Darlington, DL1 2PJ</dd>
             </div>
           </dl>
         </aside>

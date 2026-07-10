@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     telephone: "01325 381302",
     address: {
       "@type": "PostalAddress",
-      streetAddress: "Unit 3-7 Forge Way, Cleveland Trading Estate",
+      streetAddress: "Unit 6 Forge Way, Cleveland Trading Estate",
       addressLocality: "Darlington",
       addressRegion: "County Durham",
       postalCode: "DL1 2PJ",

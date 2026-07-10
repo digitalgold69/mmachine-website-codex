@@ -31,7 +31,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1">
             {links.map((link) => {
               const active = pathname === link.href || (link.href !== "/" && pathname?.startsWith(link.href));
               return (
@@ -50,15 +50,20 @@ export default function Navbar() {
             })}
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <Link href="/dashboard/login" className="text-xs text-cream/70 hover:text-gold">
-              Owner login
-            </Link>
+          <div className="hidden lg:flex flex-col items-end gap-1 text-right text-xs leading-tight text-cream/80">
+            <a href="tel:01325381302" className="hover:text-gold">
+              <span className="block font-semibold text-cream">Metals &amp; Engineering</span>
+              <span className="font-mono">01325 381302</span>
+            </a>
+            <a href="tel:01325381300" className="hover:text-gold">
+              <span className="block font-semibold text-cream">Mini Pressings &amp; Accounts</span>
+              <span className="font-mono">01325 381300</span>
+            </a>
           </div>
 
           <button
             onClick={() => setOpen(!open)}
-            className="md:hidden p-2 rounded hover:bg-racing-light"
+            className="lg:hidden p-2 rounded hover:bg-racing-light"
             aria-label="Toggle menu"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -68,7 +73,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div className="md:hidden pb-3 space-y-1">
+          <div className="lg:hidden pb-3 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -79,9 +84,16 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link href="/dashboard/login" onClick={() => setOpen(false)} className="block px-3 py-2 text-xs text-cream/70">
-              Owner login
-            </Link>
+            <div className="mt-3 space-y-2 border-t border-cream/15 px-3 pt-3 text-sm">
+              <a href="tel:01325381302" className="block text-cream/85 hover:text-gold">
+                <span className="block text-xs uppercase tracking-wide text-cream/60">Metals &amp; Engineering</span>
+                <span className="font-mono">01325 381302</span>
+              </a>
+              <a href="tel:01325381300" className="block text-cream/85 hover:text-gold">
+                <span className="block text-xs uppercase tracking-wide text-cream/60">Mini Pressings &amp; Accounts</span>
+                <span className="font-mono">01325 381300</span>
+              </a>
+            </div>
           </div>
         )}
       </div>

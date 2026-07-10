@@ -33,6 +33,10 @@ function fileDownloadUrl(key: string) {
   return `${SITE_URL}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+function dashboardUrl() {
+  return `${SITE_URL}/dashboard/orders`;
+}
+
 function customSummary(item: QuoteItem, includeFileLinks = false) {
   const custom = item.custom;
   if (!custom) return "";
@@ -46,7 +50,13 @@ function customSummary(item: QuoteItem, includeFileLinks = false) {
       ${custom.tolerance ? `<div><strong>Tolerance:</strong> ${escapeHtml(custom.tolerance)}</div>` : ""}
       ${custom.deadline ? `<div><strong>Needed by:</strong> ${escapeHtml(custom.deadline)}</div>` : ""}
       ${custom.budget ? `<div><strong>Budget:</strong> ${escapeHtml(custom.budget)}</div>` : ""}
-      <div><strong>Drawing status:</strong> ${custom.drawingStatus === "help" ? "Customer needs help from a sketch/description" : "CAD file supplied"}</div>
+      <div><strong>Drawing status:</strong> ${
+        custom.drawingStatus === "help"
+          ? "Customer needs help from a sketch/description"
+          : files.length
+            ? "Files supplied"
+            : "No file supplied"
+      }</div>
       ${
         includeFileLinks && files.length
           ? `<div style="margin-top:8px"><strong>Uploaded files:</strong><br>${files
@@ -110,6 +120,11 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
       </thead>
       <tbody>${rows}</tbody>
     </table>
+    <p style="margin:22px 0">
+      <a href="${escapeHtml(dashboardUrl())}" style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">
+        View in dashboard
+      </a>
+    </p>
     <p>Review and edit this in the owner dashboard before emailing the completed invoice to the buyer.</p>
   `;
 }

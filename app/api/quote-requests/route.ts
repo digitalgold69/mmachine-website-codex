@@ -12,10 +12,7 @@ import type { CustomQuoteDetails, QuoteFile, QuoteItem, QuoteRequest, QuoteStatu
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CUSTOM_FILE_EXTENSIONS = new Set(["dxf", "dwg", "ai", "eps", "step", "stp"]);
 const MAX_CUSTOM_FILES = 10;
-const MAX_CUSTOM_FILE_BYTES = 15 * 1024 * 1024;
-const MAX_CUSTOM_TOTAL_BYTES = 60 * 1024 * 1024;
 
 function asString(value: unknown, max = 500) {
   return String(value ?? "").trim().slice(0, max);
@@ -29,13 +26,6 @@ function asNumberOrNull(value: unknown) {
 
 function asBoolean(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
-}
-
-function asStringArray(values: unknown[], maxItems = 20, maxLength = 80) {
-  return values
-    .map((value) => asString(value, maxLength))
-    .filter(Boolean)
-    .slice(0, maxItems);
 }
 
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
@@ -123,29 +113,9 @@ async function storeCustomFiles(quoteIdValue: string, files: File[]): Promise<Qu
   return savedFiles;
 }
 
-function validateCustomFiles(files: File[], drawingStatus: CustomQuoteDetails["drawingStatus"]) {
+function validateCustomFiles(files: File[]) {
   if (files.length > MAX_CUSTOM_FILES) {
     throw new Error(`Upload up to ${MAX_CUSTOM_FILES} files at a time.`);
-  }
-
-  if (files.length === 0 && drawingStatus !== "help") {
-    throw new Error("Upload a CAD file, or choose the option that you need help from a sketch or description.");
-  }
-
-  let total = 0;
-  for (const file of files) {
-    const ext = fileExtension(file.name);
-    if (!CUSTOM_FILE_EXTENSIONS.has(ext)) {
-      throw new Error("Accepted file types are DXF, DWG, AI, EPS, STEP and STP.");
-    }
-    if (file.size > MAX_CUSTOM_FILE_BYTES) {
-      throw new Error(`${safeFileName(file.name)} is too large. Maximum file size is 15 MB.`);
-    }
-    total += file.size;
-  }
-
-  if (total > MAX_CUSTOM_TOTAL_BYTES) {
-    throw new Error("The combined upload is too large. Please send up to 60 MB at a time.");
   }
 }
 
@@ -159,7 +129,7 @@ async function createCustomQuote(req: Request) {
   const form = await req.formData();
   const drawingStatus = asString(form.get("drawingStatus"), 20) === "help" ? "help" : "cad";
   const files = uploadedFilesFromForm(form);
-  validateCustomFiles(files, drawingStatus);
+  validateCustomFiles(files);
 
   const customer = {
     name: asString(form.get("name"), 160),
@@ -186,7 +156,7 @@ async function createCustomQuote(req: Request) {
     projectName: asString(form.get("projectName"), 200),
     material: asString(form.get("material"), 160),
     thickness: asString(form.get("thickness"), 80),
-    services: asStringArray(form.getAll("services")),
+    services: [],
     finish: asString(form.get("finish"), 160),
     quantity: asString(form.get("quantity"), 80),
     units: asString(form.get("units"), 80),

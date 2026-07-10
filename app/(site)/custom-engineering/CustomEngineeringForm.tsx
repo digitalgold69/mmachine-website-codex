@@ -3,10 +3,8 @@
 import { DragEvent, FormEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
-const ACCEPTED_EXTENSIONS = ["dxf", "dwg", "ai", "eps", "step", "stp"];
 const MAX_FILES = 10;
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+const COMMON_UPLOAD_TYPES = ["CAD", "PDF", "Images", "Sketches", "Drawings", "ZIP"];
 
 const materials = [
   "Aluminium",
@@ -25,20 +23,6 @@ const materials = [
   "Steel Tube",
 ];
 
-const services = [
-  "Laser/profile cutting",
-  "Waterjet cutting",
-  "CNC routing",
-  "Folding/bending",
-  "Tapping/threading",
-  "Countersinking/counterboring",
-  "Hardware insertion",
-  "Welding/assembly",
-  "Powder coating",
-  "Anodising/plating",
-  "Deburring/edge finishing",
-];
-
 const finishOptions = [
   "Raw / as cut",
   "Deburred edges",
@@ -49,10 +33,6 @@ const finishOptions = [
   "Not sure yet",
 ];
 
-function cleanExtension(name: string) {
-  return name.toLowerCase().split(".").pop() || "";
-}
-
 function fileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -60,15 +40,6 @@ function fileSize(bytes: number) {
 
 function validate(files: File[]) {
   if (files.length > MAX_FILES) return `Upload up to ${MAX_FILES} files at a time.`;
-  const total = files.reduce((sum, file) => sum + file.size, 0);
-  if (total > MAX_TOTAL_BYTES) return "The combined upload is too large. Please keep it below 60 MB.";
-
-  const invalid = files.find((file) => !ACCEPTED_EXTENSIONS.includes(cleanExtension(file.name)));
-  if (invalid) return `${invalid.name} is not an accepted file type.`;
-
-  const tooLarge = files.find((file) => file.size > MAX_FILE_BYTES);
-  if (tooLarge) return `${tooLarge.name} is too large. Maximum file size is 15 MB.`;
-
   return "";
 }
 
@@ -121,11 +92,7 @@ export default function CustomEngineeringForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-
-    if (drawingStatus === "cad" && files.length === 0) {
-      setError("Please upload a CAD file, or choose the option that you need help from a sketch or description.");
-      return;
-    }
+    const formElement = event.currentTarget;
 
     const validation = validate(files);
     if (validation) {
@@ -133,7 +100,7 @@ export default function CustomEngineeringForm() {
       return;
     }
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     files.forEach((file) => form.append("files", file));
     form.set("drawingStatus", drawingStatus);
     form.set("arrangeOwnDelivery", arrangeOwnDelivery ? "true" : "false");
@@ -147,7 +114,7 @@ export default function CustomEngineeringForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request could not be sent.");
 
-      event.currentTarget.reset();
+      formElement.reset();
       setFiles([]);
       setDrawingStatus("cad");
       setArrangeOwnDelivery(false);
@@ -191,8 +158,8 @@ export default function CustomEngineeringForm() {
         <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Start a custom quote</p>
         <h2 className="mt-2 font-display text-3xl text-racing">Upload your design</h2>
         <p className="mt-2 text-sm leading-6 text-ink-muted">
-          Send up to ten drawings and tell us what needs making. If you do not have CAD,
-          choose the sketch/help option and describe the part.
+          Add CAD, photos, PDFs, drawings, ZIP files or anything else that helps us understand the job.
+          Files are optional if you can describe what you need clearly.
         </p>
       </div>
 
@@ -211,19 +178,20 @@ export default function CustomEngineeringForm() {
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPTED_EXTENSIONS.map((ext) => `.${ext}`).join(",")}
           className="sr-only"
           onChange={(event) => addFiles(Array.from(event.target.files || []))}
         />
         <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
-          {ACCEPTED_EXTENSIONS.map((ext) => (
-            <span key={ext} className="rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold uppercase text-racing shadow-sm">
-              .{ext}
+          {COMMON_UPLOAD_TYPES.map((type) => (
+            <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
+              {type}
             </span>
           ))}
         </div>
-        <p className="font-semibold text-racing">Drop CAD files here</p>
-        <p className="mt-1 text-sm text-ink-muted">DXF, DWG, AI, EPS, STEP or STP. Max 15 MB each.</p>
+        <p className="font-semibold text-racing">Drop files here</p>
+        <p className="mt-1 text-sm text-ink-muted">
+          CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files.
+        </p>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -332,18 +300,6 @@ export default function CustomEngineeringForm() {
         </div>
       </div>
 
-      <fieldset className="mt-5">
-        <legend className="label">Services required</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {services.map((service) => (
-            <label key={service} className="flex items-start gap-2 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
-              <input type="checkbox" name="services" value={service} className="mt-1" />
-              <span>{service}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
       <div className="mt-5">
         <label className="label" htmlFor="message">Job details *</label>
         <textarea
@@ -409,7 +365,7 @@ export default function CustomEngineeringForm() {
 
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-ink-muted">
-          DXF, DWG, AI, EPS, STEP and STP files are accepted.
+          Uploads are optional, but useful photos, drawings or files help us quote accurately.
         </p>
         <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
           {submitting ? "Submitting..." : "Submit custom request"}
