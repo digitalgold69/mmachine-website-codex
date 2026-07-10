@@ -22,9 +22,9 @@ export default function Navbar() {
   return (
     <nav className="bg-racing text-cream sticky top-0 z-50 border-b border-racing-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3">
-            <BrandMark priority className="h-11 w-11" />
+        <div className="flex min-h-20 items-center justify-between py-2">
+          <Link href="/" className="flex items-center gap-4">
+            <BrandMark priority className="h-[53px] w-[53px]" />
             <div className="leading-tight">
               <div className="font-display text-lg">M-Machine</div>
               <div className="text-xs opacity-70 -mt-1">Est. 1980</div>
@@ -50,7 +50,7 @@ export default function Navbar() {
             })}
           </div>
 
-          <div className="hidden lg:flex flex-col items-end gap-1 text-right text-xs leading-tight text-cream/80">
+          <div className="ml-5 hidden min-w-[190px] flex-col items-end gap-2 pl-4 text-right text-xs leading-tight text-cream/80 lg:flex">
             <a href="tel:01325381302" className="hover:text-gold">
               <span className="block font-semibold text-cream">Metals &amp; Engineering</span>
               <span className="font-mono">01325 381302</span>
