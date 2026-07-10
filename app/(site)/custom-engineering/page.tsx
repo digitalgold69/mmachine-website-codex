@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import CustomEngineeringForm from "./CustomEngineeringForm";
+import ScrollToQuoteButton from "./ScrollToQuoteButton";
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -187,9 +188,9 @@ export default function CustomEngineeringPage() {
               We quote it, make it in our Darlington workshop, and send the finished part to you.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="#quote-form" className="btn-primary">
+              <ScrollToQuoteButton className="btn-primary">
                 Start a custom quote
-              </Link>
+              </ScrollToQuoteButton>
               <Link href="#services" className="btn-secondary">
                 View services
               </Link>
