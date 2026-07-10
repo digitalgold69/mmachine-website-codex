@@ -59,11 +59,13 @@ function mergeFiles(current: File[], incoming: File[]) {
 
 export default function CustomEngineeringForm() {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [drawingStatus, setDrawingStatus] = useState<"cad" | "help">("cad");
   const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showNoFileWarning, setShowNoFileWarning] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ quoteId: string } | null>(null);
 
@@ -80,6 +82,7 @@ export default function CustomEngineeringForm() {
       return;
     }
     setFiles(next);
+    if (next.length > 0) setShowNoFileWarning(false);
     setError("");
   }
 
@@ -89,11 +92,7 @@ export default function CustomEngineeringForm() {
     addFiles(Array.from(event.dataTransfer.files || []));
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    const formElement = event.currentTarget;
-
+  async function sendRequest(formElement: HTMLFormElement) {
     const validation = validate(files);
     if (validation) {
       setError(validation);
@@ -126,6 +125,37 @@ export default function CustomEngineeringForm() {
     }
   }
 
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    const formElement = event.currentTarget;
+
+    if (submitting) return;
+
+    if (files.length === 0) {
+      setShowNoFileWarning(true);
+      return;
+    }
+
+    void sendRequest(formElement);
+  }
+
+  function uploadNow() {
+    setShowNoFileWarning(false);
+    setTimeout(() => inputRef.current?.click(), 0);
+  }
+
+  function continueWithoutFiles() {
+    const formElement = formRef.current;
+    if (!formElement) return;
+    if (!formElement.reportValidity()) {
+      setShowNoFileWarning(false);
+      return;
+    }
+    setShowNoFileWarning(false);
+    void sendRequest(formElement);
+  }
+
   if (success) {
     return (
       <div className="rounded-2xl border border-racing/10 bg-white p-6 shadow-sm">
@@ -153,7 +183,8 @@ export default function CustomEngineeringForm() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-racing/10 bg-white p-4 shadow-sm sm:p-6">
+    <>
+    <form ref={formRef} onSubmit={submit} className="rounded-2xl border border-racing/10 bg-white p-4 shadow-sm sm:p-6">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Start a custom quote</p>
         <h2 className="mt-2 font-display text-3xl text-racing">Upload your design</h2>
@@ -372,5 +403,39 @@ export default function CustomEngineeringForm() {
         </button>
       </div>
     </form>
+    {showNoFileWarning && (
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-racing/55 px-4 py-6 backdrop-blur-sm">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="no-file-title"
+          className="w-full max-w-md rounded-2xl border border-racing/10 bg-white p-6 shadow-2xl"
+        >
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-cream-dark text-racing">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+              <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
+          <h2 id="no-file-title" className="font-display text-2xl text-racing">
+            You haven&apos;t uploaded any files
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-ink-muted">
+            A drawing, photo or CAD file usually helps us quote more accurately. You can add one now,
+            or continue if your written details explain the job clearly.
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <button type="button" onClick={uploadNow} className="btn-primary justify-center" disabled={submitting}>
+              Upload now
+            </button>
+            <button type="button" onClick={continueWithoutFiles} className="btn-secondary justify-center" disabled={submitting}>
+              Continue anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
