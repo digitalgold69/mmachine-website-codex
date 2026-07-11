@@ -4,6 +4,8 @@ import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "reac
 import Link from "next/link";
 
 const MAX_FILES = 10;
+const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
+const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 const COMMON_UPLOAD_TYPES = ["CAD", "PDF", "Images", "Sketches", "Drawings", "ZIP"];
 
 const materials = [
@@ -40,7 +42,73 @@ function fileSize(bytes: number) {
 
 function validate(files: File[]) {
   if (files.length > MAX_FILES) return `Upload up to ${MAX_FILES} files at a time.`;
+  const oversized = files.find((file) => file.size > MAX_FILE_BYTES);
+  if (oversized) return `${oversized.name} is larger than the 2 GB per-file limit.`;
   return "";
+}
+
+type CompletedUpload = {
+  token: string;
+  name: string;
+  size: number;
+};
+
+async function jsonResponse<T>(response: Response): Promise<T> {
+  const data = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(data.error || "The file upload could not be completed.");
+  return data;
+}
+
+async function uploadPart(token: string, partNumber: number, chunk: Blob) {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        `/api/quote-uploads?token=${encodeURIComponent(token)}&partNumber=${partNumber}`,
+        { method: "PUT", body: chunk }
+      );
+      return await jsonResponse<{ partNumber: number; etag: string }>(response);
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt < 3) await new Promise((resolve) => window.setTimeout(resolve, attempt * 500));
+    }
+  }
+  throw lastError || new Error("The file upload could not be completed.");
+}
+
+async function uploadLargeFile(file: File, onProgress: (percent: number) => void): Promise<CompletedUpload> {
+  const startResponse = await fetch("/api/quote-uploads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "start", name: file.name, size: file.size, type: file.type }),
+  });
+  const start = await jsonResponse<{ token: string }>(startResponse);
+  const parts: { partNumber: number; etag: string }[] = [];
+
+  try {
+    let partNumber = 1;
+    for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_BYTES) {
+      const end = Math.min(file.size, offset + UPLOAD_CHUNK_BYTES);
+      parts.push(await uploadPart(start.token, partNumber, file.slice(offset, end)));
+      onProgress(Math.round((end / file.size) * 100));
+      partNumber += 1;
+    }
+
+    const completeResponse = await fetch("/api/quote-uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete", token: start.token, parts }),
+    });
+    const complete = await jsonResponse<{ file: CompletedUpload }>(completeResponse);
+    return complete.file;
+  } catch (error) {
+    void fetch("/api/quote-uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "abort", token: start.token }),
+    });
+    throw error;
+  }
 }
 
 function mergeFiles(current: File[], incoming: File[]) {
@@ -54,18 +122,26 @@ function mergeFiles(current: File[], incoming: File[]) {
     );
     if (!duplicate) next.push(file);
   }
-  return next.slice(0, MAX_FILES);
+  return next;
+}
+
+function fileFingerprint(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
 }
 
 export default function CustomEngineeringForm() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const successRef = useRef<HTMLDivElement | null>(null);
+  const warningDialogRef = useRef<HTMLDivElement | null>(null);
+  const warningReturnFocusRef = useRef<HTMLElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [completedUploads, setCompletedUploads] = useState<Record<string, CompletedUpload>>({});
   const [dragging, setDragging] = useState(false);
   const [drawingStatus, setDrawingStatus] = useState<"cad" | "help">("cad");
   const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ file: string; index: number; total: number; percent: number } | null>(null);
   const [showNoFileWarning, setShowNoFileWarning] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ quoteId: string } | null>(null);
@@ -83,6 +159,43 @@ export default function CustomEngineeringForm() {
 
     return () => window.clearTimeout(timeout);
   }, [success]);
+
+  useEffect(() => {
+    if (!showNoFileWarning || !warningDialogRef.current) return;
+    const dialog = warningDialogRef.current;
+    warningReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const selector = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>(selector));
+    window.setTimeout(() => controls()[0]?.focus(), 0);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowNoFileWarning(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = controls();
+      if (items.length === 0) return;
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault();
+        items[items.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === items[items.length - 1]) {
+        event.preventDefault();
+        items[0].focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      warningReturnFocusRef.current?.focus();
+    };
+  }, [showNoFileWarning]);
 
   function addFiles(incoming: File[]) {
     const next = mergeFiles(files, incoming);
@@ -110,28 +223,74 @@ export default function CustomEngineeringForm() {
     }
 
     const form = new FormData(formElement);
-    files.forEach((file) => form.append("files", file));
-    form.set("drawingStatus", drawingStatus);
-    form.set("arrangeOwnDelivery", arrangeOwnDelivery ? "true" : "false");
 
     setSubmitting(true);
     try {
+      const uploadedFiles: CompletedUpload[] = [];
+      const uploadCache = { ...completedUploads };
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const fingerprint = fileFingerprint(file);
+        let completed = uploadCache[fingerprint];
+        if (!completed) {
+          setUploadProgress({ file: file.name, index: index + 1, total: files.length, percent: 0 });
+          completed = await uploadLargeFile(file, (percent) =>
+            setUploadProgress({ file: file.name, index: index + 1, total: files.length, percent })
+          );
+          uploadCache[fingerprint] = completed;
+          setCompletedUploads({ ...uploadCache });
+        }
+        uploadedFiles.push(completed);
+      }
+
       const res = await fetch("/api/quote-requests", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "custom",
+          website: form.get("website"),
+          customer: {
+            name: form.get("name"),
+            email: form.get("email"),
+            phone: form.get("phone"),
+            company: form.get("company"),
+            address: form.get("address"),
+            arrangeOwnDelivery,
+            message: form.get("message"),
+          },
+          custom: {
+            projectName: form.get("projectName"),
+            material: form.get("material"),
+            thickness: form.get("thickness"),
+            finish: form.get("finish"),
+            quantity: form.get("quantity"),
+            units: form.get("units"),
+            tolerance: form.get("tolerance"),
+            deadline: form.get("deadline"),
+            budget: form.get("budget"),
+            drawingStatus,
+          },
+          uploadedFiles,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request could not be sent.");
+      const data = await res.json() as { error?: string; code?: string; quoteId?: string };
+      if (!res.ok) {
+        if (data.code === "UPLOAD_TOKEN_INVALID") setCompletedUploads({});
+        throw new Error(data.error || "Request could not be sent.");
+      }
 
       formElement.reset();
       setFiles([]);
+      setCompletedUploads({});
       setDrawingStatus("cad");
       setArrangeOwnDelivery(false);
+      if (!data.quoteId) throw new Error("The request was saved without a reference. Please contact M-Machine.");
       setSuccess({ quoteId: data.quoteId });
     } catch (err) {
       setError((err as Error).message || "Request could not be sent.");
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -222,6 +381,10 @@ export default function CustomEngineeringForm() {
           className="sr-only"
           onChange={(event) => addFiles(Array.from(event.target.files || []))}
         />
+        <div className="sr-only" aria-hidden="true">
+          <label htmlFor="custom-website">Website</label>
+          <input id="custom-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+        </div>
         <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
           {COMMON_UPLOAD_TYPES.map((type) => (
             <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
@@ -231,7 +394,7 @@ export default function CustomEngineeringForm() {
         </div>
         <p className="font-semibold text-racing">Drop files here</p>
         <p className="mt-1 text-sm text-ink-muted">
-          CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files.
+          CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
         </p>
         <button
           type="button"
@@ -356,33 +519,36 @@ export default function CustomEngineeringForm() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="name">Name *</label>
-          <input id="name" name="name" required className="input" />
+          <input id="name" name="name" required autoComplete="name" className="input" />
         </div>
         <div>
           <label className="label" htmlFor="company">Company</label>
-          <input id="company" name="company" className="input" />
+          <input id="company" name="company" autoComplete="organization" className="input" />
         </div>
         <div>
           <label className="label" htmlFor="email">Email *</label>
-          <input id="email" name="email" type="email" required className="input" />
+          <input id="email" name="email" type="email" required autoComplete="email" className="input" />
         </div>
         <div>
           <label className="label" htmlFor="phone">Phone *</label>
-          <input id="phone" name="phone" required className="input" />
+          <input id="phone" name="phone" type="tel" required autoComplete="tel" className="input" />
         </div>
       </div>
 
       <div className="mt-5">
-        <label className="label" htmlFor="address">Delivery address</label>
         {!arrangeOwnDelivery && (
+          <>
+          <label className="label" htmlFor="address">Delivery address</label>
           <textarea
             id="address"
             name="address"
             rows={4}
             required
             className="input resize-none"
+            autoComplete="street-address"
             placeholder="Full delivery address, including postcode"
           />
+          </>
         )}
         <label className="mt-3 flex items-start gap-3 rounded-xl border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
           <input
@@ -404,18 +570,31 @@ export default function CustomEngineeringForm() {
         </div>
       )}
 
+      {uploadProgress && (
+        <div className="mt-5 rounded-xl border border-racing/10 bg-cream-dark p-4" aria-live="polite">
+          <div className="flex items-center justify-between gap-3 text-sm text-racing">
+            <span className="truncate">Uploading {uploadProgress.index} of {uploadProgress.total}: {uploadProgress.file}</span>
+            <strong>{uploadProgress.percent}%</strong>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+            <div className="h-full bg-gold transition-[width]" style={{ width: `${uploadProgress.percent}%` }} />
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-ink-muted">
           Uploads are optional, but useful photos, drawings or files help us quote accurately.
         </p>
         <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
-          {submitting ? "Submitting..." : "Submit custom request"}
+          {submitting ? (uploadProgress ? "Uploading files..." : "Submitting...") : "Submit custom request"}
         </button>
       </div>
     </form>
     {showNoFileWarning && (
       <div className="fixed inset-0 z-[80] flex items-center justify-center bg-racing/55 px-4 py-6 backdrop-blur-sm">
         <div
+          ref={warningDialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="no-file-title"

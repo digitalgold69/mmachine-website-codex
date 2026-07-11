@@ -11,6 +11,7 @@ import {
   productCategory,
   productMetaDescription,
   productName,
+  openGraphImage,
   productSku,
   productSlug as makeProductSlug,
   productUrl,
@@ -45,6 +46,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       url: absoluteUrl(productUrl(item)),
       type: "website",
+      images: openGraphImage(
+        item.kind === "mini" ? "/about/mini-outside-factory.jpg" : "/custom-engineering/metal-stock.jpg",
+        item.kind === "mini" ? "Classic Mini at M-Machine" : "Engineering metal stock at M-Machine"
+      ),
     },
   };
 }
@@ -84,7 +89,8 @@ export default async function ProductPage({ params }: PageProps) {
       : undefined,
   };
 
-  const contactUrl = `/contact?product=${encodeURIComponent(name)}${sku ? `&sku=${encodeURIComponent(sku)}` : ""}&category=${encodeURIComponent(categoryName)}`;
+  const productPagePath = productUrl(item);
+  const contactUrl = `/contact?product=${encodeURIComponent(name)}${sku ? `&sku=${encodeURIComponent(sku)}` : ""}&category=${encodeURIComponent(categoryName)}&page=${encodeURIComponent(absoluteUrl(productPagePath))}`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -161,7 +167,7 @@ export default async function ProductPage({ params }: PageProps) {
             Ask about this part
           </Link>
           <p className="mt-3 text-xs text-ink-muted">
-            The final invoice, carriage and payment details are confirmed manually by M-Machine.
+            We confirm the final invoice, carriage and payment details with you directly.
           </p>
         </aside>
       </article>

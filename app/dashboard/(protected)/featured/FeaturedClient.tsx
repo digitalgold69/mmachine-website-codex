@@ -37,6 +37,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
 
   // Show a banner that fades after a few seconds
   useEffect(() => {
@@ -88,9 +89,10 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
           imageDataUrl: draft.imageDataUrl,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; entry?: Entry };
       if (!res.ok) throw new Error(data.error || "Save failed");
 
+      if (!data.entry) throw new Error("Save completed without returning the entry.");
       const saved: Entry = data.entry;
       setItems((prev) => {
         const i = prev.findIndex((x) => x.id === saved.id);
@@ -110,8 +112,9 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
     }
   }
 
-  async function handleDelete(it: Entry) {
-    if (!confirm(`Delete "${it.title}"? This can't be undone.`)) return;
+  async function handleDelete() {
+    const it = pendingDelete;
+    if (!it) return;
     setBusy(true);
     setError(null);
     try {
@@ -120,9 +123,10 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: it.id }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error || "Delete failed");
       setItems((prev) => prev.filter((x) => x.id !== it.id));
+      setPendingDelete(null);
       setFlash(`Deleted "${it.title}".`);
     } catch (e) {
       setError((e as Error).message || "Delete failed");
@@ -190,7 +194,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
             <div className="flex gap-2">
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
-              <button onClick={() => handleDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
+              <button type="button" onClick={() => setPendingDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
             </div>
           </div>
         ))}
@@ -200,6 +204,23 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
         <div className="bg-white rounded-xl border border-racing/10 p-12 text-center">
           <p className="text-ink-muted mb-4">No featured jobs yet. Add one to showcase your workshop&apos;s capability.</p>
           <button onClick={startAdd} className="btn-primary">Add your first job</button>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-racing-dark/55 px-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-featured-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 id="delete-featured-title" className="font-display text-2xl text-racing">Delete this featured job?</h2>
+            <p className="mt-3 text-sm leading-6 text-ink-muted">
+              &ldquo;{pendingDelete.title}&rdquo; will be removed from the public website. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setPendingDelete(null)} disabled={busy} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={busy} className="rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
+                {busy ? "Deleting..." : "Delete job"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -225,17 +246,20 @@ function EditForm({
   const [imagePreview, setImagePreview] = useState<string | null>(
     imageSrc(initial.image)
   );
+  const [imageError, setImageError] = useState("");
   const isNew = !initial.id;
 
   function handleImageChange(file: File | null) {
     if (!file) {
       setForm({ ...form, imageDataUrl: undefined });
+      setImageError("");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert("That photo is over 5 MB. Please choose a smaller one.");
+      setImageError("That photo is over 5 MB. Please choose a smaller one.");
       return;
     }
+    setImageError("");
     const reader = new FileReader();
     reader.onload = () => {
       const url = reader.result as string;
@@ -352,6 +376,7 @@ function EditForm({
                   className="text-sm"
                 />
                 <p className="text-xs text-ink-muted mt-2">JPG, PNG, WebP, or GIF. Max 5 MB. Square or landscape works best.</p>
+                {imageError && <p role="alert" className="mt-2 text-sm text-red-700">{imageError}</p>}
               </div>
             </div>
           </div>

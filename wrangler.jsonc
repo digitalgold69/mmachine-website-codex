@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mmachine-website-codex",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2026-06-15",
+  "compatibility_date": "2026-07-11",
   "compatibility_flags": [
     "nodejs_compat"
   ],

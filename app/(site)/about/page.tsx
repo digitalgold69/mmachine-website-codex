@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
+import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "About M-Machine and M-Machine-Metals",
@@ -14,6 +14,7 @@ export const metadata: Metadata = {
       "Our family-run Classic Mini panel, engineering metal and fabrication workshop in Darlington.",
     url: absoluteUrl("/about"),
     type: "website",
+    images: openGraphImage("/about/mini-outside-factory.jpg", "Classic Mini outside the M-Machine factory"),
   },
 };
 

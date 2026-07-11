@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Interactive Engineering Metals Catalogue",
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
       "Browse M-Machine engineering metals in the same column format as the customer PDF catalogue.",
     url: absoluteUrl("/catalogue/metals"),
     type: "website",
+    images: openGraphImage("/custom-engineering/metal-stock.jpg", "Engineering metal stock at M-Machine"),
   },
 };
 

@@ -25,10 +25,28 @@ export type R2BucketBinding = {
   } | null>;
   put: (
     key: string,
-    value: Uint8Array,
+    value: Uint8Array | ReadableStream,
     options?: { httpMetadata?: { contentType?: string } }
   ) => Promise<unknown>;
   delete: (key: string) => Promise<unknown>;
+  createMultipartUpload: (
+    key: string,
+    options?: { httpMetadata?: { contentType?: string } }
+  ) => Promise<R2MultipartUploadBinding>;
+  resumeMultipartUpload: (key: string, uploadId: string) => R2MultipartUploadBinding;
+};
+
+export type R2UploadedPartBinding = { partNumber: number; etag: string };
+
+export type R2MultipartUploadBinding = {
+  key: string;
+  uploadId: string;
+  uploadPart: (
+    partNumber: number,
+    value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob
+  ) => Promise<R2UploadedPartBinding>;
+  abort: () => Promise<void>;
+  complete: (parts: R2UploadedPartBinding[]) => Promise<{ size: number }>;
 };
 
 export type MMachineCloudflareEnv = {

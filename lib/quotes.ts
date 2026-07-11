@@ -1,5 +1,6 @@
 import { getD1 } from "@/lib/cloudflare";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
 
 type QuoteRow = {
   id: string;
@@ -15,6 +16,8 @@ type QuoteRow = {
   quoted_at: string | null;
   invoice_sent_at: string | null;
   paid_at: string | null;
+  paid_month_uk: string | null;
+  total_ex_vat: number | null;
   customer_email_sent_at: string | null;
   owner_email_sent_at: string | null;
 };
@@ -62,14 +65,162 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
   };
 }
 
-export async function listQuoteRequests(): Promise<QuoteRequest[]> {
+export async function listDashboardQuoteRequests(sincePaidAt: string): Promise<QuoteRequest[]> {
   const db = await getD1();
   const result = await db
-    .prepare("select * from quote_requests order by submitted_at desc")
+    .prepare(
+      `select * from quote_requests
+       where status in ('new', 'reviewing', 'invoice_sent')
+          or (status = 'paid' and paid_at >= ?)
+       order by submitted_at desc`
+    )
+    .bind(sincePaidAt)
     .all<QuoteRow>();
 
-  if (result.error) throw new Error(`D1 quote_requests read failed: ${result.error}`);
+  if (result.error) throw new Error(`D1 dashboard quote read failed: ${result.error}`);
   return (result.results || []).map(rowToQuote);
+}
+
+const QUOTE_TOTAL_SQL = `
+  coalesce(
+    total_ex_vat,
+    coalesce((
+      select sum(
+        coalesce(cast(json_extract(line.value, '$.unitPriceExVat') as real), 0) *
+        coalesce(cast(json_extract(line.value, '$.qty') as integer), 0)
+      )
+      from json_each(quote_requests.items) as line
+    ), 0)
+    + coalesce(carriage_ex_vat, 0)
+    + coalesce(extra_charges_ex_vat, 0)
+  )
+`;
+
+export type BestPaidMonth = {
+  key: string;
+  value: number;
+  count: number;
+};
+
+export async function getBestPaidMonth(): Promise<BestPaidMonth | null> {
+  const db = await getD1();
+  const missing = await db
+    .prepare(
+      `select id, coalesce(paid_at, updated_at) as paid_at
+       from quote_requests
+       where status = 'paid' and (paid_month_uk is null or paid_month_uk = '')`
+    )
+    .all<{ id: string; paid_at: string }>();
+
+  if (missing.error) throw new Error(`D1 paid month backfill read failed: ${missing.error}`);
+  for (const row of missing.results || []) {
+    const monthKey = ukDateKey(row.paid_at).slice(0, 7);
+    const result = await db
+      .prepare("update quote_requests set paid_month_uk = ? where id = ?")
+      .bind(monthKey, row.id)
+      .run();
+    if (result.error) throw new Error(`D1 paid month backfill failed: ${result.error}`);
+  }
+
+  const row = await db
+    .prepare(
+      `select
+         paid_month_uk as month_key,
+         count(*) as sales_count,
+         coalesce(sum(${QUOTE_TOTAL_SQL}), 0) as sales_value
+       from quote_requests
+       where status = 'paid' and paid_month_uk is not null and paid_month_uk != ''
+       group by paid_month_uk
+       order by sales_value desc, paid_month_uk desc
+       limit 1`
+    )
+    .first<{ month_key: string; sales_count: number; sales_value: number }>();
+
+  if (!row?.month_key) return null;
+  return {
+    key: row.month_key,
+    count: Number(row.sales_count || 0),
+    value: Number(row.sales_value || 0),
+  };
+}
+
+export type PaidHistoryResult = {
+  quotes: QuoteRequest[];
+  count: number;
+  monthStats: Record<string, { salesValue: number; salesCount: number }>;
+};
+
+export async function listActiveQuoteRequests(): Promise<QuoteRequest[]> {
+  const db = await getD1();
+  const result = await db
+    .prepare("select * from quote_requests where status in ('new', 'reviewing', 'invoice_sent') order by submitted_at desc")
+    .all<QuoteRow>();
+  if (result.error) throw new Error(`D1 active quote read failed: ${result.error}`);
+  return (result.results || []).map(rowToQuote);
+}
+
+export async function listPaidQuoteHistory(options: {
+  limit: number;
+  offset: number;
+  query?: string;
+  start?: string;
+  end?: string;
+}): Promise<PaidHistoryResult> {
+  const db = await getD1();
+  const clauses = ["status = 'paid'"];
+  const bindings: unknown[] = [];
+
+  if (options.start) {
+    clauses.push("paid_at >= ?");
+    bindings.push(options.start);
+  }
+  if (options.end) {
+    clauses.push("paid_at < ?");
+    bindings.push(options.end);
+  }
+  if (options.query?.trim()) {
+    const escaped = options.query.trim().toLowerCase().replace(/[\\%_]/g, "\\$&");
+    clauses.push("lower(id || ' ' || customer || ' ' || items || ' ' || coalesce(owner_notes, '') || ' ' || coalesce(customer_message, '')) like ? escape '\\'");
+    bindings.push(`%${escaped}%`);
+  }
+
+  const where = clauses.join(" and ");
+  const countRow = await db
+    .prepare(`select count(*) as count from quote_requests where ${where}`)
+    .bind(...bindings)
+    .first<{ count: number }>();
+  const result = await db
+    .prepare(`select * from quote_requests where ${where} order by paid_at desc limit ? offset ?`)
+    .bind(...bindings, Math.max(1, Math.min(100, options.limit)), Math.max(0, options.offset))
+    .all<QuoteRow>();
+
+  if (result.error) throw new Error(`D1 paid history read failed: ${result.error}`);
+  const quotes = (result.results || []).map(rowToQuote);
+  const monthKeys = [...new Set(quotes.map((quote) => ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)))];
+  const monthStats: Record<string, { salesValue: number; salesCount: number }> = {};
+
+  for (const monthKey of monthKeys) {
+    const bounds = ukMonthBounds(monthKey);
+    const row = await db
+      .prepare(
+        `select count(*) as sales_count, coalesce(sum(total_ex_vat), 0) as sales_value
+         from (
+           select ${QUOTE_TOTAL_SQL} as total_ex_vat
+           from quote_requests
+           where status = 'paid'
+             and paid_at >= ?
+             and paid_at < ?
+         )`
+      )
+      .bind(bounds.start.toISOString(), bounds.end.toISOString())
+      .first<{ sales_count: number; sales_value: number }>();
+    monthStats[monthKey] = {
+      salesCount: Number(row?.sales_count || 0),
+      salesValue: Number(row?.sales_value || 0),
+    };
+  }
+
+  return { quotes, count: Number(countRow?.count || 0), monthStats };
 }
 
 export async function countNewQuoteRequests(): Promise<number> {
@@ -94,6 +245,13 @@ export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> 
 
 export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteRequest> {
   const db = await getD1();
+  const paidMonthUk = quote.status === "paid"
+    ? ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)
+    : null;
+  const totalExVat = quote.items.reduce(
+    (sum, item) => sum + (typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : 0),
+    0
+  ) + (quote.carriageExVat ?? 0) + (quote.extraChargesExVat ?? 0);
 
   const result = await db
     .prepare(
@@ -112,9 +270,11 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         quoted_at,
         invoice_sent_at,
         paid_at,
+        paid_month_uk,
+        total_ex_vat,
         customer_email_sent_at,
         owner_email_sent_at
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       on conflict(id) do update set
         submitted_at = excluded.submitted_at,
         updated_at = excluded.updated_at,
@@ -128,6 +288,8 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         quoted_at = excluded.quoted_at,
         invoice_sent_at = excluded.invoice_sent_at,
         paid_at = excluded.paid_at,
+        paid_month_uk = excluded.paid_month_uk,
+        total_ex_vat = excluded.total_ex_vat,
         customer_email_sent_at = excluded.customer_email_sent_at,
         owner_email_sent_at = excluded.owner_email_sent_at
       `
@@ -146,6 +308,8 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       quote.quotedAt ?? null,
       quote.invoiceSentAt ?? null,
       quote.paidAt ?? null,
+      paidMonthUk,
+      totalExVat,
       quote.customerEmailSentAt ?? null,
       quote.ownerEmailSentAt ?? null
     )

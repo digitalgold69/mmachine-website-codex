@@ -6,13 +6,24 @@ import {
   buildOwnerQuoteEmail,
   sendQuoteEmail,
 } from "@/lib/quote-email";
-import { getQuoteRequest, listQuoteRequests, saveQuoteRequest } from "@/lib/quotes";
+import { getQuoteRequest, listActiveQuoteRequests, listPaidQuoteHistory, saveQuoteRequest } from "@/lib/quotes";
 import type { CustomQuoteDetails, QuoteFile, QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import { products } from "@/lib/mini-data";
+import { metals } from "@/lib/metals-data";
+import { checkRateLimit } from "@/lib/request-limits";
+import { readCompletedFileToken } from "@/lib/quote-upload-token";
+import type { QuoteCustomer } from "@/lib/quote-types";
+import { ukHistoryBounds, ukMonthBounds } from "@/lib/uk-time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_CUSTOM_FILES = 10;
+const MAX_ORDER_LINES = 100;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const miniById = new Map(products.map((product) => [product.id, product]));
+const metalsById = new Map(metals.map((product) => [product.id, product]));
 
 function asString(value: unknown, max = 500) {
   return String(value ?? "").trim().slice(0, max);
@@ -52,6 +63,51 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
   };
 }
 
+function safePublicItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
+  const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
+  const productId = asString(raw.productId, 120);
+
+  if (raw.catalogue === "mini") {
+    const product = miniById.get(productId);
+    if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
+    return {
+      key: `mini-${product.id}`,
+      catalogue: "mini",
+      productId: product.id,
+      code: product.code,
+      description: product.name,
+      unit: "each",
+      qty,
+      unitPriceExVat: product.priceExVat,
+      unitPriceIncVat: product.priceIncVat,
+    };
+  }
+
+  if (raw.catalogue === "metals") {
+    const product = metalsById.get(productId);
+    if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
+    return {
+      key: `metals-${product.id}`,
+      catalogue: "metals",
+      productId: product.id,
+      code: product.code,
+      description: [product.form, product.metal, product.spec, product.size]
+        .filter(Boolean)
+        .join(" - "),
+      shape: product.form,
+      metal: product.metal,
+      spec: product.spec,
+      size: product.size,
+      unit: product.unit,
+      qty,
+      unitPriceExVat: product.priceExVat,
+      unitPriceIncVat: product.priceIncVat,
+    };
+  }
+
+  throw new Error(`Item ${index + 1} is invalid.`);
+}
+
 function safeStatus(value: unknown): QuoteStatus {
   if (value === "quoted" || value === "invoice_sent") return "invoice_sent";
   if (value === "reviewing" || value === "paid" || value === "closed") return value;
@@ -59,8 +115,11 @@ function safeStatus(value: unknown): QuoteStatus {
 }
 
 function quoteId(kind = "") {
-  const prefix = kind ? `Q-${kind}` : "Q-";
-  return `${prefix}${Date.now().toString(36).toUpperCase()}`;
+  const cleanKind = kind.replace(/[^a-z0-9]+/gi, "").toUpperCase();
+  const prefix = cleanKind ? `Q-${cleanKind}-` : "Q-";
+  const time = Date.now().toString(36).toUpperCase();
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+  return `${prefix}${time}-${random}`;
 }
 
 function safeFileName(name: string) {
@@ -92,9 +151,7 @@ async function storeCustomFiles(quoteIdValue: string, files: File[]): Promise<Qu
     const cleanName = safeFileName(file.name);
     const ext = fileExtension(cleanName);
     const key = `quote-requests/${quoteIdValue}/${crypto.randomUUID()}-${cleanName}`;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-
-    await bucket.put(key, bytes, {
+    await bucket.put(key, file.stream(), {
       httpMetadata: {
         contentType: file.type || "application/octet-stream",
       },
@@ -125,6 +182,158 @@ function uploadedFilesFromForm(form: FormData) {
     .filter((value): value is File => value instanceof File && value.size > 0);
 }
 
+async function persistCustomQuote(
+  id: string,
+  customer: QuoteCustomer,
+  custom: CustomQuoteDetails,
+  files: QuoteFile[]
+) {
+  const now = new Date().toISOString();
+  custom.files = files;
+
+  const item: QuoteItem = {
+    key: `custom-${id}`,
+    catalogue: "custom",
+    productId: id,
+    code: "CUSTOM",
+    description: custom.projectName || "Custom fabrication request",
+    qty: Math.max(1, Math.min(999, Math.floor(Number(custom.quantity) || 1))),
+    unit: custom.units || "job",
+    unitPriceExVat: null,
+    unitPriceIncVat: null,
+    custom,
+  };
+
+  const quote: QuoteRequest = {
+    id,
+    submittedAt: now,
+    updatedAt: now,
+    status: "new",
+    customer,
+    items: [item],
+    ownerNotes: "",
+    customerMessage: "",
+    carriageExVat: null,
+    extraChargesExVat: null,
+    quotedAt: null,
+    invoiceSentAt: null,
+    paidAt: null,
+    customerEmailSentAt: null,
+    ownerEmailSentAt: null,
+  };
+
+  let saved = await saveQuoteRequest(quote);
+  const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
+  const email = await sendQuoteEmail({
+    to: ownerEmail,
+    subject: `New M-Machine custom fabrication request ${quote.id}`,
+    html: buildOwnerQuoteEmail(quote),
+    replyTo: quote.customer.email,
+  });
+  if (email.ok) {
+    saved = await saveQuoteRequest({
+      ...saved,
+      ownerEmailSentAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    quoteId: saved.id,
+    ownerEmailSent: email.ok,
+    files: files.map((file) => ({
+      name: file.name,
+      size: file.size,
+      path: customFileDownloadPath(file.key),
+    })),
+  });
+}
+
+async function createCustomQuoteJson(body: {
+  customer?: Partial<QuoteCustomer>;
+  custom?: Partial<CustomQuoteDetails>;
+  uploadedFiles?: { token?: string }[];
+  website?: string;
+}) {
+  const customer: QuoteCustomer = {
+    name: asString(body.customer?.name, 160),
+    email: asString(body.customer?.email, 220),
+    phone: asString(body.customer?.phone, 80),
+    company: asString(body.customer?.company, 180),
+    address: asString(body.customer?.address, 1200),
+    arrangeOwnDelivery: body.customer?.arrangeOwnDelivery === true,
+    message: asString(body.customer?.message, 2400),
+  };
+
+  if (asString(body.website, 200)) {
+    return NextResponse.json({ ok: true, quoteId: quoteId("CF") });
+  }
+  if (!customer.name || !customer.email || !customer.phone) {
+    return NextResponse.json({ error: "Name, email and phone are required" }, { status: 400 });
+  }
+  if (!EMAIL_PATTERN.test(customer.email)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+  if (!customer.arrangeOwnDelivery && !customer.address) {
+    return NextResponse.json(
+      { error: "Delivery address is required unless you will arrange collection or delivery" },
+      { status: 400 }
+    );
+  }
+
+  const rawCustom = body.custom || {};
+  const custom: CustomQuoteDetails = {
+    projectName: asString(rawCustom.projectName, 200),
+    material: asString(rawCustom.material, 160),
+    thickness: asString(rawCustom.thickness, 80),
+    services: [],
+    finish: asString(rawCustom.finish, 160),
+    quantity: asString(rawCustom.quantity, 80),
+    units: asString(rawCustom.units, 80),
+    tolerance: asString(rawCustom.tolerance, 160),
+    deadline: asString(rawCustom.deadline, 160),
+    budget: asString(rawCustom.budget, 100),
+    drawingStatus: rawCustom.drawingStatus === "help" ? "help" : "cad",
+  };
+  if (!custom.projectName && !customer.message) {
+    return NextResponse.json(
+      { error: "Tell us what you need made before submitting the request." },
+      { status: 400 }
+    );
+  }
+
+  const uploadedFiles = Array.isArray(body.uploadedFiles) ? body.uploadedFiles : [];
+  if (uploadedFiles.length > MAX_CUSTOM_FILES) {
+    return NextResponse.json({ error: `Upload up to ${MAX_CUSTOM_FILES} files at a time.` }, { status: 400 });
+  }
+
+  let files: QuoteFile[];
+  try {
+    files = uploadedFiles.map((file) => readCompletedFileToken(String(file.token || "")));
+  } catch {
+    return NextResponse.json(
+      {
+        error: "One or more file uploads expired. Please submit again to re-upload them.",
+        code: "UPLOAD_TOKEN_INVALID",
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    return await persistCustomQuote(quoteId("CF"), customer, custom, files);
+  } catch (error) {
+    console.error("custom_quote_json_submission_failed", {
+      error: error instanceof Error ? error.message : "unknown error",
+    });
+    return NextResponse.json(
+      { error: "Custom request could not be submitted. Please try again or call M-Machine." },
+      { status: 500 }
+    );
+  }
+}
+
 async function createCustomQuote(req: Request) {
   const form = await req.formData();
   const drawingStatus = asString(form.get("drawingStatus"), 20) === "help" ? "help" : "cad";
@@ -143,6 +352,14 @@ async function createCustomQuote(req: Request) {
 
   if (!customer.name || !customer.email || !customer.phone) {
     return NextResponse.json({ error: "Name, email and phone are required" }, { status: 400 });
+  }
+
+  if (!EMAIL_PATTERN.test(customer.email)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+
+  if (asString(form.get("website"), 200)) {
+    return NextResponse.json({ ok: true, quoteId: quoteId("CF-") });
   }
 
   if (!customer.arrangeOwnDelivery && !customer.address) {
@@ -174,75 +391,49 @@ async function createCustomQuote(req: Request) {
   }
 
   try {
-    const now = new Date().toISOString();
-    const id = quoteId("CF-");
-    custom.files = await storeCustomFiles(id, files);
-
-    const item: QuoteItem = {
-      key: `custom-${id}`,
-      catalogue: "custom",
-      productId: id,
-      code: "CUSTOM",
-      description: custom.projectName || "Custom fabrication request",
-      qty: Math.max(1, Math.min(999, Math.floor(Number(custom.quantity) || 1))),
-      unit: custom.units || "job",
-      unitPriceExVat: null,
-      unitPriceIncVat: null,
-      custom,
-    };
-
-    const quote: QuoteRequest = {
-      id,
-      submittedAt: now,
-      updatedAt: now,
-      status: "new",
-      customer,
-      items: [item],
-      ownerNotes: "",
-      customerMessage: "",
-      carriageExVat: null,
-      extraChargesExVat: null,
-      quotedAt: null,
-      invoiceSentAt: null,
-      paidAt: null,
-      customerEmailSentAt: null,
-      ownerEmailSentAt: null,
-    };
-
-    const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
-    const email = await sendQuoteEmail({
-      to: ownerEmail,
-      subject: `New M-Machine custom fabrication request ${quote.id}`,
-      html: buildOwnerQuoteEmail(quote),
-      replyTo: quote.customer.email,
-    });
-    if (email.ok) quote.ownerEmailSentAt = new Date().toISOString();
-
-    const saved = await saveQuoteRequest(quote);
-    return NextResponse.json({
-      ok: true,
-      quoteId: saved.id,
-      ownerEmailSent: email.ok,
-      files: custom.files.map((file) => ({
-        name: file.name,
-        size: file.size,
-        path: customFileDownloadPath(file.key),
-      })),
-    });
+    const id = quoteId("CF");
+    const storedFiles = await storeCustomFiles(id, files);
+    return await persistCustomQuote(id, customer, custom, storedFiles);
   } catch (err) {
+    console.error("custom_quote_submission_failed", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
     return NextResponse.json(
-      { error: (err as Error).message || "Custom request could not be submitted. Please try again." },
+      { error: "Custom request could not be submitted. Please try again or call M-Machine." },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireLogin();
   if (auth) return auth;
 
   try {
-    const quotes = await listQuoteRequests();
+    const url = new URL(request.url);
+    if (url.searchParams.get("history") === "paid") {
+      const page = Math.max(1, Math.floor(Number(url.searchParams.get("page")) || 1));
+      const pageSize = Math.max(1, Math.min(50, Math.floor(Number(url.searchParams.get("pageSize")) || 8)));
+      const month = url.searchParams.get("month") || "";
+      const time = url.searchParams.get("time") || "all";
+      const bounds = /^\d{4}-\d{2}$/.test(month)
+        ? ukMonthBounds(month)
+        : ukHistoryBounds(
+            time === "today" || time === "7d" || time === "month" || time === "year"
+              ? time
+              : "all"
+          );
+      const history = await listPaidQuoteHistory({
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        query: asString(url.searchParams.get("q"), 200),
+        start: bounds?.start.toISOString(),
+        end: bounds?.end.toISOString(),
+      });
+      return NextResponse.json(history);
+    }
+
+    const quotes = await listActiveQuoteRequests();
     return NextResponse.json({ quotes });
   } catch (err) {
     return NextResponse.json(
@@ -253,12 +444,21 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const rateLimit = await checkRateLimit(req, "quote-request", 20, 60 * 60);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests have been submitted. Please wait and try again." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    );
+  }
+
   const contentType = req.headers.get("content-type") || "";
   if (contentType.includes("multipart/form-data")) {
     return createCustomQuote(req);
   }
 
   let body: {
+    kind?: "custom";
     customer?: {
       name?: string;
       email?: string;
@@ -269,6 +469,9 @@ export async function POST(req: Request) {
       message?: string;
     };
     items?: Partial<QuoteItem>[];
+    website?: string;
+    custom?: Partial<CustomQuoteDetails>;
+    uploadedFiles?: { token?: string }[];
   } = {};
 
   try {
@@ -291,6 +494,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name, email and phone are required" }, { status: 400 });
   }
 
+  if (body.kind === "custom") {
+    return createCustomQuoteJson(body);
+  }
+
+
+  if (!EMAIL_PATTERN.test(customer.email)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+
+  if (asString(body.website, 200)) {
+    return NextResponse.json({ ok: true, quoteId: quoteId() });
+  }
+
   if (!customer.arrangeOwnDelivery && !customer.address) {
     return NextResponse.json(
       { error: "Delivery address is required unless you will arrange collection or delivery" },
@@ -303,8 +519,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Quote request has no items" }, { status: 400 });
   }
 
+
+  if (rawItems.length > MAX_ORDER_LINES) {
+    return NextResponse.json(
+      { error: `Please submit no more than ${MAX_ORDER_LINES} different lines at once.` },
+      { status: 400 }
+    );
+  }
+
   try {
-    const items = rawItems.map(safeItem);
+    const items = rawItems.map(safePublicItem);
     const now = new Date().toISOString();
     const quote: QuoteRequest = {
       id: quoteId(),
@@ -324,6 +548,7 @@ export async function POST(req: Request) {
       ownerEmailSentAt: null,
     };
 
+    let saved = await saveQuoteRequest(quote);
     const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
     const email = await sendQuoteEmail({
       to: ownerEmail,
@@ -331,14 +556,24 @@ export async function POST(req: Request) {
       html: buildOwnerQuoteEmail(quote),
       replyTo: quote.customer.email,
     });
-    if (email.ok) quote.ownerEmailSentAt = new Date().toISOString();
-
-    const saved = await saveQuoteRequest(quote);
+    if (email.ok) {
+      saved = await saveQuoteRequest({
+        ...saved,
+        ownerEmailSentAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
     return NextResponse.json({ ok: true, quoteId: saved.id, ownerEmailSent: email.ok });
   } catch (err) {
+    console.error("catalogue_quote_submission_failed", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
+    const customerError = err instanceof Error && /Item \d+/.test(err.message)
+      ? err.message
+      : "Order request could not be submitted. Please try again or contact M-Machine.";
     return NextResponse.json(
-      { error: "Order request could not be submitted. Please try again or contact M-Machine." },
-      { status: 500 }
+      { error: customerError },
+      { status: customerError !== "Order request could not be submitted. Please try again or contact M-Machine." ? 400 : 500 }
     );
   }
 }
@@ -382,6 +617,9 @@ export async function PATCH(req: Request) {
     };
 
     if (Array.isArray(body.items) && body.items.length > 0) {
+      if (body.items.length > MAX_ORDER_LINES) {
+        return NextResponse.json({ error: "Too many invoice lines" }, { status: 400 });
+      }
       next.items = body.items.map(safeItem);
     }
 
@@ -395,16 +633,30 @@ export async function PATCH(req: Request) {
 
     let customerEmailSent = false;
     if (body.emailCustomer) {
+      const incompleteLine = next.items.find(
+        (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
+      );
+      if (incompleteLine) {
+        return NextResponse.json(
+          { error: "Add an ex VAT price to every invoice line before emailing the customer." },
+          { status: 400 }
+        );
+      }
+
+      const savedDraft = await saveQuoteRequest(next);
       const email = await sendQuoteEmail({
-        to: next.customer.email,
-        subject: `M-Machine invoice ${next.id}`,
-        html: buildCustomerInvoiceEmail(next),
+        to: savedDraft.customer.email,
+        subject: `M-Machine invoice ${savedDraft.id}`,
+        html: buildCustomerInvoiceEmail(savedDraft),
         replyTo: process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk",
       });
       if (!email.ok) {
         return NextResponse.json(
-          { error: "Email could not be sent. Please send manually and try again later." },
-          { status: 500 }
+          {
+            error: "Invoice changes were saved, but the email could not be sent. Please try again later.",
+            quote: savedDraft,
+          },
+          { status: 502 }
         );
       }
       const sentAt = new Date().toISOString();
@@ -424,6 +676,9 @@ export async function PATCH(req: Request) {
     const saved = await saveQuoteRequest(next);
     return NextResponse.json({ ok: true, quote: saved, customerEmailSent });
   } catch (err) {
+    console.error("quote_update_failed", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
     return NextResponse.json({ error: "Order could not be saved. Please try again." }, { status: 500 });
   }
 }

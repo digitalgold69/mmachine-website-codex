@@ -8,6 +8,7 @@ import {
   getAllSeoCategories,
   getSeoCategory,
   jsonLdScript,
+  openGraphImage,
   productSlug,
   type SeoCategory,
 } from "@/lib/seo";
@@ -36,6 +37,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: category.description,
       url: absoluteUrl(categoryUrl(category)),
       type: "website",
+      images: openGraphImage(
+        category.kind === "mini-index" || category.kind === "mini-section"
+          ? "/about/mini-outside-factory.jpg"
+          : "/custom-engineering/metal-stock.jpg",
+        category.kind === "mini-index" || category.kind === "mini-section"
+          ? "Classic Mini at M-Machine"
+          : "Engineering metal stock at M-Machine"
+      ),
     },
   };
 }
@@ -85,7 +94,7 @@ export default async function CategoryPage({ params }: PageProps) {
         name: "Are prices final?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Prices are shown from the current catalogue data where available. The team confirms availability, carriage and final invoice details before payment.",
+          text: "Prices are shown from the current catalogue data where available. We confirm availability, carriage and final invoice details before payment.",
         },
       },
     ],
@@ -164,6 +173,26 @@ export default async function CategoryPage({ params }: PageProps) {
         <Link href="/contact" className="text-sm font-semibold text-racing hover:text-gold">
           Request a quote
         </Link>
+      </section>
+
+      <section className="mt-10 border-t border-racing/10 pt-8">
+        <h2 className="font-display text-2xl text-racing">Ordering questions</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <article>
+            <h3 className="font-semibold text-racing">Can I order these parts online?</h3>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">
+              Add items to your order request, or contact us with the part number, size or specification.
+              We confirm the details directly before payment.
+            </p>
+          </article>
+          <article>
+            <h3 className="font-semibold text-racing">Are prices final?</h3>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">
+              Prices come from the current catalogue where available. We confirm availability, carriage and
+              the final invoice before asking for payment.
+            </p>
+          </article>
+        </div>
       </section>
     </div>
   );

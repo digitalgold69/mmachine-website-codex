@@ -8,11 +8,12 @@ export default function ContactForm() {
   const searchParams = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const product = searchParams.get("product") || "";
   const sku = searchParams.get("sku") || "";
   const category = searchParams.get("category") || "";
-  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+  const pageUrl = searchParams.get("page") || "";
 
   const defaultMessage = product
     ? `Please can you help with this item?\n\nProduct: ${product}${sku ? `\nPart number / SKU: ${sku}` : ""}${category ? `\nCategory: ${category}` : ""}\nPage: ${pageUrl}`
@@ -21,6 +22,7 @@ export default function ContactForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
     const formData = new FormData(e.currentTarget);
     try {
       const res = await fetch("/api/enquiry", {
@@ -28,9 +30,11 @@ export default function ContactForm() {
         body: JSON.stringify(Object.fromEntries(formData)),
         headers: { "Content-Type": "application/json" },
       });
-      if (res.ok) setSubmitted(true);
-    } catch {
-      alert("Something went wrong - please call us on 01325 381302.");
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Your message could not be sent.");
+      setSubmitted(true);
+    } catch (err) {
+      setError((err as Error).message || "Your message could not be sent. Please call 01325 381302.");
     } finally {
       setLoading(false);
     }
@@ -44,9 +48,9 @@ export default function ContactForm() {
             <path d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="font-display text-3xl text-racing mb-3">Thanks - message received</h1>
+        <h2 className="font-display text-3xl text-racing mb-3">Thanks - message received</h2>
         <p className="text-ink-muted mb-6">
-          One of the team will come back to you within one working day. For urgent matters, call 01325 381302.
+          One of the team will get back to you. For urgent matters, call 01325 381302.
         </p>
         <Link href="/" className="btn-primary">Back to homepage</Link>
       </div>
@@ -89,7 +93,7 @@ export default function ContactForm() {
         </div>
         <div className="bg-cream-dark rounded-lg p-4 border-l-4 border-gold">
           <p className="text-xs text-ink-muted">
-            We do not take payment online. The team confirms availability, carriage and invoice details directly.
+            We do not take payment online. We confirm availability, carriage and invoice details with you directly.
           </p>
         </div>
       </aside>
@@ -108,19 +112,23 @@ export default function ContactForm() {
         <input type="hidden" name="sku" value={sku} />
         <input type="hidden" name="category" value={category} />
         <input type="hidden" name="pageUrl" value={pageUrl} />
+        <div className="sr-only" aria-hidden="true">
+          <label htmlFor="contact-website">Website</label>
+          <input id="contact-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+        </div>
 
         <div className="grid sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="label" htmlFor="contact-name">Your name *</label>
-            <input id="contact-name" name="name" required className="input" />
+            <input id="contact-name" name="name" required autoComplete="name" className="input" />
           </div>
           <div>
             <label className="label" htmlFor="contact-email">Email *</label>
-            <input id="contact-email" name="email" type="email" required className="input" />
+            <input id="contact-email" name="email" type="email" required autoComplete="email" className="input" />
           </div>
           <div>
             <label className="label" htmlFor="contact-phone">Phone</label>
-            <input id="contact-phone" name="phone" type="tel" className="input" />
+            <input id="contact-phone" name="phone" type="tel" autoComplete="tel" className="input" />
           </div>
           <div>
             <label className="label" htmlFor="contact-type">Enquiry type</label>
@@ -132,6 +140,11 @@ export default function ContactForm() {
             </select>
           </div>
         </div>
+        {error && (
+          <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
         <div className="mb-4">
           <label className="label" htmlFor="contact-message">Message *</label>
           <textarea
@@ -146,7 +159,7 @@ export default function ContactForm() {
         </div>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-ink-muted">
-            We will never share your details.
+            We only use your details to respond to this enquiry.
           </p>
           <button type="submit" disabled={loading} className="btn-primary">
             {loading ? "Sending..." : "Send enquiry"}

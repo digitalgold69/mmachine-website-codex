@@ -4,7 +4,15 @@ import { products, sections, type Product, type Section } from "@/lib/mini-data"
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk";
 
 export const SITE_URL = configuredSiteUrl.replace(/\/+$/, "");
-export const DEFAULT_OG_IMAGE = "/og-image.jpg";
+export const DEFAULT_OG_IMAGE = "/custom-engineering/custom-fabrication-cam.jpg";
+export const IS_PREVIEW_DEPLOYMENT = (() => {
+  try {
+    const hostname = new URL(SITE_URL).hostname;
+    return hostname.endsWith(".workers.dev") || hostname.endsWith(".vercel.app");
+  } catch {
+    return true;
+  }
+})();
 
 export type SeoProduct =
   | { kind: "mini"; product: Product }
@@ -48,6 +56,10 @@ export function absoluteUrl(path = "/") {
   return new URL(path, SITE_URL).toString();
 }
 
+export function openGraphImage(path = DEFAULT_OG_IMAGE, alt = "M-Machine engineering and fabrication") {
+  return [{ url: absoluteUrl(path), alt }];
+}
+
 export function slugify(value: string) {
   return value
     .toLowerCase()
@@ -63,6 +75,13 @@ export function miniSectionSlug(section: Section) {
 
 export function metalCategorySlug(category: { key: string; label: string }) {
   return `metals-${slugify(category.label || category.key)}`;
+}
+
+function miniSectionTitle(section: Section) {
+  const label = section.label.toLowerCase().replace(/\s*&\s*/g, " and ");
+  if (label === "side repairs") return "Classic Mini side repair panels";
+  if (/panel|doors|wings|subframes|accessories/.test(label)) return `Classic Mini ${label}`;
+  return `Classic Mini ${label} panels`;
 }
 
 export function productSlug(item: SeoProduct) {
@@ -93,12 +112,13 @@ export function getAllSeoCategories(): SeoCategory[] {
     },
     ...sections.map((section): SeoCategory => {
       const sectionProducts = products.filter((product) => product.section === section.code);
+      const title = miniSectionTitle(section);
       return {
         kind: "mini-section",
         slug: miniSectionSlug(section),
         section,
-        title: `Classic Mini ${section.label.toLowerCase()} panels`,
-        description: `${section.label} parts for Classic Mini restoration, including ${section.subtitle.toLowerCase()}.`,
+        title,
+        description: `${title} for restoration and repair, including ${section.subtitle.toLowerCase()}.`,
         products: sectionProducts,
       };
     }),
@@ -175,7 +195,9 @@ export function productCategory(item: SeoProduct) {
 export function productMetaDescription(item: SeoProduct) {
   if (item.kind === "mini") {
     const section = productCategory(item);
-    const fits = [item.product.fits, item.product.mark, item.product.bodyType].filter(Boolean).join(", ");
+    const fits = Array.from(
+      new Set([item.product.fits, item.product.mark, item.product.bodyType].filter((value): value is string => Boolean(value)))
+    ).join(", ");
     return `${item.product.name}${item.product.code ? ` (${item.product.code})` : ""}, listed in ${section?.title || "Classic Mini panels"}. ${fits ? `Fits: ${fits}. ` : ""}Request a quote from M-Machine.`;
   }
 

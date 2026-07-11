@@ -6,7 +6,7 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
 
-const escapeHtml = (value: string | number | null | undefined) =>
+export const escapeHtml = (value: string | number | null | undefined) =>
   String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -226,6 +226,7 @@ function invoiceRows(items: QuoteItem[]) {
 
 export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
   const totals = quoteTotals(quote);
+  const vatRegistrationNumber = process.env.VAT_REGISTRATION_NUMBER?.trim();
   return `
     <div style="margin:0;background:#fbf8f1;padding:28px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
       <div style="max-width:780px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:14px;overflow:hidden">
@@ -289,7 +290,13 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
           </table>
 
           <p style="margin:24px 0 0;line-height:1.55">Please contact us on 01325 381302 to confirm the order and arrange payment.</p>
-          <p style="margin:18px 0 0;color:#0f3d2e;font-weight:700">M-Machine</p>
+          <div style="margin:24px 0 0;padding-top:18px;border-top:1px solid #eadfca;font-size:12px;line-height:1.6;color:#6b5a46">
+            <strong style="display:block;color:#0f3d2e">M-Machine / Craftgrange Limited</strong>
+            Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br>
+            Metals &amp; Engineering: 01325 381302 &nbsp; Mini Pressings &amp; Accounts: 01325 381300<br>
+            sales@m-machine.co.uk &nbsp; Company no. 01476185
+            ${vatRegistrationNumber ? `<br>VAT registration no. ${escapeHtml(vatRegistrationNumber)}` : ""}
+          </div>
         </div>
       </div>
     </div>
@@ -297,6 +304,39 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
 }
 
 export const buildCustomerQuoteEmail = buildCustomerInvoiceEmail;
+
+export function buildOwnerEnquiryEmail(enquiry: {
+  name: string;
+  email: string;
+  phone?: string;
+  type?: string;
+  message: string;
+  product?: string;
+  sku?: string;
+  category?: string;
+  pageUrl?: string;
+}) {
+  const productDetails = enquiry.product
+    ? `
+      <div style="margin:18px 0;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#fbf8f1">
+        <strong style="display:block;color:#0f3d2e;margin-bottom:8px">Product enquiry</strong>
+        <div><strong>Product:</strong> ${escapeHtml(enquiry.product)}</div>
+        ${enquiry.sku ? `<div><strong>Part number / SKU:</strong> ${escapeHtml(enquiry.sku)}</div>` : ""}
+        ${enquiry.category ? `<div><strong>Category:</strong> ${escapeHtml(enquiry.category)}</div>` : ""}
+        ${enquiry.pageUrl ? `<div><strong>Page:</strong> <a href="${escapeHtml(enquiry.pageUrl)}">${escapeHtml(enquiry.pageUrl)}</a></div>` : ""}
+      </div>`
+    : "";
+
+  return `
+    <h2 style="color:#0f3d2e">New M-Machine website enquiry</h2>
+    <p><strong>Name:</strong> ${escapeHtml(enquiry.name)}</p>
+    <p><strong>Email:</strong> ${escapeHtml(enquiry.email)}</p>
+    <p><strong>Phone:</strong> ${escapeHtml(enquiry.phone || "Not supplied")}</p>
+    <p><strong>Enquiry type:</strong> ${escapeHtml(enquiry.type || "General question")}</p>
+    ${productDetails}
+    <div style="margin-top:18px"><strong>Message:</strong><br>${escapeHtml(enquiry.message).replace(/\n/g, "<br>")}</div>
+  `;
+}
 
 export async function sendQuoteEmail(opts: {
   to: string;
@@ -311,24 +351,31 @@ export async function sendQuoteEmail(opts: {
     return { ok: false, skipped: true, error: "Email sending is unavailable" };
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: opts.to,
-      subject: opts.subject,
-      html: opts.html,
-      reply_to: opts.replyTo,
-    }),
-  });
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        reply_to: opts.replyTo,
+      }),
+    });
 
-  if (!res.ok) {
-    return { ok: false, skipped: false, error: await res.text() };
+    if (!res.ok) {
+      return { ok: false, skipped: false, error: await res.text() };
+    }
+
+    return { ok: true, skipped: false, error: null };
+  } catch (error) {
+    console.error("email_delivery_failed", {
+      error: error instanceof Error ? error.message : "unknown error",
+    });
+    return { ok: false, skipped: false, error: "Email delivery request failed" };
   }
-
-  return { ok: true, skipped: false, error: null };
 }

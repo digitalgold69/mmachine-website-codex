@@ -131,6 +131,8 @@ export async function saveFeaturedEntry(input: {
   const current = await getFeaturedRow(id);
   let imageUrl = current?.image_url || null;
   let imagePath = current?.image_path || null;
+  const previousImagePath = current?.image_path || null;
+  let uploadedImagePath: string | null = null;
 
   if (input.imageDataUrl) {
     const ext = extFromDataUrl(input.imageDataUrl);
@@ -142,7 +144,8 @@ export async function saveFeaturedEntry(input: {
     }
 
     const bucket = await getFeaturedImagesBucket();
-    imagePath = `${id}.${ext}`;
+    imagePath = `${id}-${Date.now()}.${ext}`;
+    uploadedImagePath = imagePath;
     imageUrl = null;
     await bucket.put(imagePath, bytes, {
       httpMetadata: { contentType: contentTypeFromExt(ext) },
@@ -195,10 +198,28 @@ export async function saveFeaturedEntry(input: {
     )
     .run();
 
-  if (result.error) throw new Error(`D1 featured_work save failed: ${result.error}`);
+  if (result.error) {
+    if (uploadedImagePath) {
+      try {
+        const bucket = await getFeaturedImagesBucket();
+        await bucket.delete(uploadedImagePath);
+      } catch {
+        // The database error is the useful failure to report.
+      }
+    }
+    throw new Error(`D1 featured_work save failed: ${result.error}`);
+  }
 
   const saved = await getFeaturedRow(id);
   if (!saved) throw new Error("D1 featured_work save failed: saved row could not be read.");
+  if (previousImagePath && previousImagePath !== imagePath) {
+    try {
+      const bucket = await getFeaturedImagesBucket();
+      await bucket.delete(previousImagePath);
+    } catch {
+      // The new database row and image are already valid; stale cleanup can wait.
+    }
+  }
   return workToEntry(rowToWork(saved));
 }
 

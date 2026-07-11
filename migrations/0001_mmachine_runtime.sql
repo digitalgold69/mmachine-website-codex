@@ -13,6 +13,8 @@ create table if not exists quote_requests (
   quoted_at text,
   invoice_sent_at text,
   paid_at text,
+  paid_month_uk text,
+  total_ex_vat real,
   customer_email_sent_at text,
   owner_email_sent_at text
 );
@@ -25,6 +27,12 @@ on quote_requests (status);
 
 create index if not exists quote_requests_paid_at_idx
 on quote_requests (paid_at desc);
+
+create index if not exists quote_requests_status_paid_at_idx
+on quote_requests (status, paid_at desc);
+
+create index if not exists quote_requests_paid_month_uk_idx
+on quote_requests (status, paid_month_uk);
 
 create table if not exists featured_work (
   id text primary key,

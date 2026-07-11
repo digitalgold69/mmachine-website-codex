@@ -53,7 +53,9 @@ export function verifySessionToken(token: string | undefined): boolean {
   } catch {
     return false;
   }
-  if (signature !== expected) return false;
+  const supplied = Buffer.from(signature, "hex");
+  const wanted = Buffer.from(expected, "hex");
+  if (supplied.length !== wanted.length || !crypto.timingSafeEqual(supplied, wanted)) return false;
   const issuedAt = parseInt(payload, 10);
   if (!Number.isFinite(issuedAt)) return false;
   const ageMs = Date.now() - issuedAt;

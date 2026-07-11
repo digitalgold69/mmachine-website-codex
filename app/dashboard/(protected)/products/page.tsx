@@ -1,517 +1,111 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { products as initialProducts, sections } from "@/lib/mini-data";
-import type { Product, StockLevel } from "@/lib/mini-data";
-import { metalCategories, metals as initialMetals } from "@/lib/metals-data";
-import type { MetalProduct } from "@/lib/metals-data";
-
-const GBP = "\u00a3";
+import { products, sections } from "@/lib/mini-data";
+import { metalCategories, metals } from "@/lib/metals-data";
 
 type Catalogue = "mini" | "metals";
-type Editing =
-  | { catalogue: "mini"; item: Product }
-  | { catalogue: "metals"; item: MetalProduct };
 
 export default function DashboardProductsPage() {
-  const [miniItems, setMiniItems] = useState<Product[]>(initialProducts);
-  const [metalItems, setMetalItems] = useState<MetalProduct[]>(initialMetals);
   const [catalogue, setCatalogue] = useState<Catalogue>("mini");
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [stockFilter, setStockFilter] = useState("all");
-  const [editing, setEditing] = useState<Editing | null>(null);
-  const [limit, setLimit] = useState(30);
+  const [category, setCategory] = useState("all");
+  const [limit, setLimit] = useState(40);
 
-  const miniFiltered = useMemo(() => {
-    let list = miniItems;
-    if (categoryFilter !== "all") list = list.filter((p) => p.section === categoryFilter);
-    if (stockFilter !== "all") list = list.filter((p) => p.stock === stockFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.fits.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [miniItems, categoryFilter, stockFilter, search]);
+  const miniRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter((product) =>
+      (category === "all" || product.section === category) &&
+      (!query || [product.code, product.name, product.fits].join(" ").toLowerCase().includes(query))
+    );
+  }, [category, search]);
 
-  const metalFiltered = useMemo(() => {
-    let list = metalItems;
-    if (categoryFilter !== "all") list = list.filter((p) => p.category === categoryFilter);
-    if (stockFilter !== "all") list = list.filter((p) => p.stock === stockFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.form.toLowerCase().includes(q) ||
-          p.metal.toLowerCase().includes(q) ||
-          p.spec.toLowerCase().includes(q) ||
-          p.size.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [metalItems, categoryFilter, stockFilter, search]);
+  const metalRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return metals.filter((product) =>
+      (category === "all" || product.category === category) &&
+      (!query || [product.code, product.form, product.metal, product.spec, product.size, product.unit]
+        .join(" ")
+        .toLowerCase()
+        .includes(query))
+    );
+  }, [category, search]);
 
-  const filteredCount = catalogue === "mini" ? miniFiltered.length : metalFiltered.length;
-  const totalCount = catalogue === "mini" ? miniItems.length : metalItems.length;
+  const rows = catalogue === "mini" ? miniRows : metalRows;
+  const total = catalogue === "mini" ? products.length : metals.length;
 
   function switchCatalogue(next: Catalogue) {
     setCatalogue(next);
     setSearch("");
-    setCategoryFilter("all");
-    setStockFilter("all");
-    setLimit(30);
-    setEditing(null);
-  }
-
-  function saveMini(updated: Product) {
-    setMiniItems((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-    setEditing(null);
-  }
-
-  function saveMetal(updated: MetalProduct) {
-    setMetalItems((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-    setEditing(null);
-  }
-
-  if (editing?.catalogue === "mini") {
-    return <EditMiniForm product={editing.item} onSave={saveMini} onCancel={() => setEditing(null)} />;
-  }
-
-  if (editing?.catalogue === "metals") {
-    return <EditMetalForm product={editing.item} onSave={saveMetal} onCancel={() => setEditing(null)} />;
+    setCategory("all");
+    setLimit(40);
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="font-display text-3xl text-racing">Products</h1>
-          <p className="text-ink-muted text-sm">
-            {filteredCount.toLocaleString()} of {totalCount.toLocaleString()} {catalogue === "mini" ? "Mini panel" : "metal"} lines
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="font-display text-3xl text-racing">Catalogue lookup</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          Check the product details and prices currently shown on the website.
+        </p>
+      </div>
+
+      <div className="mb-5 rounded-xl border-l-4 border-gold bg-cream-dark p-4 text-sm leading-6 text-racing">
+        To change a price or product, edit the usual master spreadsheet on the M-Machine computer and run the
+        M-Machine sync. This page is for checking the result; it does not change the master files.
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-racing/10 bg-white p-1">
-        <button
-          type="button"
-          onClick={() => switchCatalogue("mini")}
-          className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "mini" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}
-        >
-          Mini panels ({miniItems.length.toLocaleString()})
+        <button type="button" onClick={() => switchCatalogue("mini")} aria-pressed={catalogue === "mini"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "mini" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
+          Mini panels ({products.length.toLocaleString("en-GB")})
         </button>
-        <button
-          type="button"
-          onClick={() => switchCatalogue("metals")}
-          className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "metals" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}
-        >
-          Metals ({metalItems.length.toLocaleString()})
+        <button type="button" onClick={() => switchCatalogue("metals")} aria-pressed={catalogue === "metals"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "metals" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
+          Metals ({metals.length.toLocaleString("en-GB")})
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-racing/10 p-4 mb-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_220px_180px]">
-          <input
-            type="search"
-            placeholder={catalogue === "mini" ? "Search code, name, or fitment..." : "Search shape, metal, spec, size, or code..."}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setLimit(30);
-            }}
-            className="input"
-          />
-          <select
-            className="input"
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setLimit(30);
-            }}
-          >
-            <option value="all">{catalogue === "mini" ? "All sections" : "All metal categories"}</option>
-            {catalogue === "mini"
-              ? sections.map((s) => <option key={s.code} value={s.code}>{s.code} - {s.label}</option>)
-              : metalCategories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-          </select>
-          <select
-            className="input"
-            value={stockFilter}
-            onChange={(e) => {
-              setStockFilter(e.target.value);
-              setLimit(30);
-            }}
-          >
-            <option value="all">All stock</option>
-            <option value="in">In stock</option>
-            <option value="low">Low stock</option>
-            <option value="out">Out of stock</option>
-          </select>
+      <div className="mb-4 rounded-xl border border-racing/10 bg-white p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+          <div>
+            <label htmlFor="catalogue-search" className="label">Search catalogue</label>
+            <input id="catalogue-search" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setLimit(40); }} placeholder={catalogue === "mini" ? "Part number or description" : "Shape, metal, spec or size"} className="input" />
+          </div>
+          <div>
+            <label htmlFor="catalogue-category" className="label">Category</label>
+            <select id="catalogue-category" value={category} onChange={(event) => { setCategory(event.target.value); setLimit(40); }} className="input">
+              <option value="all">{catalogue === "mini" ? "All Mini sections" : "All metal categories"}</option>
+              {catalogue === "mini"
+                ? sections.map((section) => <option key={section.code} value={section.code}>{section.code} - {section.label}</option>)
+                : metalCategories.map((metal) => <option key={metal.key} value={metal.key}>{metal.label}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
-      {catalogue === "mini" ? (
-        <MiniTable
-          rows={miniFiltered.slice(0, limit)}
-          total={miniFiltered.length}
-          limit={limit}
-          onMore={() => setLimit(limit + 30)}
-          onEdit={(item) => setEditing({ catalogue: "mini", item })}
-        />
-      ) : (
-        <MetalTable
-          rows={metalFiltered.slice(0, limit)}
-          total={metalFiltered.length}
-          limit={limit}
-          onMore={() => setLimit(limit + 30)}
-          onEdit={(item) => setEditing({ catalogue: "metals", item })}
-        />
-      )}
-
-      <p className="text-xs text-ink-muted mt-4">
-        Product edits here are dashboard-side edits. The production source of truth remains the uploaded master spreadsheets.
-      </p>
-    </div>
-  );
-}
-
-function MiniTable({
-  rows,
-  total,
-  limit,
-  onMore,
-  onEdit,
-}: {
-  rows: Product[];
-  total: number;
-  limit: number;
-  onMore: () => void;
-  onEdit: (item: Product) => void;
-}) {
-  return (
-    <ProductShell total={total} shown={rows.length} limit={limit} onMore={onMore}>
-      <table className="w-full min-w-[860px]">
-        <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
-          <tr>
-            <th className="text-left px-4 py-3">Code</th>
-            <th className="text-left px-4 py-3">Name</th>
-            <th className="text-left px-4 py-3">Section</th>
-            <th className="text-left px-4 py-3">Stock</th>
-            <th className="text-right px-4 py-3">Price ex VAT</th>
-            <th className="text-right px-4 py-3">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => {
-            const sec = sections.find((s) => s.code === p.section);
-            return (
-              <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/30">
-                <td className="px-4 py-3 font-mono text-xs text-ink-muted whitespace-nowrap">{p.code}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-racing">{p.name}</div>
-                  <div className="text-xs text-ink-muted">{p.fits}</div>
-                </td>
-                <td className="px-4 py-3 text-sm text-ink-muted">
-                  <span className="font-mono text-xs bg-cream-dark px-2 py-0.5 rounded mr-2">{p.section}</span>
-                  {sec?.label}
-                </td>
-                <td className="px-4 py-3"><StockBadge stock={p.stock} qty={p.stockQty} /></td>
-                <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap">{money(p.priceExVat)}</td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => onEdit(p)} className="btn-secondary text-xs py-1 px-3">Edit</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </ProductShell>
-  );
-}
-
-function MetalTable({
-  rows,
-  total,
-  limit,
-  onMore,
-  onEdit,
-}: {
-  rows: MetalProduct[];
-  total: number;
-  limit: number;
-  onMore: () => void;
-  onEdit: (item: MetalProduct) => void;
-}) {
-  return (
-    <ProductShell total={total} shown={rows.length} limit={limit} onMore={onMore}>
-      <table className="w-full min-w-[960px]">
-        <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
-          <tr>
-            <th className="text-left px-4 py-3">Shape</th>
-            <th className="text-left px-4 py-3">Metal</th>
-            <th className="text-left px-4 py-3">Spec</th>
-            <th className="text-left px-4 py-3">Size</th>
-            <th className="text-left px-4 py-3">Unit</th>
-            <th className="text-right px-4 py-3">Price ex VAT</th>
-            <th className="text-right px-4 py-3">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/30">
-              <td className="px-4 py-3 font-medium text-racing">{p.form}</td>
-              <td className="px-4 py-3">{p.metal}</td>
-              <td className="px-4 py-3">{p.spec}</td>
-              <td className="px-4 py-3">{p.size}</td>
-              <td className="px-4 py-3">{p.unit}</td>
-              <td className="px-4 py-3 text-right font-semibold text-racing whitespace-nowrap">{money(p.priceExVat)}</td>
-              <td className="px-4 py-3 text-right">
-                <button onClick={() => onEdit(p)} className="btn-secondary text-xs py-1 px-3">Edit</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </ProductShell>
-  );
-}
-
-function ProductShell({
-  children,
-  total,
-  shown,
-  limit,
-  onMore,
-}: {
-  children: React.ReactNode;
-  total: number;
-  shown: number;
-  limit: number;
-  onMore: () => void;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-racing/10 overflow-hidden">
-      <div className="overflow-x-auto">
-        {shown === 0 ? (
-          <div className="text-center py-12 text-ink-muted">No products match these filters.</div>
-        ) : (
-          children
-        )}
-      </div>
-      {shown < total && (
-        <div className="bg-cream-dark border-t border-racing/10 p-4 text-center">
-          <button onClick={onMore} className="btn-secondary text-sm">
-            Show more ({Math.max(0, total - limit)} remaining)
-          </button>
+      <div className="overflow-hidden rounded-xl border border-racing/10 bg-white">
+        <div className="border-b border-racing/10 bg-cream-dark px-4 py-3 text-sm text-ink-muted">
+          Showing {Math.min(limit, rows.length).toLocaleString("en-GB")} of {rows.length.toLocaleString("en-GB")} matching lines ({total.toLocaleString("en-GB")} total)
         </div>
-      )}
-    </div>
-  );
-}
-
-function EditMiniForm({
-  product,
-  onSave,
-  onCancel,
-}: {
-  product: Product;
-  onSave: (p: Product) => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState(product);
-  const update = <K extends keyof Product>(field: K, value: Product[K]) => setForm({ ...form, [field]: value });
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const priceIncVat = typeof form.priceExVat === "number" ? Math.round(form.priceExVat * 1.2 * 100) / 100 : null;
-    onSave({ ...form, priceIncVat });
-  }
-
-  return (
-    <ProductFormShell title="Edit Mini panel" onCancel={onCancel} onSubmit={handleSubmit}>
-      <div>
-        <label className="label">Product code</label>
-        <input className="input" value={form.code} onChange={(e) => update("code", e.target.value)} required />
-      </div>
-      <div>
-        <label className="label">Section</label>
-        <select className="input" value={form.section} onChange={(e) => update("section", e.target.value)}>
-          {sections.map((s) => <option key={s.code} value={s.code}>{s.code} - {s.label}</option>)}
-        </select>
-      </div>
-      <div className="sm:col-span-2">
-        <label className="label">Product name</label>
-        <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} required />
-      </div>
-      <div className="sm:col-span-2">
-        <label className="label">Fits / applicability</label>
-        <input className="input" value={form.fits} onChange={(e) => update("fits", e.target.value)} />
-      </div>
-      <MiniStockFields form={form} update={update} />
-    </ProductFormShell>
-  );
-}
-
-function EditMetalForm({
-  product,
-  onSave,
-  onCancel,
-}: {
-  product: MetalProduct;
-  onSave: (p: MetalProduct) => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState(product);
-  const update = <K extends keyof MetalProduct>(field: K, value: MetalProduct[K]) => setForm({ ...form, [field]: value });
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const priceIncVat = typeof form.priceExVat === "number" ? Math.round(form.priceExVat * 1.2 * 100) / 100 : null;
-    onSave({ ...form, priceIncVat, pricePerKg: form.priceExVat, description: form.name });
-  }
-
-  return (
-    <ProductFormShell title="Edit metal line" onCancel={onCancel} onSubmit={handleSubmit}>
-      <div>
-        <label className="label">Shape</label>
-        <input className="input" value={form.form} onChange={(e) => update("form", e.target.value)} required />
-      </div>
-      <div>
-        <label className="label">Metal</label>
-        <input className="input" value={form.metal} onChange={(e) => update("metal", e.target.value)} required />
-      </div>
-      <div>
-        <label className="label">Spec</label>
-        <input className="input" value={form.spec} onChange={(e) => update("spec", e.target.value)} />
-      </div>
-      <div>
-        <label className="label">Size</label>
-        <input className="input" value={form.size} onChange={(e) => update("size", e.target.value)} required />
-      </div>
-      <div>
-        <label className="label">Unit</label>
-        <input className="input" value={form.unit} onChange={(e) => update("unit", e.target.value)} />
-      </div>
-      <div>
-        <label className="label">Category</label>
-        <select className="input" value={form.category} onChange={(e) => update("category", e.target.value)}>
-          {metalCategories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="label">Price ex VAT ({GBP})</label>
-        <input
-          type="number"
-          step="0.01"
-          className="input"
-          value={form.priceExVat ?? ""}
-          onChange={(e) => update("priceExVat", e.target.value ? Number(e.target.value) : null)}
-        />
-      </div>
-      <div>
-        <label className="label">Stock status</label>
-        <select className="input" value={form.stock} onChange={(e) => update("stock", e.target.value as MetalProduct["stock"])}>
-          <option value="in">In stock</option>
-          <option value="low">Low stock</option>
-          <option value="out">Out of stock</option>
-        </select>
-      </div>
-      <div className="sm:col-span-2">
-        <label className="label">Display name</label>
-        <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} required />
-      </div>
-    </ProductFormShell>
-  );
-}
-
-function ProductFormShell({
-  title,
-  children,
-  onCancel,
-  onSubmit,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onCancel: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-}) {
-  return (
-    <div>
-      <button onClick={onCancel} className="text-sm text-ink-muted hover:text-racing mb-3">Back to products</button>
-      <h1 className="font-display text-3xl text-racing mb-6">{title}</h1>
-
-      <form onSubmit={onSubmit} className="bg-white rounded-xl border border-racing/10 p-6 max-w-4xl">
-        <div className="grid sm:grid-cols-2 gap-4">{children}</div>
-        <div className="flex gap-3 mt-6 pt-6 border-t border-racing/10">
-          <button type="submit" className="btn-primary">Save changes</button>
-          <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <div className="overflow-x-auto">
+          {catalogue === "mini" ? (
+            <table className="w-full min-w-[760px]">
+              <thead className="text-xs uppercase tracking-wider text-ink-muted"><tr><th className="px-4 py-3 text-left">Part no.</th><th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-left">Section</th><th className="px-4 py-3 text-right">Ex VAT</th><th className="px-4 py-3 text-right">Inc VAT</th></tr></thead>
+              <tbody>{miniRows.slice(0, limit).map((product) => <tr key={product.id} className="border-t border-racing/5"><td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-racing">{product.code}</td><td className="px-4 py-3"><div className="font-medium text-racing">{product.name}</div><div className="text-xs text-ink-muted">{product.fits}</div></td><td className="px-4 py-3 text-sm text-ink-muted">{product.section}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceExVat)}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceIncVat)}</td></tr>)}</tbody>
+            </table>
+          ) : (
+            <table className="w-full min-w-[920px]">
+              <thead className="text-xs uppercase tracking-wider text-ink-muted"><tr><th className="px-4 py-3 text-left">Shape</th><th className="px-4 py-3 text-left">Metal</th><th className="px-4 py-3 text-left">Spec.</th><th className="px-4 py-3 text-left">Size</th><th className="px-4 py-3 text-left">Unit</th><th className="px-4 py-3 text-right">Ex VAT</th><th className="px-4 py-3 text-right">Inc VAT</th></tr></thead>
+              <tbody>{metalRows.slice(0, limit).map((product) => <tr key={product.id} className="border-t border-racing/5"><td className="px-4 py-3 font-medium text-racing">{product.form}</td><td className="px-4 py-3">{product.metal}</td><td className="px-4 py-3 text-ink-muted">{product.spec || "-"}</td><td className="px-4 py-3">{product.size}</td><td className="whitespace-nowrap px-4 py-3 text-ink-muted">{product.unit}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceExVat)}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceIncVat)}</td></tr>)}</tbody>
+            </table>
+          )}
+          {rows.length === 0 && <div className="px-4 py-12 text-center text-sm text-ink-muted">No catalogue lines match that search.</div>}
         </div>
-      </form>
+        {limit < rows.length && <div className="border-t border-racing/10 bg-cream-dark p-4 text-center"><button type="button" onClick={() => setLimit((value) => value + 40)} className="btn-secondary text-sm">Show more ({rows.length - limit} remaining)</button></div>}
+      </div>
     </div>
-  );
-}
-
-function MiniStockFields({
-  form,
-  update,
-}: {
-  form: Product;
-  update: <K extends keyof Product>(field: K, value: Product[K]) => void;
-}) {
-  return (
-    <>
-      <div>
-        <label className="label">Price ex VAT ({GBP})</label>
-        <input
-          type="number"
-          step="0.01"
-          className="input"
-          value={form.priceExVat ?? ""}
-          onChange={(e) => update("priceExVat", e.target.value ? Number(e.target.value) : null)}
-        />
-      </div>
-      <div>
-        <label className="label">Stock quantity</label>
-        <input
-          type="number"
-          className="input"
-          value={form.stockQty}
-          onChange={(e) => {
-            const qty = Number(e.target.value) || 0;
-            update("stockQty", qty);
-            if (qty === 0) update("stock", "out" as StockLevel);
-            else if (qty < 4) update("stock", "low" as StockLevel);
-            else update("stock", "in" as StockLevel);
-          }}
-        />
-      </div>
-      <div>
-        <label className="label">Stock status</label>
-        <select className="input" value={form.stock} onChange={(e) => update("stock", e.target.value as StockLevel)}>
-          <option value="in">In stock</option>
-          <option value="low">Low stock</option>
-          <option value="out">Out of stock</option>
-        </select>
-      </div>
-    </>
-  );
-}
-
-function StockBadge({ stock, qty }: { stock: StockLevel; qty?: number }) {
-  return (
-    <span className={`stock-badge stock-${stock}`}>
-      {stock === "in" ? `In${typeof qty === "number" ? ` (${qty})` : ""}` : stock === "low" ? `Low${typeof qty === "number" ? ` (${qty})` : ""}` : "Out"}
-    </span>
   );
 }
 
 function money(value: number | null | undefined) {
-  return typeof value === "number" ? `${GBP}${value.toFixed(2)}` : <span className="text-xs italic">POA</span>;
+  return typeof value === "number" ? `\u00a3${value.toFixed(2)}` : "POA";
 }

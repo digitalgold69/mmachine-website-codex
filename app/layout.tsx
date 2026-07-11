@@ -1,7 +1,19 @@
 import type { Metadata } from "next";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import QuoteCartProvider from "@/components/QuoteCart";
-import { SITE_URL, jsonLdScript } from "@/lib/seo";
+import { DEFAULT_OG_IMAGE, IS_PREVIEW_DEPLOYMENT, SITE_URL, absoluteUrl, jsonLdScript } from "@/lib/seo";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -30,21 +42,23 @@ export const metadata: Metadata = {
     title: "M-Machine | Classic Mini Panels & Engineering Metals",
     description:
       "Four decades supplying classic Mini panels, engineering metals and bespoke fabrication from our Darlington workshop.",
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1600, height: 1200, alt: "Custom engineering work at M-Machine" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "M-Machine | Classic Mini Panels & Engineering Metals",
     description:
       "Classic Mini panels, tool steels, stainless and bespoke fabrication. Est. 1980.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {
     icon: [{ url: "/brand/m-machine-butterfly.png", type: "image/png" }],
     apple: [{ url: "/brand/m-machine-butterfly.png" }],
   },
   robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+    index: !IS_PREVIEW_DEPLOYMENT,
+    follow: !IS_PREVIEW_DEPLOYMENT,
+    googleBot: { index: !IS_PREVIEW_DEPLOYMENT, follow: !IS_PREVIEW_DEPLOYMENT, "max-image-preview": "large" },
   },
   alternates: { canonical: SITE_URL },
 };
@@ -52,12 +66,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const organization = {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": ["Organization", "LocalBusiness"],
+    "@id": `${SITE_URL}/#business`,
     name: "M-Machine",
     legalName: "Craftgrange Limited",
     url: SITE_URL,
     email: "sales@m-machine.co.uk",
     telephone: "01325 381302",
+    logo: absoluteUrl("/brand/m-machine-butterfly.png"),
+    sameAs: ["https://www.facebook.com/p/M-Machine-61568650964800/"],
     address: {
       "@type": "PostalAddress",
       streetAddress: "Unit 6 Forge Way, Cleveland Trading Estate",
@@ -68,17 +85,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     },
   };
 
-  const localBusiness = {
-    ...organization,
-    "@type": "LocalBusiness",
-    priceRange: "\u00a3\u00a3",
-  };
-
   const website = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "M-Machine",
     url: SITE_URL,
+    publisher: { "@id": `${SITE_URL}/#business` },
     potentialAction: {
       "@type": "SearchAction",
       target: `${SITE_URL}/search/?q={search_term_string}`,
@@ -87,17 +99,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="en-GB">
+    <html lang="en-GB" className={`${inter.variable} ${playfair.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(organization)} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(localBusiness)} />
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(website)} />
       </head>
-      <body>
-        <QuoteCartProvider>{children}</QuoteCartProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

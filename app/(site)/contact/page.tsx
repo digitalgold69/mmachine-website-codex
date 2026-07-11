@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import ContactForm from "@/components/ContactForm";
-import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
+import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Contact M-Machine",
@@ -15,6 +15,7 @@ export const metadata: Metadata = {
       "Send a part enquiry, quote request or metals specification to M-Machine in Darlington.",
     url: absoluteUrl("/contact"),
     type: "website",
+    images: openGraphImage(),
   },
 };
 

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import {
+  IS_PREVIEW_DEPLOYMENT,
   SITE_URL,
   getAllSeoCategories,
   getAllSeoProducts,
@@ -7,28 +8,27 @@ import {
 } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
+  if (IS_PREVIEW_DEPLOYMENT) return [];
+
   const staticPages: MetadataRoute.Sitemap = [
-    { url: SITE_URL, lastModified, priority: 1 },
-    { url: `${SITE_URL}/parts`, lastModified, priority: 0.95 },
-    { url: `${SITE_URL}/machines/classic-mini`, lastModified, priority: 0.85 },
-    { url: `${SITE_URL}/catalogue/mini`, lastModified, priority: 0.75 },
-    { url: `${SITE_URL}/catalogue/metals`, lastModified, priority: 0.75 },
-    { url: `${SITE_URL}/custom-engineering`, lastModified, priority: 0.85 },
-    { url: `${SITE_URL}/featured`, lastModified, priority: 0.7 },
-    { url: `${SITE_URL}/about`, lastModified, priority: 0.7 },
-    { url: `${SITE_URL}/contact`, lastModified, priority: 0.7 },
+    { url: SITE_URL, priority: 1 },
+    { url: `${SITE_URL}/parts`, priority: 0.95 },
+    { url: `${SITE_URL}/machines`, priority: 0.8 },
+    { url: `${SITE_URL}/machines/classic-mini`, priority: 0.85 },
+    { url: `${SITE_URL}/custom-engineering`, priority: 0.85 },
+    { url: `${SITE_URL}/featured`, priority: 0.7 },
+    { url: `${SITE_URL}/about`, priority: 0.7 },
+    { url: `${SITE_URL}/contact`, priority: 0.7 },
+    { url: `${SITE_URL}/privacy`, priority: 0.3 },
   ];
 
   const categoryPages: MetadataRoute.Sitemap = getAllSeoCategories().map((category) => ({
     url: `${SITE_URL}/parts/${category.slug}`,
-    lastModified,
     priority: category.kind.endsWith("index") ? 0.9 : 0.82,
   }));
 
   const productPages: MetadataRoute.Sitemap = getAllSeoProducts().map((product) => ({
     url: `${SITE_URL}${productUrl(product)}`,
-    lastModified,
     priority: 0.64,
   }));
 

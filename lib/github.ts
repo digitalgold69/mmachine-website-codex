@@ -72,7 +72,8 @@ export async function readFile(path: string): Promise<FileMeta | null> {
   const res = await fetch(url, { headers: headers(), cache: "no-store" });
   if (res.status === 404) return null;
   if (!res.ok) throw helpfulGitHubError("GitHub readFile", path, res.status, await res.text());
-  const j = await res.json();
+  const j = await res.json() as { sha?: string; content?: string };
+  if (!j.sha) throw new Error(`GitHub readFile ${path} returned no file SHA.`);
   return { sha: j.sha, content: typeof j.content === "string" ? j.content : "" };
 }
 

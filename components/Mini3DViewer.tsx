@@ -685,9 +685,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointercancel", onPointerCancel);
     renderer.domElement.style.cursor = "grab";
-    // Skip 300ms tap-delay and double-tap zoom inside the canvas; OrbitControls
-    // still gets pan/zoom from the pan-x pan-y allowance.
-    renderer.domElement.style.touchAction = "pan-x pan-y";
+    // Vertical swipes keep scrolling the page; horizontal drags rotate the Mini.
+    renderer.domElement.style.touchAction = "pan-y";
 
     // --- Render scheduling --------------------------------------------------
     const observer = typeof IntersectionObserver !== "undefined"
@@ -736,11 +735,11 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-racing/10 bg-cream-dark">
-      <div ref={mountRef} className="h-[560px] w-full select-none" />
+      <div ref={mountRef} className="h-[360px] w-full select-none sm:h-[440px] lg:h-[560px]" />
 
       {/* Top-left: status chip */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <div className="bg-racing/90 text-cream px-3 py-1.5 rounded-md text-[11px] tracking-wider">
+      <div className="absolute left-4 top-16 z-10 flex gap-2 sm:top-4">
+        <div className="max-w-[calc(100vw-64px)] rounded-md bg-racing/90 px-3 py-1.5 text-[11px] tracking-wider text-cream">
           {modelStatus === "loading"     && "LOADING MODEL…"}
           {modelStatus === "placeholder" && "NO MODEL — DROP mini.glb IN /public/models/"}
           {modelStatus === "loaded"      && `${modeLabel} · DRAG TO ORBIT · CLICK TO FILTER`}
@@ -751,6 +750,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <div className="bg-white/95 rounded-lg p-1 flex border border-racing/10 shadow-sm">
           <button
+            type="button"
             onClick={() => setMode("exterior")}
             className={`px-3 py-1.5 rounded text-[11px] font-semibold tracking-wider transition-colors ${
               mode === "exterior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
@@ -759,6 +759,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
             EXTERIOR
           </button>
           <button
+            type="button"
             onClick={() => setMode("interior")}
             className={`px-3 py-1.5 rounded text-[11px] font-semibold tracking-wider transition-colors ${
               mode === "interior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
@@ -787,17 +788,18 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           <div className="text-[11px] text-ink-muted font-semibold tracking-wider">
             {selectedSection === "all" ? `CATALOGUE · ${modeLabel}` : `SECTION ${selectedSection} · ${modeLabel}`}
           </div>
-          <div className="text-base font-semibold text-racing truncate">
+          <div className="text-sm font-semibold leading-snug text-racing sm:text-base">
             {selectedSection === "all"
               ? `All panels — ${sections.length} sections. Click the Mini to filter, toggle Interior for chassis parts.`
               : currentSection ? currentSection.label : "Unknown"}
           </div>
           {currentSection && selectedSection !== "all" && (
-            <div className="text-xs text-ink-muted truncate">{currentSection.subtitle}</div>
+            <div className="text-xs text-ink-muted">{currentSection.subtitle}</div>
           )}
         </div>
         {selectedSection !== "all" && (
           <button
+            type="button"
             onClick={() => onSelect("all")}
             className="text-xs text-racing hover:text-gold underline whitespace-nowrap"
           >

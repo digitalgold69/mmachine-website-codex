@@ -179,21 +179,6 @@ function formatMonth(monthKey: string) {
   }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
 }
 
-function isInTimeFilter(quote: QuoteRequest, filter: TimeFilter) {
-  if (filter === "all") return true;
-
-  const relevantDate = new Date(historyDate(quote));
-  const todayKey = ukDateKey(new Date());
-  const quoteKey = ukDateKey(relevantDate);
-
-  if (filter === "today") return quoteKey === todayKey;
-  if (filter === "month") return quoteKey.slice(0, 7) === todayKey.slice(0, 7);
-  if (filter === "year") return quoteKey.slice(0, 4) === todayKey.slice(0, 4);
-
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  return Date.now() - relevantDate.getTime() <= sevenDays;
-}
-
 function isPaidQuote(quote: QuoteRequest) {
   return quote.status === "paid" || Boolean(quote.paidAt);
 }
@@ -204,41 +189,6 @@ function isPendingPaymentQuote(quote: QuoteRequest) {
 
 function isOpenRequestQuote(quote: QuoteRequest) {
   return !isPaidQuote(quote) && !isPendingPaymentQuote(quote) && quote.status !== "closed";
-}
-
-function quoteSearchText(quote: QuoteRequest) {
-  return [
-    quote.id,
-    statusLabel(quote.status),
-    quote.customer.name,
-    quote.customer.email,
-    quote.customer.phone,
-    quote.customer.company,
-    quote.customer.message,
-    quote.customerMessage,
-    quote.ownerNotes,
-    ...quote.items.flatMap((item) => [
-      item.code,
-      item.description,
-      item.shape,
-      item.metal,
-      item.spec,
-      item.size,
-      item.unit,
-      item.custom?.projectName,
-      item.custom?.material,
-      item.custom?.thickness,
-      item.custom?.finish,
-      item.custom?.tolerance,
-      item.custom?.deadline,
-      item.custom?.budget,
-      ...(item.custom?.services || []),
-      ...(item.custom?.files || []).map((file) => file.name),
-    ]),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
 }
 
 function StatusPill({ status }: { status: QuoteStatus }) {
@@ -405,12 +355,21 @@ export default function OrdersClient({
   initialQuotes,
   initialError,
   initialMonth = "",
+  initialHistoryCount,
+  initialMonthStats,
 }: {
   initialQuotes: QuoteRequest[];
   initialError: string;
   initialMonth?: string;
+  initialHistoryCount: number;
+  initialMonthStats: Record<string, { salesValue: number; salesCount: number }>;
 }) {
   const [quotes, setQuotes] = useState(initialQuotes);
+  const [historyRows, setHistoryRows] = useState(initialQuotes.filter(isPaidQuote));
+  const [historyCount, setHistoryCount] = useState(initialHistoryCount);
+  const [historyMonthStats, setHistoryMonthStats] = useState(initialMonthStats);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<QuoteRequest | null>(null);
   const [query, setQuery] = useState("");
@@ -422,6 +381,7 @@ export default function OrdersClient({
   const [actionNotice, setActionNotice] = useState<{ quoteId: string; tone: "success" | "error"; text: string } | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
   const invoiceRef = useRef<HTMLDivElement | null>(null);
+  const firstHistoryLoad = useRef(true);
 
   const sortedQuotes = useMemo(
     () => [...quotes].sort((a, b) => Date.parse(historyDate(b)) - Date.parse(historyDate(a))),
@@ -438,45 +398,15 @@ export default function OrdersClient({
     [sortedQuotes]
   );
 
-  const historyQuotes = useMemo(
-    () => sortedQuotes.filter(isPaidQuote),
-    [sortedQuotes]
-  );
-
-  const filteredHistoryQuotes = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return historyQuotes.filter((quote) => {
-      if (monthFilter) {
-        if (historyMonthKey(quote) !== monthFilter) return false;
-      } else if (!isInTimeFilter(quote, timeFilter)) {
-        return false;
-      }
-      if (needle && !quoteSearchText(quote).includes(needle)) return false;
-      return true;
-    });
-  }, [historyQuotes, monthFilter, query, timeFilter]);
-
   const selected = useMemo(
     () => quotes.find((quote) => quote.id === selectedId) ?? null,
     [quotes, selectedId]
   );
 
-  const pageCount = Math.max(1, Math.ceil(filteredHistoryQuotes.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(historyCount / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageQuotes = filteredHistoryQuotes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const monthStats = useMemo(() => {
-    const stats = new Map<string, { salesValue: number; salesCount: number }>();
-
-    for (const quote of filteredHistoryQuotes) {
-      const key = historyMonthKey(quote);
-      const current = stats.get(key) || { salesValue: 0, salesCount: 0 };
-      current.salesCount += 1;
-      current.salesValue += totals(quote).totalEx;
-      stats.set(key, current);
-    }
-
-    return stats;
-  }, [filteredHistoryQuotes]);
+  const pageQuotes = historyRows;
+  const monthStats = useMemo(() => new Map(Object.entries(historyMonthStats)), [historyMonthStats]);
 
   const pageGroups = useMemo(() => {
     const groups = new Map<string, { key: string; label: string; quotes: QuoteRequest[]; salesValue: number; salesCount: number }>();
@@ -498,6 +428,56 @@ export default function OrdersClient({
 
     return [...groups.values()];
   }, [monthStats, pageQuotes]);
+
+  useEffect(() => {
+    if (firstHistoryLoad.current) {
+      firstHistoryLoad.current = false;
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setHistoryLoading(true);
+      try {
+        const params = new URLSearchParams({
+          history: "paid",
+          page: String(currentPage),
+          pageSize: String(PAGE_SIZE),
+          q: query.trim(),
+          time: timeFilter,
+          month: monthFilter,
+        });
+        const response = await fetch(`/api/quote-requests?${params}`, { signal: controller.signal });
+        const data = await response.json() as {
+          error?: string;
+          quotes?: QuoteRequest[];
+          count?: number;
+          monthStats?: Record<string, { salesValue: number; salesCount: number }>;
+        };
+        if (!response.ok) throw new Error(data.error || "Order history could not be loaded.");
+        const nextRows = data.quotes || [];
+        setHistoryRows(nextRows);
+        setHistoryCount(Number(data.count || 0));
+        setHistoryMonthStats(data.monthStats || {});
+        setQuotes((current) => {
+          const byId = new Map(current.map((quote) => [quote.id, quote]));
+          nextRows.forEach((quote) => byId.set(quote.id, quote));
+          return [...byId.values()];
+        });
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setMessage((error as Error).message || "Order history could not be loaded.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      }
+    }, query.trim() ? 250 : 20);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [currentPage, historyRevision, monthFilter, query, timeFilter]);
 
   useEffect(() => {
     setPage(1);
@@ -551,8 +531,17 @@ export default function OrdersClient({
   }
 
   function updateQuote(updated: QuoteRequest) {
-    setQuotes((current) => current.map((quote) => (quote.id === updated.id ? updated : quote)));
+    setQuotes((current) => {
+      const exists = current.some((quote) => quote.id === updated.id);
+      return exists
+        ? current.map((quote) => (quote.id === updated.id ? updated : quote))
+        : [updated, ...current];
+    });
+    setHistoryRows((current) =>
+      current.map((quote) => (quote.id === updated.id ? updated : quote))
+    );
     setDraft((current) => (current?.id === updated.id ? cloneQuote(updated) : current));
+    if (isPaidQuote(updated)) setHistoryRevision((value) => value + 1);
   }
 
   async function markViewed(quote: QuoteRequest) {
@@ -562,10 +551,11 @@ export default function OrdersClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...quote, status: "reviewing" }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; quote?: QuoteRequest };
       if (!res.ok) throw new Error(data.error || "Could not mark viewed");
 
-      updateQuote(data.quote as QuoteRequest);
+      if (!data.quote) throw new Error("Could not load the updated order.");
+      updateQuote(data.quote);
       window.dispatchEvent(new Event("mmachine:new-quote-viewed"));
     } catch (err) {
       setMessage((err as Error).message || "Could not mark viewed");
@@ -589,10 +579,14 @@ export default function OrdersClient({
           markPaid: Boolean(options.markPaid),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Save failed");
+      const data = await res.json() as { error?: string; quote?: QuoteRequest };
+      if (!res.ok) {
+        if (data.quote) updateQuote(data.quote);
+        throw new Error(data.error || "Save failed");
+      }
 
-      const updated = data.quote as QuoteRequest;
+      if (!data.quote) throw new Error("Save completed without returning the order.");
+      const updated = data.quote;
       updateQuote(updated);
       const text = options.markPaid
         ? "Order marked as paid."
@@ -627,10 +621,13 @@ export default function OrdersClient({
   }
 
   const draftTotals = draft ? totals(draft) : null;
+  const invoiceReady = draft
+    ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
+    : false;
   const draftFiles = draft ? customFiles(draft) : [];
   const isSaving = Boolean(savingAction);
-  const showingFrom = filteredHistoryQuotes.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const showingTo = Math.min(currentPage * PAGE_SIZE, filteredHistoryQuotes.length);
+  const showingFrom = historyCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const showingTo = Math.min(currentPage * PAGE_SIZE, historyCount);
 
   return (
     <div>
@@ -710,7 +707,7 @@ export default function OrdersClient({
                 </select>
               </div>
               <div className="pb-2 text-right text-xs text-ink-muted">
-                {showingFrom}-{showingTo} of {filteredHistoryQuotes.length}
+                {showingFrom}-{showingTo} of {historyCount}
               </div>
             </div>
             {monthFilter && (
@@ -727,8 +724,13 @@ export default function OrdersClient({
             )}
           </div>
 
-          <div className="space-y-5 p-4">
-            {pageQuotes.length === 0 && (
+          <div className={`space-y-5 p-4 transition-opacity ${historyLoading ? "opacity-60" : "opacity-100"}`} aria-busy={historyLoading}>
+            {historyLoading && (
+              <div className="rounded-lg bg-cream-dark p-3 text-sm text-ink-muted" aria-live="polite">
+                Loading order history...
+              </div>
+            )}
+            {!historyLoading && pageQuotes.length === 0 && (
               <div className="rounded-lg bg-cream-dark p-5 text-sm text-ink-muted">
                 No orders match that search.
               </div>
@@ -1078,6 +1080,12 @@ export default function OrdersClient({
               </div>
             )}
 
+            {!invoiceReady && (
+              <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Add an ex VAT price to every invoice line before emailing it to the customer.
+              </div>
+            )}
+
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-5">
               {draft.status !== "paid" && (
                 <button
@@ -1099,7 +1107,7 @@ export default function OrdersClient({
               </button>
               <button
                 type="button"
-                disabled={isSaving}
+                disabled={isSaving || !invoiceReady}
                 onClick={() => saveDraft(true)}
                 className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
               >

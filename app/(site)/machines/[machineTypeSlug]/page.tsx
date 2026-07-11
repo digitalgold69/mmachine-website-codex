@@ -8,6 +8,7 @@ import {
   getSeoCategory,
   jsonLdScript,
   miniSectionSlug,
+  openGraphImage,
   productSlug,
 } from "@/lib/seo";
 
@@ -34,6 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         "Classic Mini pressed steel panels and repair sections from M-Machine in Darlington.",
       url: absoluteUrl("/machines/classic-mini"),
       type: "website",
+      images: openGraphImage("/about/mini-outside-factory.jpg", "Classic Mini at M-Machine"),
     },
   };
 }

@@ -4,9 +4,10 @@ import { isLoggedIn } from "@/lib/auth";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { listFeaturedWork } from "@/lib/featured";
-import { listQuoteRequests } from "@/lib/quotes";
+import { getBestPaidMonth, listDashboardQuoteRequests, type BestPaidMonth } from "@/lib/quotes";
 import { quoteTotals } from "@/lib/quote-email";
 import type { QuoteItem, QuoteRequest } from "@/lib/quote-types";
+import { shiftUkDateKey, ukDateKey, ukMidnightUtc } from "@/lib/uk-time";
 
 export const dynamic = "force-dynamic";
 
@@ -46,13 +47,22 @@ export default async function DashboardHomePage() {
   if (!(await isLoggedIn())) redirect("/dashboard/login");
 
   let quotes: QuoteRequest[] = [];
+  let bestPaidMonth: BestPaidMonth | null = null;
   let featuredCount = 0;
   let dataError = "";
 
   try {
-    quotes = await listQuoteRequests();
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    [quotes, bestPaidMonth] = await Promise.all([
+      listDashboardQuoteRequests(ninetyDaysAgo.toISOString()),
+      getBestPaidMonth(),
+    ]);
   } catch (err) {
-    dataError = (err as Error).message;
+    console.error("dashboard_analytics_load_failed", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
+    dataError = "Business figures could not be loaded. Refresh the page to try again.";
   }
 
   try {
@@ -61,7 +71,7 @@ export default async function DashboardHomePage() {
     featuredCount = 0;
   }
 
-  const analytics = buildAnalytics(quotes);
+  const analytics = buildAnalytics(quotes, bestPaidMonth);
   const catalogueCount = products.length + metals.length;
 
   return (
@@ -145,7 +155,7 @@ export default async function DashboardHomePage() {
       </section>
 
       <section className="grid xl:grid-cols-2 gap-5 mb-6">
-        <Panel title="Top sellers">
+        <Panel title="Top sellers, past 90 days">
           {analytics.topItems.length === 0 ? (
             <EmptyState>No item history yet.</EmptyState>
           ) : (
@@ -161,7 +171,7 @@ export default async function DashboardHomePage() {
           )}
         </Panel>
 
-        <Panel title="Top customers">
+        <Panel title="Top customers, past 90 days">
           {analytics.topCustomers.length === 0 ? (
             <EmptyState>No customer history yet.</EmptyState>
           ) : (
@@ -170,7 +180,7 @@ export default async function DashboardHomePage() {
                 key: customer.detail,
                 left: customer.name,
                 sub: customer.detail,
-                right: `${customer.orders} ${customer.orders === 1 ? "request" : "requests"}`,
+                right: `${customer.orders} ${customer.orders === 1 ? "sale" : "sales"}`,
                 value: money(customer.value),
               }))}
             />
@@ -212,11 +222,14 @@ export default async function DashboardHomePage() {
   );
 }
 
-function buildAnalytics(quotes: QuoteRequest[]) {
+function buildAnalytics(
+  quotes: QuoteRequest[],
+  bestPaidMonth: BestPaidMonth | null
+) {
   const now = new Date();
   const todayKey = ukDateKey(now);
   const monthKey = todayKey.slice(0, 7);
-  const sevenDaysAgo = daysAgo(now, 7);
+  const sevenDaysAgo = ukMidnightUtc(shiftUkDateKey(todayKey, -6));
   const ninetyDaysAgo = daysAgo(now, 90);
 
   const todayRequests = quotes.filter((quote) => ukDateKey(quote.submittedAt) === todayKey);
@@ -240,7 +253,7 @@ function buildAnalytics(quotes: QuoteRequest[]) {
   const paidTodayValue = paidTodayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
   const paid90DayValue = paid90DayQuotes.reduce((sum, quote) => sum + quoteTotals(quote).totalExVat, 0);
 
-  const bestMonth = bestMonthFrom(quotes);
+  const bestMonth = bestPaidMonth;
   const topItems = topItemsFrom(paidQuotes);
   const topCustomers = topCustomersFrom(paidQuotes);
   const dailyTrend = lastDays(7).map((day) => {
@@ -348,17 +361,6 @@ function topCustomersFrom(quotes: QuoteRequest[]): RankedCustomer[] {
   return [...map.values()].sort((a, b) => b.value - a.value || b.orders - a.orders).slice(0, 8);
 }
 
-function bestMonthFrom(quotes: QuoteRequest[]) {
-  const months = new Map<string, number>();
-  for (const quote of quotes.filter((q) => q.status === "paid")) {
-    const key = ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7);
-    months.set(key, (months.get(key) || 0) + quoteTotals(quote).totalExVat);
-  }
-  return [...months.entries()]
-    .map(([key, value]) => ({ key, value }))
-    .sort((a, b) => b.value - a.value)[0];
-}
-
 function daysAgo(from: Date, count: number) {
   const date = new Date(from);
   date.setDate(date.getDate() - count);
@@ -374,12 +376,12 @@ function invoiceDate(quote: QuoteRequest) {
 }
 
 function lastDays(count: number): Omit<DayPoint, "count" | "value">[] {
-  const today = new Date();
+  const todayKey = ukDateKey();
   return Array.from({ length: count }, (_, index) => {
-    const d = new Date(today);
-    d.setUTCDate(today.getUTCDate() - (count - index - 1));
+    const key = shiftUkDateKey(todayKey, -(count - index - 1));
+    const d = new Date(`${key}T12:00:00.000Z`);
     return {
-      key: ukDateKey(d),
+      key,
       label: index === count - 1 ? "Today" : formatShortDate(d),
     };
   });
@@ -395,17 +397,6 @@ function itemLabel(item: QuoteItem) {
     : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
-}
-
-function ukDateKey(value: string | Date) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(value));
-  const part = (type: string) => parts.find((p) => p.type === type)?.value || "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function formatDateTime(value: string) {

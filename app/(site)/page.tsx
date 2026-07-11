@@ -52,7 +52,7 @@ export default async function HomePage() {
             </h1>
             <p className="text-lg text-ink-muted leading-relaxed mb-8 max-w-xl">
               Four decades supplying restorers, workshops and fabricators from our Darlington workshop.
-              Every panel listed is stocked on the shelf — not drop-shipped.
+              Browse our current catalogues, then send an order request for availability, carriage and payment details.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/catalogue/mini" className="btn-primary">
@@ -117,12 +117,12 @@ export default async function HomePage() {
                     <path d="M3 12h18M8 8v8M16 8v8" />
                   </svg>
                 </div>
-                <span className="text-xs font-mono text-gold">{metalsCount} GRADES</span>
+                <span className="text-xs font-mono text-gold">{metalsCount} CATALOGUE LINES</span>
               </div>
               <h3 className="font-display text-xl text-racing mb-2">Engineering metals</h3>
               <p className="text-sm text-ink-muted mb-4">
-                Tool steels, stainless, aluminium, brass. Cut to size from stock. Same-day despatch
-                on orders placed before noon.
+                Tool steels, stainless, aluminium, brass and specialist engineering materials,
+                supplied in the sizes and units shown in our current catalogue.
               </p>
             </Link>
             <div className="flex items-center gap-4 flex-wrap">
@@ -211,12 +211,25 @@ export default async function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
+            {latestFeatured.length === 0 && (
+              <div className="md:col-span-3 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
+                New workshop projects will appear here as they are added by M-Machine.
+              </div>
+            )}
             {latestFeatured.map((job) => (
               <article key={job.id} className="card bg-white flex flex-col">
                 <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
                   {job.imagePath ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
+                    <img
+                      src={job.imagePath}
+                      alt={job.title}
+                      width={1200}
+                      height={900}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
                       <path d="M10 40 L30 15 L50 40 Z" />
@@ -247,8 +260,8 @@ export default async function HomePage() {
             <div className="text-sm text-ink-muted">Mini parts in catalogue</div>
           </div>
           <div>
-            <div className="font-display text-4xl text-gold mb-2">900+</div>
-            <div className="text-sm text-ink-muted">Metal grades</div>
+            <div className="font-display text-4xl text-gold mb-2">{metalsCount.toLocaleString("en-GB")}</div>
+            <div className="text-sm text-ink-muted">Metal catalogue lines</div>
           </div>
           <div>
             <div className="font-display text-4xl text-gold mb-2">UK</div>

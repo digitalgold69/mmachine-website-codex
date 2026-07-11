@@ -5,6 +5,7 @@ import {
   breadcrumbJsonLd,
   getAllSeoCategories,
   jsonLdScript,
+  openGraphImage,
 } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export const metadata: Metadata = {
       "Classic Mini panels, repair sections and engineering metals from M-Machine in Darlington.",
     url: absoluteUrl("/parts"),
     type: "website",
+    images: openGraphImage(),
   },
 };
 

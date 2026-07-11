@@ -21,7 +21,7 @@ export async function GET(
 
   const { key: segments } = await params;
   const key = (segments || []).join("/");
-  if (!key || !key.startsWith("quote-requests/")) {
+  if (!key || (!key.startsWith("quote-requests/") && !key.startsWith("quote-uploads/"))) {
     return new Response("Not found", { status: 404 });
   }
 
@@ -40,6 +40,7 @@ export async function GET(
   }
   headers.set("Content-Disposition", `attachment; filename="${safeDownloadName(key).replace(/"/g, "")}"`);
   headers.set("Cache-Control", "private, no-store");
+  headers.set("X-Content-Type-Options", "nosniff");
 
   return new Response(object.body, { headers });
 }

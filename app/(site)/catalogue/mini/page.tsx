@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
@@ -29,16 +29,7 @@ export default function MiniCataloguePage() {
   const [markFilter, setMarkFilter] = useState("All marks");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
-  const [showPanelSelector, setShowPanelSelector] = useState(false);
   const partsListRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 768px)");
-    const update = () => setShowPanelSelector(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
 
   const filtered = useMemo(() => {
     let list = products;
@@ -82,14 +73,16 @@ export default function MiniCataloguePage() {
         </p>
       </div>
 
-      {showPanelSelector && (
-        <Mini3DViewer selectedSection={section} onSelect={chooseSection} />
-      )}
+      <Mini3DViewer selectedSection={section} onSelect={chooseSection} />
 
       <div className="mt-6 bg-white rounded-xl border border-racing/10 p-3 sm:p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[220px]">
+            <label htmlFor="mini-panel-search" className="sr-only">
+              Search the Classic Mini panels catalogue
+            </label>
             <input
+              id="mini-panel-search"
               type="search"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setDisplayLimit(50); }}
@@ -98,6 +91,7 @@ export default function MiniCataloguePage() {
             />
           </div>
           <button
+            type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-xs text-racing hover:text-gold underline whitespace-nowrap px-2"
           >
@@ -121,6 +115,7 @@ export default function MiniCataloguePage() {
             </div>
             {(bodyFilter !== "All" || markFilter !== "All marks") && (
               <button
+                type="button"
                 onClick={() => { setBodyFilter("All"); setMarkFilter("All marks"); }}
                 className="text-xs text-racing hover:text-gold underline pb-3"
               >
@@ -133,6 +128,7 @@ export default function MiniCataloguePage() {
         <div className="overflow-x-auto pt-2 border-t border-racing/5">
           <div className="flex w-max gap-2 pb-1">
           <button
+            type="button"
             onClick={() => chooseSection("all")}
             className={`min-h-[58px] w-[112px] shrink-0 rounded-md border px-2 py-2 text-center transition-colors ${
               section === "all"
@@ -152,6 +148,7 @@ export default function MiniCataloguePage() {
             const active = section === s.code;
             return (
               <button
+                type="button"
                 key={s.code}
                 onClick={() => chooseSection(s.code)}
                 className={`min-h-[58px] w-[112px] shrink-0 rounded-md border px-2 py-2 text-center transition-colors ${

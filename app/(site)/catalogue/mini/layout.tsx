@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Interactive Classic Mini Panels Catalogue",
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
       "Browse M-Machine Classic Mini pressed panel sections with the interactive 3D Mini selector.",
     url: absoluteUrl("/catalogue/mini"),
     type: "website",
+    images: openGraphImage("/about/mini-outside-factory.jpg", "Classic Mini at M-Machine"),
   },
 };
 

@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
@@ -52,6 +53,7 @@ export function OrderButton({
     <button
       type="button"
       onClick={() => beginAdd(item)}
+      aria-label={`Order ${itemLabel(item)}`}
       className={`inline-flex h-8 min-w-[68px] items-center justify-center rounded-md bg-gold px-2.5 text-sm font-semibold leading-none text-cream transition hover:bg-gold-light ${className}`}
     >
       Order
@@ -69,6 +71,9 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
   const [success, setSuccess] = useState<{ quoteId: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const pendingDialogRef = useRef<HTMLDivElement | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     try {
@@ -85,6 +90,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
   const count = items.reduce((sum, item) => sum + item.qty, 0);
   const showCartUi = !pathname?.startsWith("/dashboard");
+  const hasPoaItems = items.some((item) => typeof item.unitPriceExVat !== "number");
 
   const subtotal = useMemo(
     () =>
@@ -95,6 +101,53 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       ),
     [items]
   );
+
+  useEffect(() => {
+    if (!pending && !drawerOpen) return;
+
+    const dialog = pending ? pendingDialogRef.current : drawerRef.current;
+    if (!dialog) return;
+
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusableSelector =
+      'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+    window.setTimeout(() => focusable()[0]?.focus(), 0);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (pending) setPending(null);
+        else closeDrawer();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      returnFocusRef.current?.focus();
+    };
+  }, [drawerOpen, pending]);
 
   function beginAdd(item: PendingItem) {
     setPending(item);
@@ -165,13 +218,15 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             message: form.get("message"),
           },
           items,
+          website: form.get("website"),
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as { error?: string; quoteId?: string };
       if (!res.ok) throw new Error(data.error || "Quote request failed");
       formEl.reset();
       setItems([]);
       setArrangeOwnDelivery(false);
+      if (!data.quoteId) throw new Error("The order was saved without a reference. Please contact M-Machine.");
       setSuccess({ quoteId: data.quoteId });
     } catch (err) {
       setMessage((err as Error).message || "Quote request failed");
@@ -188,6 +243,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
+          aria-label={`Open order with ${count} ${count === 1 ? "item" : "items"}`}
           className="fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-racing px-5 text-sm font-semibold text-cream shadow-lg transition hover:bg-[#155040]"
         >
           Order Now
@@ -199,10 +255,16 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
       {showCartUi && pending && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-racing-dark/55 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+          <div
+            ref={pendingDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-to-order-title"
+            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+          >
             <div className="mb-4">
               <div className="text-xs uppercase tracking-wider text-ink-muted">Add to quote</div>
-              <h2 className="mt-1 text-lg font-semibold text-racing">{itemLabel(pending)}</h2>
+              <h2 id="add-to-order-title" className="mt-1 text-lg font-semibold text-racing">{itemLabel(pending)}</h2>
               <p className="mt-1 text-sm text-ink-muted">
                 {money(pending.unitPriceExVat)} ex VAT
                 {pending.unit ? ` / ${pending.unit}` : ""}
@@ -213,6 +275,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 type="button"
                 onClick={() => setPendingQty((qty) => Math.max(1, qty - 1))}
                 className="h-10 w-10 rounded-md border border-racing/20 text-lg text-racing"
+                aria-label="Reduce quantity"
               >
                 -
               </button>
@@ -223,11 +286,13 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 value={pendingQty}
                 onChange={(e) => setPendingQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
                 className="input h-10 w-24 text-center"
+                aria-label="Quantity"
               />
               <button
                 type="button"
                 onClick={() => setPendingQty((qty) => Math.min(999, qty + 1))}
                 className="h-10 w-10 rounded-md border border-racing/20 text-lg text-racing"
+                aria-label="Increase quantity"
               >
                 +
               </button>
@@ -246,11 +311,17 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
       {showCartUi && drawerOpen && (
         <div className="fixed inset-0 z-[60] bg-racing-dark/40">
-          <aside className="ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-xl">
+          <aside
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quote-cart-title"
+            className="ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-xl"
+          >
             <div className="flex items-center justify-between border-b border-racing/10 p-5">
               <div>
                 <div className="text-xs uppercase tracking-wider text-ink-muted">Quote request</div>
-                <h2 className="font-display text-2xl text-racing">Cart</h2>
+                <h2 id="quote-cart-title" className="font-display text-2xl text-racing">Your order</h2>
               </div>
               <button
                 type="button"
@@ -264,7 +335,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
             <div className="flex-1 overflow-y-auto p-5">
               {success ? (
-                <div className="flex min-h-full items-center justify-center">
+                <div className="flex min-h-full items-center justify-center" aria-live="polite">
                   <div className="w-full rounded-lg border border-racing/10 bg-cream-dark p-6 text-center">
                     <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-racing text-lg font-semibold text-cream">
                       OK
@@ -333,34 +404,42 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
               {!success && items.length > 0 && (
               <form onSubmit={submitQuote} className="mt-5 space-y-3 border-t border-racing/10 pt-5">
+                <div className="sr-only" aria-hidden="true">
+                  <label htmlFor="order-website">Website</label>
+                  <input id="order-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+                </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Name *</label>
-                    <input name="name" required className="input" />
+                    <label className="label" htmlFor="order-name">Name *</label>
+                    <input id="order-name" name="name" required autoComplete="name" className="input" />
                   </div>
                   <div>
-                    <label className="label">Company</label>
-                    <input name="company" className="input" />
+                    <label className="label" htmlFor="order-company">Company</label>
+                    <input id="order-company" name="company" autoComplete="organization" className="input" />
                   </div>
                   <div>
-                    <label className="label">Email *</label>
-                    <input name="email" type="email" required className="input" />
+                    <label className="label" htmlFor="order-email">Email *</label>
+                    <input id="order-email" name="email" type="email" required autoComplete="email" className="input" />
                   </div>
                   <div>
-                    <label className="label">Phone *</label>
-                    <input name="phone" required className="input" />
+                    <label className="label" htmlFor="order-phone">Phone *</label>
+                    <input id="order-phone" name="phone" type="tel" required autoComplete="tel" className="input" />
                   </div>
                 </div>
                 <div>
-                  <label className="label">Delivery</label>
                   {!arrangeOwnDelivery && (
+                    <>
+                    <label className="label" htmlFor="order-address">Delivery address</label>
                     <textarea
+                      id="order-address"
                       name="address"
                       rows={4}
                       required
                       className="input resize-none"
+                      autoComplete="street-address"
                       placeholder="Full delivery address, including postcode"
                     />
+                    </>
                   )}
                   <label className="mt-3 flex items-start gap-3 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
                     <input
@@ -378,8 +457,9 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                   </label>
                 </div>
                 <div>
-                  <label className="label">Message</label>
+                  <label className="label" htmlFor="order-message">Message</label>
                   <textarea
+                    id="order-message"
                     name="message"
                     rows={3}
                     className="input resize-none"
@@ -388,15 +468,18 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm text-ink-muted">
-                    Guide subtotal ex VAT:{" "}
+                    {hasPoaItems ? "Known subtotal ex VAT" : "Guide subtotal ex VAT"}:{" "}
                     <strong className="text-racing">{"\u00a3"}{subtotal.toFixed(2)}</strong>
+                    {hasPoaItems && (
+                      <span className="mt-1 block text-xs">POA items will be confirmed before invoicing.</span>
+                    )}
                   </div>
                   <button type="submit" disabled={submitting || items.length === 0} className="btn-primary">
                     {submitting ? "Sending..." : "Submit Order"}
                   </button>
                 </div>
                 {message && (
-                  <div className="rounded-lg bg-cream-dark p-3 text-sm text-racing">{message}</div>
+                  <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{message}</div>
                 )}
               </form>
               )}

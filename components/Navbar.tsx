@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BrandMark from "@/components/BrandMark";
 
 const links = [
@@ -18,6 +18,8 @@ const links = [
 export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => setOpen(false), [pathname]);
 
   return (
     <nav className="bg-racing text-cream sticky top-0 z-50 border-b border-racing-dark">
@@ -62,9 +64,12 @@ export default function Navbar() {
           </div>
 
           <button
+            type="button"
             onClick={() => setOpen(!open)}
             className="lg:hidden p-2 rounded hover:bg-racing-light"
             aria-label="Toggle menu"
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               {open ? <path d="M6 6l12 12M6 18L18 6" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
@@ -73,7 +78,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div className="lg:hidden pb-3 space-y-1">
+          <div id="mobile-navigation" className="lg:hidden pb-3 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}

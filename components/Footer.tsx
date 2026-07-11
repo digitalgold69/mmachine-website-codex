@@ -47,7 +47,7 @@ export default function Footer() {
                   Facebook
                 </a>
               </li>
-              <li><a href="#" className="hover:text-gold">Privacy policy</a></li>
+              <li><Link href="/privacy" className="hover:text-gold">Privacy policy</Link></li>
             </ul>
           </div>
 

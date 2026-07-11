@@ -2,7 +2,7 @@ import Link from "next/link";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import type { Metadata } from "next";
-import { absoluteUrl, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
+import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Featured custom work — fabrication, machining & restoration",
@@ -13,6 +13,7 @@ export const metadata: Metadata = {
     description: "Bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
     url: absoluteUrl("/featured"),
     type: "website",
+    images: openGraphImage("/custom-engineering/custom-fabrication-cam.jpg", "Custom engineering work at M-Machine"),
   },
 };
 
@@ -55,12 +56,26 @@ export default async function FeaturedPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-12">
-        {featuredWork.map((job) => (
+        {featuredWork.length === 0 && (
+          <div className="md:col-span-2 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
+            New workshop projects will appear here as they are added.
+          </div>
+        )}
+        {featuredWork.map((job, index) => (
           <article key={job.id} className="card bg-white">
             <div className="aspect-[16/10] bg-cream-dark rounded-lg mb-5 overflow-hidden flex items-center justify-center">
               {job.imagePath ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={job.imagePath} alt={job.title} className="w-full h-full object-cover" />
+                <img
+                  src={job.imagePath}
+                  alt={job.title}
+                  width={1200}
+                  height={750}
+                  loading={index === 0 ? "eager" : "lazy"}
+                  fetchPriority={index === 0 ? "high" : "auto"}
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
                   <path d="M10 40 L30 15 L50 40 Z" />
@@ -90,7 +105,7 @@ export default async function FeaturedPage() {
           We love taking on unusual jobs. Send us a drawing, a photo, or just describe what you need —
           one of our engineers will come back to you with a quote.
         </p>
-        <Link href="/contact" className="btn-gold">
+        <Link href="/custom-engineering#quote-form" className="btn-gold">
           Start a bespoke enquiry →
         </Link>
       </section>
