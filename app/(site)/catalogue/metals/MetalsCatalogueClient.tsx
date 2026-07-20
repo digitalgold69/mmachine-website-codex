@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { OrderButton } from "@/components/QuoteCart";
 import type { MetalProduct } from "@/lib/metals-data";
@@ -108,14 +109,25 @@ export default function MetalsCatalogueClient({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-8">
+      <header className="mb-8">
         <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
         <h1 className="mt-2 font-display text-4xl text-racing">Metals catalogue</h1>
         <p className="mt-2 max-w-3xl text-ink-muted">
           Browse the metals catalogue in the same column format as the printed customer catalogue.
           Prices are shown ex VAT and inc VAT.
         </p>
-      </div>
+        <div className="mt-6 overflow-hidden rounded-lg border border-racing/10 bg-racing">
+          <Image
+            src="/catalogue/m-machine-metals-cutting.gif"
+            alt="Engineering metal being cut in the M-Machine workshop"
+            width={1024}
+            height={409}
+            priority
+            unoptimized
+            className="aspect-[1024/409] w-full object-cover"
+          />
+        </div>
+      </header>
 
       <div className="mb-6">
         <div className="mb-4 flex flex-wrap gap-2" aria-label="Filter by metal category">

@@ -244,17 +244,15 @@ export default async function HomePage() {
                 </p>
                 <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
                 <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>
-                <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                  <div>
-                    <div className="font-semibold text-racing">
-                      {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)}` : "POA"}
+                {typeof job.priceExVat === "number" && (
+                  <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                    <div>
+                      <div className="font-semibold text-racing">£{job.priceExVat.toFixed(2)}</div>
+                      <div className="text-xs text-ink-muted">ex VAT</div>
                     </div>
-                    <div className="text-xs text-ink-muted">
-                      {typeof job.priceExVat === "number" ? "ex VAT" : "Price confirmed before invoicing"}
-                    </div>
+                    <OrderButton item={featuredOrderItem(job)} />
                   </div>
-                  <OrderButton item={featuredOrderItem(job)} />
-                </div>
+                )}
               </article>
             ))}
           </div>

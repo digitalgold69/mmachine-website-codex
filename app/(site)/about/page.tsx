@@ -14,7 +14,7 @@ export const metadata: Metadata = {
       "Classic Mini panels, engineering materials and custom engineering from our Darlington premises.",
     url: absoluteUrl("/about"),
     type: "website",
-    images: openGraphImage("/custom-engineering/saw-cutting.jpg", "Engineering material being cut at M-Machine"),
+    images: openGraphImage("/custom-engineering/metal-stock.jpg", "Engineering material stock at M-Machine"),
   },
 };
 
@@ -103,15 +103,15 @@ export default function AboutPage() {
 
         <figure className="my-12 overflow-hidden rounded-lg bg-racing">
           <Image
-            src="/custom-engineering/saw-cutting.jpg"
-            alt="Engineering material being cut on the bandsaw at M-Machine"
+            src="/custom-engineering/metal-stock.jpg"
+            alt="Engineering material stock at M-Machine in Darlington"
             width={1600}
             height={1200}
             priority
-            className="aspect-[16/7] w-full object-cover"
+            className="aspect-[4/3] w-full object-cover sm:aspect-[2/1] lg:aspect-[16/7]"
           />
           <figcaption className="px-5 py-3 text-sm text-cream/85">
-            Material stock, cutting and engineering work at our Darlington premises.
+            Engineering material stock at our Darlington premises.
           </figcaption>
         </figure>
 

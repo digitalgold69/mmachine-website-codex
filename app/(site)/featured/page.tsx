@@ -56,9 +56,9 @@ export default async function FeaturedPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-12">
+      <div className="grid gap-6 mb-12 md:grid-cols-2 lg:grid-cols-3">
         {featuredWork.length === 0 && (
-          <div className="md:col-span-2 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
+          <div className="md:col-span-2 lg:col-span-3 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
             New Featured Work will appear here as it is added.
           </div>
         )}
@@ -96,17 +96,15 @@ export default async function FeaturedPage() {
               <summary className="cursor-pointer text-racing font-medium hover:text-gold">Read the full story</summary>
               <p className="mt-2 text-ink-muted leading-relaxed">{job.fullStory}</p>
             </details>
-            <div className="mt-5 flex items-center justify-between gap-4 border-t border-racing/10 pt-4">
-              <div>
-                <div className="font-semibold text-racing">
-                  {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)}` : "POA"}
+            {typeof job.priceExVat === "number" && (
+              <div className="mt-5 flex items-center justify-between gap-4 border-t border-racing/10 pt-4">
+                <div>
+                  <div className="font-semibold text-racing">£{job.priceExVat.toFixed(2)}</div>
+                  <div className="text-xs text-ink-muted">ex VAT</div>
                 </div>
-                <div className="text-xs text-ink-muted">
-                  {typeof job.priceExVat === "number" ? "ex VAT" : "Price confirmed before invoicing"}
-                </div>
+                <OrderButton item={featuredOrderItem(job)} />
               </div>
-              <OrderButton item={featuredOrderItem(job)} />
-            </div>
+            )}
           </article>
         ))}
       </div>
