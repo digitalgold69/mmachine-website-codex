@@ -1,0 +1,65 @@
+export type Article = {
+  slug: string;
+  title: string;
+  shortTitle: string;
+  description: string;
+  category: string;
+  image: string;
+  imageAlt: string;
+  readingTime: string;
+};
+
+export const articles: Article[] = [
+  {
+    slug: "metal-grades-and-uses",
+    title: "Metal Grades and Uses: A Machining Guide",
+    shortTitle: "Metal grades and uses",
+    description:
+      "A practical guide to EN1A, EN3, EN8, EN16, EN19 and EN24 steel grades, including common uses, machining characteristics and finishing advice.",
+    category: "Materials",
+    image: "/articles/metal-grades/en8d.jpg",
+    imageAlt: "EN8 engineering steel and a machined component",
+    readingTime: "10 min read",
+  },
+  {
+    slug: "what-en-and-bs970-mean",
+    title: "What Do EN and BS970 Steel Grades Mean?",
+    shortTitle: "What EN and BS970 mean",
+    description:
+      "Understand traditional EN steel numbers and how to read BS970 designations such as 080M40, including steel type, supply condition and carbon content.",
+    category: "Materials",
+    image: "/articles/en-bs970/meaning.jpg",
+    imageAlt: "Engineering steel grade reference for EN and BS970 specifications",
+    readingTime: "6 min read",
+  },
+  {
+    slug: "heat-treating-tool-steel",
+    title: "How to Heat Treat and Temper Tool Steel",
+    shortTitle: "Heat treating tool steel",
+    description:
+      "An introductory workshop guide to hardening and tempering gauge plate, silver steel and O1 tool steel, from pre-heating and quenching to final tempering.",
+    category: "Workshop Guides",
+    image: "/articles/heat-treatment/hero.jpg",
+    imageAlt: "Tool steel being heated in a workshop",
+    readingTime: "11 min read",
+  },
+  {
+    slug: "how-to-use-a-dividing-head",
+    title: "How to Use a Dividing Head or Rotary Index Table",
+    shortTitle: "Using a dividing head",
+    description:
+      "A practical introduction to dividing heads, rotary tables, hole plates and sector arms, with a worked example for calculating equal divisions.",
+    category: "Workshop Guides",
+    image: "/articles/dividing-head/hero.jpg",
+    imageAlt: "Dividing head and rotary index table in a machine workshop",
+    readingTime: "12 min read",
+  },
+];
+
+export function getArticle(slug: string) {
+  return articles.find((article) => article.slug === slug);
+}
+
+export function articleUrl(article: Article) {
+  return `/articles/${article.slug}`;
+}

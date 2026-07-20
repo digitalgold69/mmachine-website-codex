@@ -6,6 +6,7 @@ import {
   getAllSeoProducts,
   productUrl,
 } from "@/lib/seo";
+import { articleUrl, articles } from "@/lib/articles";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   if (IS_PREVIEW_DEPLOYMENT) return [];
@@ -17,6 +18,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/machines/classic-mini`, priority: 0.85 },
     { url: `${SITE_URL}/custom-engineering`, priority: 0.85 },
     { url: `${SITE_URL}/featured`, priority: 0.7 },
+    { url: `${SITE_URL}/articles`, priority: 0.78 },
     { url: `${SITE_URL}/about`, priority: 0.7 },
     { url: `${SITE_URL}/contact`, priority: 0.7 },
     { url: `${SITE_URL}/privacy`, priority: 0.3 },
@@ -32,5 +34,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.64,
   }));
 
-  return [...staticPages, ...categoryPages, ...productPages];
+  const articlePages: MetadataRoute.Sitemap = articles.map((article) => ({
+    url: `${SITE_URL}${articleUrl(article)}`,
+    priority: 0.72,
+  }));
+
+  return [...staticPages, ...categoryPages, ...productPages, ...articlePages];
 }

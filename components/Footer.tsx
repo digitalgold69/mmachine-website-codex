@@ -1,11 +1,13 @@
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
+import { articleUrl, articles } from "@/lib/articles";
+import CurrentYear from "@/components/CurrentYear";
 
 export default function Footer() {
   return (
     <footer className="bg-racing text-cream mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+        <div className="grid grid-cols-1 gap-8 mb-10 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <BrandMark className="h-11 w-11" />
@@ -29,6 +31,18 @@ export default function Footer() {
               <li><Link href="/catalogue/metals" className="hover:text-gold">Engineering metals</Link></li>
               <li><Link href="/custom-engineering" className="hover:text-gold">Custom engineering quotes</Link></li>
               <li><Link href="/featured" className="hover:text-gold">Featured Work</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gold mb-3 text-sm">Engineering Guides</h4>
+            <ul className="space-y-2 text-sm opacity-80">
+              <li><Link href="/articles" className="hover:text-gold">All guides</Link></li>
+              {articles.map((article) => (
+                <li key={article.slug}>
+                  <Link href={articleUrl(article)} className="hover:text-gold">{article.shortTitle}</Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -57,15 +71,17 @@ export default function Footer() {
               Unit 6 Forge Way<br />
               Cleveland Trading Estate<br />
               Darlington, DL1 2PJ<br /><br />
-              Metals &amp; Engineering: <a href="tel:01325381302" className="hover:text-gold">01325 381302</a><br />
-              Mini Pressings &amp; Accounts: <a href="tel:01325381300" className="hover:text-gold">01325 381300</a><br />
+              Metals &amp; Engineering:<br />
+              <a href="tel:01325381302" className="hover:text-gold">01325 381302</a><br />
+              Mini Pressings &amp; Accounts:<br />
+              <a href="tel:01325381300" className="hover:text-gold">01325 381300</a><br />
               <a href="mailto:sales@m-machine.co.uk" className="hover:text-gold">sales@m-machine.co.uk</a>
             </address>
           </div>
         </div>
 
         <div className="border-t border-racing-light pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <p>&copy; {new Date().getFullYear()} M-Machine &middot; Craftgrange Limited &middot; Company no. 01476185</p>
+          <p>&copy; <CurrentYear /> M-Machine &middot; Craftgrange Limited &middot; Company no. 01476185</p>
           <p>Proudly British engineering since 1980</p>
         </div>
       </div>

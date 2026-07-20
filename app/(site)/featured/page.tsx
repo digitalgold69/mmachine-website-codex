@@ -92,10 +92,12 @@ export default async function FeaturedPage() {
             </div>
             <h2 className="font-display text-xl text-racing mb-2">{job.title}</h2>
             <p className="text-sm text-ink-muted leading-relaxed mb-3">{job.description}</p>
-            <details className="text-sm">
-              <summary className="cursor-pointer text-racing font-medium hover:text-gold">Read the full story</summary>
-              <p className="mt-2 text-ink-muted leading-relaxed">{job.fullStory}</p>
-            </details>
+            {job.fullStory?.trim() && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-racing font-medium hover:text-gold">Read More</summary>
+                <p className="mt-2 text-ink-muted leading-relaxed">{job.fullStory}</p>
+              </details>
+            )}
             {typeof job.priceExVat === "number" && (
               <div className="mt-5 flex items-center justify-between gap-4 border-t border-racing/10 pt-4">
                 <div>
