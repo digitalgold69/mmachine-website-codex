@@ -30,17 +30,24 @@ export default async function HomePage() {
     <>
       {/* HERO */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-cream via-cream-dark to-cream pointer-events-none" />
-        <div className="absolute top-0 right-0 w-1/2 h-full pointer-events-none opacity-20 hidden md:block">
-          <svg viewBox="0 0 600 400" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-            <g stroke="#0F3D2E" strokeWidth="1.5" fill="none">
-              <path d="M80 300 L80 220 Q80 180 120 180 L200 180 L240 120 L420 120 L460 180 L540 180 Q580 180 580 220 L580 300 Z" />
-              <circle cx="170" cy="300" r="45" />
-              <circle cx="490" cy="300" r="45" />
-              <path d="M240 180 L240 220 L420 220 L420 180" />
-              <path d="M260 140 L400 140" />
-            </g>
-          </svg>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cream via-cream-dark to-cream" />
+        <Image
+          src="/home/mmachine-hero.png"
+          alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
+          fill
+          priority
+          sizes="100vw"
+          className="pointer-events-none object-cover object-center opacity-[0.08] lg:hidden"
+        />
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block">
+          <Image
+            src="/home/mmachine-hero.png"
+            alt=""
+            fill
+            priority
+            sizes="50vw"
+            className="object-contain object-center"
+          />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
