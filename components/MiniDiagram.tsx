@@ -68,7 +68,7 @@ export default function MiniDiagram({ selectedSection, onSelect }: Props) {
       </div>
 
       {/* Instruction badge */}
-      <div className="absolute top-4 left-4 bg-racing/90 text-cream px-3 py-1.5 rounded-md text-[11px] tracking-wider pointer-events-none">
+      <div className="absolute top-4 left-4 bg-racing/90 text-cream px-3 py-1.5 rounded-md text-[12px] tracking-wider pointer-events-none">
         CLICK A SECTION · SWITCH VIEWS BELOW
       </div>
 
@@ -98,7 +98,7 @@ export default function MiniDiagram({ selectedSection, onSelect }: Props) {
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`px-3 py-1.5 rounded text-[11px] font-semibold tracking-wider transition-colors ${
+            className={`px-3 py-1.5 rounded text-[12px] font-semibold tracking-wider transition-colors ${
               view === v ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
             }`}
           >
@@ -110,7 +110,7 @@ export default function MiniDiagram({ selectedSection, onSelect }: Props) {
       {/* Readout bar */}
       <div className="absolute bottom-4 left-4 right-4 bg-white/95 rounded-lg p-3 flex items-center justify-between gap-3 border border-racing/10">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-ink-muted font-semibold tracking-wider">
+          <div className="text-[12px] text-ink-muted font-semibold tracking-wider">
             {selectedSection === "all" ? "CATALOGUE" : `SECTION ${selectedSection}`}
           </div>
           <div className="text-base font-semibold text-racing truncate">

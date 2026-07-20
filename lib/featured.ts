@@ -9,6 +9,7 @@ export type FeaturedWork = {
   category: string;
   fullStory: string;
   imagePath: string | null;
+  priceExVat: number | null;
 };
 
 export type FeaturedEntry = {
@@ -20,6 +21,7 @@ export type FeaturedEntry = {
   category: string;
   fullStory: string;
   image: string;
+  priceExVat: number | null;
 };
 
 type FeaturedRow = {
@@ -33,7 +35,33 @@ type FeaturedRow = {
   image_url: string | null;
   image_path: string | null;
   created_at: string;
+  price_ex_vat: number | null;
 };
+
+let pricingSchemaReady: Promise<void> | null = null;
+
+async function ensureFeaturedPricingSchema() {
+  if (!pricingSchemaReady) {
+    pricingSchemaReady = (async () => {
+      const db = await getD1();
+      const table = await db.prepare(`
+        create table if not exists featured_work_prices (
+          featured_id text primary key,
+          price_ex_vat real check (price_ex_vat is null or price_ex_vat >= 0),
+          updated_at text not null
+        )
+      `).run();
+      if (table.error) throw new Error(`D1 featured pricing setup failed: ${table.error}`);
+    })();
+  }
+
+  try {
+    await pricingSchemaReady;
+  } catch (error) {
+    pricingSchemaReady = null;
+    throw error;
+  }
+}
 
 function imageUrlFromPath(path: string | null) {
   return path ? `/api/featured-images/${encodeURIComponent(path)}` : null;
@@ -49,6 +77,7 @@ function rowToWork(row: FeaturedRow): FeaturedWork {
     category: row.category || "Fabrication",
     fullStory: row.full_story || "",
     imagePath: row.image_url || imageUrlFromPath(row.image_path),
+    priceExVat: typeof row.price_ex_vat === "number" ? row.price_ex_vat : null,
   };
 }
 
@@ -62,24 +91,35 @@ function workToEntry(work: FeaturedWork): FeaturedEntry {
     category: work.category,
     fullStory: work.fullStory,
     image: work.imagePath || "",
+    priceExVat: work.priceExVat,
   };
 }
 
 async function getFeaturedRow(id: string): Promise<FeaturedRow | null> {
+  await ensureFeaturedPricingSchema();
   const db = await getD1();
   return db
     .prepare(
-      "select id,title,description,tag,year,category,full_story,image_url,image_path,created_at from featured_work where id = ?"
+      `select fw.id,fw.title,fw.description,fw.tag,fw.year,fw.category,fw.full_story,
+        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat
+       from featured_work fw
+       left join featured_work_prices fwp on fwp.featured_id = fw.id
+       where fw.id = ?`
     )
     .bind(id)
     .first<FeaturedRow>();
 }
 
 export async function listFeaturedWork(): Promise<FeaturedWork[]> {
+  await ensureFeaturedPricingSchema();
   const db = await getD1();
   const result = await db
     .prepare(
-      "select id,title,description,tag,year,category,full_story,image_url,image_path,created_at from featured_work order by created_at desc"
+      `select fw.id,fw.title,fw.description,fw.tag,fw.year,fw.category,fw.full_story,
+        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat
+       from featured_work fw
+       left join featured_work_prices fwp on fwp.featured_id = fw.id
+       order by fw.created_at desc`
     )
     .all<FeaturedRow>();
 
@@ -155,6 +195,13 @@ export async function saveFeaturedEntry(input: {
   }
 
   const now = new Date().toISOString();
+  const rawPrice = entry.priceExVat;
+  const priceExVat = rawPrice === null || rawPrice === undefined
+    ? null
+    : Number(rawPrice);
+  if (priceExVat !== null && (!Number.isFinite(priceExVat) || priceExVat < 0)) {
+    throw new Error("Price must be a valid positive amount, or left blank for POA.");
+  }
   const result = await db
     .prepare(
       `
@@ -210,6 +257,19 @@ export async function saveFeaturedEntry(input: {
     throw new Error(`D1 featured_work save failed: ${result.error}`);
   }
 
+  const priceResult = priceExVat === null
+    ? await db.prepare("delete from featured_work_prices where featured_id = ?").bind(id).run()
+    : await db.prepare(`
+        insert into featured_work_prices (featured_id, price_ex_vat, updated_at)
+        values (?, ?, ?)
+        on conflict(featured_id) do update set
+          price_ex_vat = excluded.price_ex_vat,
+          updated_at = excluded.updated_at
+      `).bind(id, priceExVat, now).run();
+  if (priceResult.error) {
+    throw new Error(`D1 featured price save failed: ${priceResult.error}`);
+  }
+
   const saved = await getFeaturedRow(id);
   if (!saved) throw new Error("D1 featured_work save failed: saved row could not be read.");
   if (previousImagePath && previousImagePath !== imagePath) {
@@ -230,6 +290,8 @@ export async function deleteFeaturedEntry(id: string): Promise<void> {
   const result = await db.prepare("delete from featured_work where id = ?").bind(safe).run();
 
   if (result.error) throw new Error(`D1 featured_work delete failed: ${result.error}`);
+  const priceResult = await db.prepare("delete from featured_work_prices where featured_id = ?").bind(safe).run();
+  if (priceResult.error) throw new Error(`D1 featured price delete failed: ${priceResult.error}`);
 
   if (current?.image_path) {
     try {

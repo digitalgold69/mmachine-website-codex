@@ -18,7 +18,7 @@ export default function BrandMark({
         src="/brand/m-machine-butterfly.png"
         alt=""
         fill
-        sizes="48px"
+        sizes="64px"
         priority={priority}
         className="object-contain drop-shadow-sm"
       />

@@ -22,6 +22,20 @@ body {
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 17px;
+  line-height: 1.625;
+}
+
+.home-hero-title {
+  font-size: 36px;
+}
+
+@media (min-width: 640px) {
+  .home-hero-title { font-size: 48px; }
+}
+
+@media (min-width: 1024px) {
+  .home-hero-title { font-size: 60px; }
 }
 
 .font-display {
@@ -40,7 +54,7 @@ body {
   border-radius: 999px;
   background: var(--cream-dark);
   color: var(--racing);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -52,7 +66,7 @@ body {
   color: var(--cream);
   padding: 12px 24px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   transition: background 0.15s;
   border: none;
@@ -68,7 +82,7 @@ body {
   color: var(--racing);
   padding: 12px 24px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   border: 1px solid var(--racing);
   transition: background 0.15s;
@@ -84,7 +98,7 @@ body {
   color: var(--cream);
   padding: 12px 24px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -105,7 +119,7 @@ body {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.3px;
 }
@@ -118,7 +132,7 @@ body {
   padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid rgba(15, 61, 46, 0.2);
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
   background: white;
   transition: border-color 0.15s;
@@ -131,7 +145,7 @@ body {
 
 .label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-muted);
   font-weight: 600;
   margin-bottom: 6px;

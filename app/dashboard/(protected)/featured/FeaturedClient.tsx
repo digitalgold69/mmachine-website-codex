@@ -13,6 +13,7 @@ type Entry = {
   category: string;
   fullStory: string;
   image: string;
+  priceExVat: number | null;
 };
 
 // What the EditForm operates on. `imageFile` is what the user picked from
@@ -56,6 +57,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       category: "Fabrication",
       fullStory: "",
       image: "",
+      priceExVat: null,
     });
   }
 
@@ -85,6 +87,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             category: draft.category,
             fullStory: draft.fullStory,
             image: draft.image,
+            priceExVat: draft.priceExVat,
           },
           imageDataUrl: draft.imageDataUrl,
         }),
@@ -151,7 +154,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="font-display text-3xl text-racing">Featured workshop jobs</h1>
+          <h1 className="font-display text-3xl text-racing">Featured Work</h1>
           <p className="text-ink-muted text-sm">{items.length} showcase {items.length === 1 ? "job" : "jobs"} on the public site</p>
         </div>
         <div className="flex gap-2">
@@ -192,6 +195,9 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
+            <p className="mb-4 text-sm font-semibold text-racing">
+              {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
+            </p>
             <div className="flex gap-2">
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
               <button type="button" onClick={() => setPendingDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
@@ -202,7 +208,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
 
       {items.length === 0 && (
         <div className="bg-white rounded-xl border border-racing/10 p-12 text-center">
-          <p className="text-ink-muted mb-4">No featured jobs yet. Add one to showcase your workshop&apos;s capability.</p>
+          <p className="text-ink-muted mb-4">No featured items yet. Add one to showcase what M-Machine can make.</p>
           <button onClick={startAdd} className="btn-primary">Add your first job</button>
         </div>
       )}
@@ -272,7 +278,7 @@ function EditForm({
   return (
     <div>
       <button onClick={onCancel} className="text-sm text-ink-muted hover:text-racing mb-3" disabled={busy}>
-        ← Back to featured work
+        ← Back to Featured Work
       </button>
       <h1 className="font-display text-3xl text-racing mb-6">{isNew ? "Add new featured job" : "Edit featured job"}</h1>
 
@@ -331,6 +337,29 @@ function EditForm({
               onChange={(e) => setForm({ ...form, category: e.target.value })}
               placeholder="e.g. Fabrication, Engineering, Welding"
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="featured-price">Price ex VAT (optional)</label>
+            <div className="relative max-w-xs">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-muted">£</span>
+              <input
+                id="featured-price"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                className="input pl-8"
+                value={form.priceExVat ?? ""}
+                onChange={(e) => setForm({
+                  ...form,
+                  priceExVat: e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
+                })}
+                placeholder="Leave blank for POA"
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">
+              Leave this blank when the item needs to be quoted individually.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="label">Short description *</label>

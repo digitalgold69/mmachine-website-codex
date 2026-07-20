@@ -10,7 +10,7 @@ const links = [
   { href: "/catalogue/mini", label: "Mini panels" },
   { href: "/catalogue/metals", label: "Metals" },
   { href: "/custom-engineering", label: "Custom work" },
-  { href: "/featured", label: "Featured work" },
+  { href: "/featured", label: "Featured Work" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
@@ -24,23 +24,23 @@ export default function Navbar() {
   return (
     <nav className="bg-racing text-cream sticky top-0 z-50 border-b border-racing-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-20 items-center justify-between py-2">
-          <Link href="/" className="flex items-center gap-4">
-            <BrandMark priority className="h-[53px] w-[53px]" />
+        <div className="flex min-h-[92px] items-center justify-between py-3 lg:min-h-[100px]">
+          <Link href="/" className="flex items-center gap-4 sm:gap-5">
+            <BrandMark priority className="h-[58px] w-[58px] sm:h-[64px] sm:w-[64px]" />
             <div className="leading-tight">
-              <div className="font-display text-lg">M-Machine</div>
-              <div className="text-xs opacity-70 -mt-1">Est. 1980</div>
+              <div className="font-display text-2xl font-bold text-white">M-Machine</div>
+              <div className="mt-0.5 text-sm font-medium text-cream/80">Est. 1980</div>
             </div>
           </Link>
 
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden xl:flex items-center gap-1">
             {links.map((link) => {
               const active = pathname === link.href || (link.href !== "/" && pathname?.startsWith(link.href));
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-3 py-2.5 rounded-md text-sm font-semibold transition-colors ${
                     active
                       ? "bg-gold text-cream"
                       : "text-cream hover:bg-racing-light"
@@ -52,7 +52,7 @@ export default function Navbar() {
             })}
           </div>
 
-          <div className="ml-5 hidden min-w-[190px] flex-col items-end gap-2 pl-4 text-right text-xs leading-tight text-cream/80 lg:flex">
+          <div className="ml-6 hidden min-w-[205px] flex-col items-end gap-3 border-l border-cream/15 pl-5 text-right text-xs leading-snug text-cream/80 xl:flex">
             <a href="tel:01325381302" className="hover:text-gold">
               <span className="block font-semibold text-cream">Metals &amp; Engineering</span>
               <span className="font-mono">01325 381302</span>
@@ -65,8 +65,8 @@ export default function Navbar() {
 
           <button
             type="button"
-            onClick={() => setOpen(!open)}
-            className="lg:hidden p-2 rounded hover:bg-racing-light"
+            onClick={() => setOpen((current) => !current)}
+            className="xl:hidden p-3 rounded hover:bg-racing-light"
             aria-label="Toggle menu"
             aria-expanded={open}
             aria-controls="mobile-navigation"
@@ -78,7 +78,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div id="mobile-navigation" className="lg:hidden pb-3 space-y-1">
+          <div id="mobile-navigation" className="xl:hidden pb-3 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}

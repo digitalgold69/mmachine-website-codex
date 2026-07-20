@@ -137,8 +137,8 @@ export default function MiniCataloguePage() {
             }`}
           >
             <span className="block font-mono text-lg font-bold leading-none">All</span>
-            <span className="mt-1 block truncate text-[11px] font-semibold leading-tight">All sections</span>
-            <span className={`block text-[10px] ${section === "all" ? "text-cream/75" : "text-ink-muted"}`}>
+            <span className="mt-1 block truncate text-[12px] font-semibold leading-tight">All sections</span>
+            <span className={`block text-[11px] ${section === "all" ? "text-cream/75" : "text-ink-muted"}`}>
               {products.length}
             </span>
           </button>
@@ -159,8 +159,8 @@ export default function MiniCataloguePage() {
                 title={s.subtitle}
               >
                 <span className="block font-mono text-lg font-bold leading-none">{s.code}</span>
-                <span className="mt-1 block truncate text-[11px] font-semibold leading-tight">{s.label}</span>
-                <span className={`block text-[10px] ${active ? "text-cream/75" : "text-ink-muted"}`}>
+                <span className="mt-1 block truncate text-[12px] font-semibold leading-tight">{s.label}</span>
+                <span className={`block text-[11px] ${active ? "text-cream/75" : "text-ink-muted"}`}>
                   {count}
                 </span>
               </button>

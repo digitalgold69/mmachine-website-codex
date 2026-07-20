@@ -14,6 +14,7 @@ import { checkRateLimit } from "@/lib/request-limits";
 import { readCompletedFileToken } from "@/lib/quote-upload-token";
 import type { QuoteCustomer } from "@/lib/quote-types";
 import { ukHistoryBounds, ukMonthBounds } from "@/lib/uk-time";
+import { listFeaturedWork, type FeaturedWork } from "@/lib/featured";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,13 @@ function asBoolean(value: unknown) {
 
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
   const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
-  const catalogue = raw.catalogue === "custom" ? "custom" : raw.catalogue === "metals" ? "metals" : "mini";
+  const catalogue = raw.catalogue === "custom"
+    ? "custom"
+    : raw.catalogue === "metals"
+      ? "metals"
+      : raw.catalogue === "featured"
+        ? "featured"
+        : "mini";
   const description = asString(raw.description, 1000);
   if (!description) throw new Error(`Item ${index + 1} is missing a description`);
 
@@ -63,7 +70,11 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
   };
 }
 
-function safePublicItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
+function safePublicItem(
+  raw: Partial<QuoteItem>,
+  index: number,
+  featuredById: Map<string, FeaturedWork>
+): QuoteItem {
   const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
   const productId = asString(raw.productId, 120);
 
@@ -102,6 +113,23 @@ function safePublicItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
       qty,
       unitPriceExVat: product.priceExVat,
       unitPriceIncVat: product.priceIncVat,
+    };
+  }
+
+  if (raw.catalogue === "featured") {
+    const featured = featuredById.get(productId);
+    if (!featured) throw new Error(`Item ${index + 1} is no longer available.`);
+    const priceExVat = featured.priceExVat;
+    return {
+      key: `featured-${featured.id}`,
+      catalogue: "featured",
+      productId: featured.id,
+      code: `FW-${featured.id.toUpperCase()}`,
+      description: featured.title,
+      unit: "each",
+      qty,
+      unitPriceExVat: priceExVat,
+      unitPriceIncVat: typeof priceExVat === "number" ? Number((priceExVat * 1.2).toFixed(2)) : null,
     };
   }
 
@@ -528,10 +556,15 @@ export async function POST(req: Request) {
   }
 
   try {
-    const items = rawItems.map(safePublicItem);
+    const needsFeatured = rawItems.some((item) => item.catalogue === "featured");
+    const featuredById = needsFeatured
+      ? new Map((await listFeaturedWork()).map((item) => [item.id, item]))
+      : new Map<string, FeaturedWork>();
+    const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById));
     const now = new Date().toISOString();
+    const featuredOnly = items.every((item) => item.catalogue === "featured");
     const quote: QuoteRequest = {
-      id: quoteId(),
+      id: quoteId(featuredOnly ? "FW" : ""),
       submittedAt: now,
       updatedAt: now,
       status: "new",
@@ -552,7 +585,9 @@ export async function POST(req: Request) {
     const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
     const email = await sendQuoteEmail({
       to: ownerEmail,
-      subject: `New M-Machine quote request ${quote.id}`,
+      subject: featuredOnly
+        ? `New M-Machine Featured Work order ${quote.id}`
+        : `New M-Machine quote request ${quote.id}`,
       html: buildOwnerQuoteEmail(quote),
       replyTo: quote.customer.email,
     });
@@ -668,6 +703,15 @@ export async function PATCH(req: Request) {
     }
 
     if (body.markPaid) {
+      const incompleteLine = next.items.find(
+        (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
+      );
+      if (incompleteLine) {
+        return NextResponse.json(
+          { error: "Add an ex VAT price to every invoice line before marking the order as paid." },
+          { status: 400 }
+        );
+      }
       const paidAt = new Date().toISOString();
       next.status = "paid";
       next.paidAt = paidAt;

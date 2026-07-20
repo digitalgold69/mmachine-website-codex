@@ -8,6 +8,8 @@ import { products, sections } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
+import { featuredOrderItem } from "@/lib/featured-order";
+import { OrderButton } from "@/components/QuoteCart";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +48,9 @@ export default async function HomePage() {
             <p className="text-xs tracking-[3px] font-semibold text-gold mb-4">
               CLASSIC MINI SPECIALISTS · EST. 1980
             </p>
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-racing leading-[1.1] mb-6">
-              Pressed panels, engineered parts,<br />
-              <span className="text-gold">built to last.</span>
+            <h1 className="home-hero-title font-display font-semibold text-racing leading-[1.1] mb-6">
+              Mini Panels, Custom Engineering,<br />
+              <span className="text-gold">Huge Material Range.</span>
             </h1>
             <p className="text-lg text-ink-muted leading-relaxed mb-8 max-w-xl">
               Four decades supplying restorers, workshops and fabricators from our Darlington workshop.
@@ -202,18 +204,18 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
             <div>
-              <h2 className="font-display text-3xl text-racing mb-2">Featured workshop jobs</h2>
+              <h2 className="font-display text-3xl text-racing mb-2">Featured Work</h2>
               <p className="text-ink-muted">One-off fabrication, machining and restoration work.</p>
             </div>
             <Link href="/featured" className="text-sm font-medium text-racing hover:text-gold">
-              View all featured work →
+              View all Featured Work →
             </Link>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {latestFeatured.length === 0 && (
               <div className="md:col-span-3 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
-                New workshop projects will appear here as they are added by M-Machine.
+                New Featured Work will appear here as it is added by M-Machine.
               </div>
             )}
             {latestFeatured.map((job) => (
@@ -242,6 +244,17 @@ export default async function HomePage() {
                 </p>
                 <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
                 <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>
+                <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                  <div>
+                    <div className="font-semibold text-racing">
+                      {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)}` : "POA"}
+                    </div>
+                    <div className="text-xs text-ink-muted">
+                      {typeof job.priceExVat === "number" ? "ex VAT" : "Price confirmed before invoicing"}
+                    </div>
+                  </div>
+                  <OrderButton item={featuredOrderItem(job)} />
+                </div>
               </article>
             ))}
           </div>

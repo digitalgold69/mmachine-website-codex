@@ -35,7 +35,7 @@ export default function DashboardNav({ initialNewRequestCount }: { initialNewReq
         )}
       </Link>
       <Link href="/dashboard/featured" className="inline-flex min-w-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-racing hover:bg-cream-dark sm:px-4">
-        Featured work
+        Featured Work
       </Link>
     </nav>
   );

@@ -290,7 +290,7 @@ export default function CustomEngineeringPage() {
                 View metals catalogue
               </Link>
               <Link href="/featured" className="btn-secondary">
-                See workshop examples
+                See Featured Work
               </Link>
             </div>
           </div>

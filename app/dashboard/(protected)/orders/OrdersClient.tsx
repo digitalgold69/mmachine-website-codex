@@ -40,17 +40,20 @@ const lineExVat = (item: QuoteItem) =>
   typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : null;
 
 const totals = (quote: QuoteRequest) => {
+  const hasPoaItems = quote.items.some((item) => typeof item.unitPriceExVat !== "number");
   const goods = quote.items.reduce((sum, item) => sum + (lineExVat(item) ?? 0), 0);
   const carriage = quote.carriageExVat ?? 0;
   const extra = quote.extraChargesExVat ?? 0;
   const totalEx = goods + carriage + extra;
   const vat = totalEx * 0.2;
-  return { goods, carriage, extra, totalEx, vat, totalInc: totalEx + vat };
+  return { goods, carriage, extra, totalEx, vat, totalInc: totalEx + vat, hasPoaItems };
 };
 
 const itemName = (item: QuoteItem) =>
   item.catalogue === "custom"
     ? item.custom?.projectName || item.description || "Custom fabrication request"
+    : item.catalogue === "featured"
+    ? item.description || "Featured Work item"
     : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
@@ -102,12 +105,13 @@ function orderCardSummary(quote: QuoteRequest) {
   return itemName(firstItem);
 }
 
-type QuoteKind = "mini" | "metals" | "custom" | "mixed";
+type QuoteKind = "mini" | "metals" | "custom" | "featured" | "mixed";
 
 const KIND_STYLES: Record<QuoteKind, string> = {
   mini: "bg-racing/10 text-racing",
   metals: "bg-cream-dark text-racing",
   custom: "bg-gold/15 text-gold",
+  featured: "bg-sky-50 text-sky-800",
   mixed: "bg-stone-100 text-stone-700",
 };
 
@@ -115,6 +119,7 @@ const KIND_LABELS: Record<QuoteKind, string> = {
   mini: "Mini parts",
   metals: "Metals",
   custom: "Custom fab",
+  featured: "Featured Work",
   mixed: "Mixed order",
 };
 
@@ -122,6 +127,7 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
   const kinds = new Set(quote.items.map((item) => item.catalogue));
   if (kinds.size > 1) return "mixed";
   if (kinds.has("custom")) return "custom";
+  if (kinds.has("featured")) return "featured";
   if (kinds.has("metals")) return "metals";
   return "mini";
 }
@@ -322,7 +328,9 @@ function OrderCard({
             {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
           </div>
           <div className="text-right">
-            <div className="font-semibold text-racing">{money(quoteTotals.totalEx)}</div>
+            <div className="font-semibold text-racing">
+              {quoteTotals.hasPoaItems ? "POA" : money(quoteTotals.totalEx)}
+            </div>
             <div className="text-xs text-ink-muted">ex VAT</div>
           </div>
         </div>
@@ -968,6 +976,8 @@ export default function OrdersClient({
                           placeholder={
                             item.catalogue === "custom"
                               ? "Custom ref"
+                              : item.catalogue === "featured"
+                                ? "Featured ref"
                               : item.catalogue === "mini"
                                 ? "Mini part no."
                                 : "Metal code"

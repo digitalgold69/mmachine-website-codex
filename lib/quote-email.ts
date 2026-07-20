@@ -23,6 +23,21 @@ const itemName = (item: QuoteItem) => {
   return item.description;
 };
 
+function itemReference(item: QuoteItem) {
+  if (item.catalogue === "custom") return "Custom";
+  if (item.catalogue === "metals") return item.shape || item.code || "Metal";
+  return item.code || (item.catalogue === "featured" ? "Featured Work" : "");
+}
+
+function orderType(quote: QuoteRequest) {
+  const kinds = new Set(quote.items.map((item) => item.catalogue));
+  if (kinds.size > 1) return "Mixed order";
+  if (kinds.has("featured")) return "Featured Work";
+  if (kinds.has("custom")) return "Custom fabrication";
+  if (kinds.has("metals")) return "Metals";
+  return "Mini parts";
+}
+
 const lineExVat = (item: QuoteItem) =>
   typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : null;
 
@@ -151,7 +166,7 @@ function quoteRows(items: QuoteItem[]) {
       (item) => `
         <tr>
           <td>${escapeHtml(item.qty)}</td>
-          <td>${escapeHtml(item.catalogue === "mini" ? item.code : item.catalogue === "custom" ? "Custom" : item.shape)}</td>
+          <td>${escapeHtml(itemReference(item))}</td>
           <td>${escapeHtml(itemName(item))}${item.catalogue === "custom" ? customSummary(item, true) : ""}</td>
           <td>${escapeHtml(item.unit || "")}</td>
           <td style="text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
@@ -165,6 +180,7 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
   const rows = quoteRows(quote.items);
   return `
     <h2>New M-Machine order request: ${escapeHtml(quote.id)}</h2>
+    <p><strong>Order type:</strong> ${escapeHtml(orderType(quote))}</p>
     <p><strong>Name:</strong> ${escapeHtml(quote.customer.name)}</p>
     <p><strong>Email:</strong> ${escapeHtml(quote.customer.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(quote.customer.phone)}</p>
@@ -210,7 +226,7 @@ function invoiceRows(items: QuoteItem[]) {
       return `
         <tr>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:center">${escapeHtml(item.qty)}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;font-family:monospace;color:#0f3d2e">${escapeHtml(item.catalogue === "mini" ? item.code : item.catalogue === "custom" ? "Custom" : item.shape)}</td>
+          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;font-family:monospace;color:#0f3d2e">${escapeHtml(itemReference(item))}</td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca">
             <strong style="color:#0f3d2e">${escapeHtml(item.description)}</strong>
             <div style="color:#6b5a46;font-size:12px;margin-top:3px">${escapeHtml(itemName(item))}</div>

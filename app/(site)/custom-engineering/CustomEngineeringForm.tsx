@@ -344,7 +344,7 @@ export default function CustomEngineeringForm() {
             Send another request
           </button>
           <Link href="/featured" className="btn-secondary justify-center">
-            View workshop work
+            View Featured Work
           </Link>
         </div>
       </div>

@@ -12,6 +12,7 @@ export type FeaturedWork = {
   category: string;
   fullStory: string;
   imagePath: string | null;  // null = no image, page falls back to placeholder
+  priceExVat: number | null;
 };
 
 export const featuredWork: FeaturedWork[] = [];

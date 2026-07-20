@@ -739,7 +739,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
       {/* Top-left: status chip */}
       <div className="absolute left-4 top-16 z-10 flex gap-2 sm:top-4">
-        <div className="max-w-[calc(100vw-64px)] rounded-md bg-racing/90 px-3 py-1.5 text-[11px] tracking-wider text-cream">
+        <div className="max-w-[calc(100vw-64px)] rounded-md bg-racing/90 px-3 py-1.5 text-[12px] tracking-wider text-cream">
           {modelStatus === "loading"     && "LOADING MODEL…"}
           {modelStatus === "placeholder" && "NO MODEL — DROP mini.glb IN /public/models/"}
           {modelStatus === "loaded"      && `${modeLabel} · DRAG TO ORBIT · CLICK TO FILTER`}
@@ -752,7 +752,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           <button
             type="button"
             onClick={() => setMode("exterior")}
-            className={`px-3 py-1.5 rounded text-[11px] font-semibold tracking-wider transition-colors ${
+            className={`px-3 py-1.5 rounded text-[12px] font-semibold tracking-wider transition-colors ${
               mode === "exterior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
             }`}
           >
@@ -761,7 +761,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           <button
             type="button"
             onClick={() => setMode("interior")}
-            className={`px-3 py-1.5 rounded text-[11px] font-semibold tracking-wider transition-colors ${
+            className={`px-3 py-1.5 rounded text-[12px] font-semibold tracking-wider transition-colors ${
               mode === "interior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
             }`}
           >
@@ -773,7 +773,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       {/* Hover tooltip */}
       {hovered && (
         <div
-          className="absolute bg-racing text-cream px-3 py-1.5 rounded-md text-[11px] font-mono z-20 pointer-events-none shadow-lg"
+          className="absolute bg-racing text-cream px-3 py-1.5 rounded-md text-[12px] font-mono z-20 pointer-events-none shadow-lg"
           style={{ left: hovered.x + 16, top: hovered.y + 16 }}
         >
           <span className="font-sans font-semibold text-gold">{hovered.code}</span>
@@ -785,7 +785,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       {/* Bottom readout bar */}
       <div className="absolute bottom-4 left-4 right-4 bg-white/95 rounded-lg p-3 flex items-center justify-between gap-3 border border-racing/10 shadow-sm z-10">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-ink-muted font-semibold tracking-wider">
+          <div className="text-[12px] text-ink-muted font-semibold tracking-wider">
             {selectedSection === "all" ? `CATALOGUE · ${modeLabel}` : `SECTION ${selectedSection} · ${modeLabel}`}
           </div>
           <div className="text-sm font-semibold leading-snug text-racing sm:text-base">

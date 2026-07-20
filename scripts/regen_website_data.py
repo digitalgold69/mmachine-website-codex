@@ -514,6 +514,14 @@ def build_featured_work():
             print(f"  ! entry {i} in featured-work.json is not an object - skipping")
             continue
 
+        raw_price = e.get("priceExVat")
+        try:
+            price_ex_vat = None if raw_price in (None, "") else round(float(raw_price), 2)
+            if price_ex_vat is not None and price_ex_vat < 0:
+                price_ex_vat = None
+        except (TypeError, ValueError):
+            price_ex_vat = None
+
         item = {
             "id":          str(e.get("id", f"f{i+1:03d}")),
             "title":       str(e.get("title", "Untitled")),
@@ -523,6 +531,7 @@ def build_featured_work():
             "category":    str(e.get("category", "Fabrication")),
             "fullStory":   str(e.get("fullStory", "")),
             "imagePath":   None,
+            "priceExVat":  price_ex_vat,
         }
 
         img = (e.get("image") or "").strip()
@@ -594,6 +603,7 @@ export type FeaturedWork = {{
   category: string;
   fullStory: string;
   imagePath: string | null;  // null = no image, page falls back to placeholder
+  priceExVat: number | null;
 }};
 
 export const featuredWork: FeaturedWork[] = {entries_json};

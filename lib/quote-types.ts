@@ -1,4 +1,4 @@
-export type QuoteCatalogue = "mini" | "metals" | "custom";
+export type QuoteCatalogue = "mini" | "metals" | "custom" | "featured";
 
 export type QuoteFile = {
   key: string;

@@ -543,7 +543,7 @@ export default function Mini3D({ selectedSection, onSelect }: Props) {
     <div className="relative rounded-2xl overflow-hidden border border-racing/10" style={{ background: "linear-gradient(180deg, #F5EFE0 0%, #EAE0C8 100%)" }}>
       <div ref={mountRef} className="w-full h-[480px]" />
 
-      <div className="absolute top-4 left-4 bg-racing/90 text-cream px-3 py-1.5 rounded-md text-[11px] tracking-wider pointer-events-none">
+      <div className="absolute top-4 left-4 bg-racing/90 text-cream px-3 py-1.5 rounded-md text-[12px] tracking-wider pointer-events-none">
         DRAG TO ROTATE · CLICK A SECTION
       </div>
 
@@ -568,7 +568,7 @@ export default function Mini3D({ selectedSection, onSelect }: Props) {
 
       <div className="absolute bottom-4 left-4 right-4 bg-white/95 rounded-lg p-3 flex items-center justify-between gap-3 border border-racing/10">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-ink-muted font-semibold tracking-wider">
+          <div className="text-[12px] text-ink-muted font-semibold tracking-wider">
             {selectedSection === "all" ? "CATALOGUE" : `SECTION ${selectedSection}`}
           </div>
           <div className="text-base font-semibold text-racing truncate">

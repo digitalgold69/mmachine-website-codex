@@ -3,14 +3,16 @@ import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import type { Metadata } from "next";
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
+import { featuredOrderItem } from "@/lib/featured-order";
+import { OrderButton } from "@/components/QuoteCart";
 
 export const metadata: Metadata = {
-  title: "Featured custom work — fabrication, machining & restoration",
-  description: "Showcase of bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
+  title: "Featured Work",
+  description: "Order from a selection of featured fabrication, machining and engineering work by M-Machine.",
   alternates: { canonical: absoluteUrl("/featured") },
   openGraph: {
-    title: "Featured custom work | M-Machine",
-    description: "Bespoke fabrication, one-off engineering and restoration projects from the M-Machine workshop.",
+    title: "Featured Work | M-Machine",
+    description: "Order from a selection of featured fabrication, machining and engineering work by M-Machine.",
     url: absoluteUrl("/featured"),
     type: "website",
     images: openGraphImage("/custom-engineering/custom-fabrication-cam.jpg", "Custom engineering work at M-Machine"),
@@ -29,13 +31,13 @@ export default async function FeaturedPage() {
 
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Home", path: "/" },
-    { name: "Featured work", path: "/featured" },
+    { name: "Featured Work", path: "/featured" },
   ]);
 
   const collection = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Featured workshop jobs",
+    name: "Featured Work",
     description: metadata.description,
     url: absoluteUrl("/featured"),
   };
@@ -47,18 +49,17 @@ export default async function FeaturedPage() {
 
       <div className="mb-10">
         <Link href="/" className="text-sm text-ink-muted hover:text-racing">← Home</Link>
-        <h1 className="font-display text-4xl text-racing mt-2 mb-2">Featured workshop jobs</h1>
+        <h1 className="font-display text-4xl text-racing mt-2 mb-2">Featured Work</h1>
         <p className="text-ink-muted max-w-2xl">
-          A showcase of the one-off fabrication, machining and restoration work
-          that passes through the workshop. If you need something bespoke,
-          these show what we&apos;re capable of.
+          Browse recent fabrication, machining and engineering work. Order an item shown here,
+          or use it as a starting point and tell us what you need changed.
         </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-12">
         {featuredWork.length === 0 && (
           <div className="md:col-span-2 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
-            New workshop projects will appear here as they are added.
+            New Featured Work will appear here as it is added.
           </div>
         )}
         {featuredWork.map((job, index) => (
@@ -84,7 +85,7 @@ export default async function FeaturedPage() {
               )}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="chip !bg-racing !text-cream !text-[10px]">{job.tag.toUpperCase()}</span>
+              <span className="chip !bg-racing !text-cream">{job.tag.toUpperCase()}</span>
               <span className="text-xs text-ink-muted">{job.year}</span>
               <span className="text-xs text-ink-muted">·</span>
               <span className="text-xs text-ink-muted">{job.category}</span>
@@ -95,6 +96,17 @@ export default async function FeaturedPage() {
               <summary className="cursor-pointer text-racing font-medium hover:text-gold">Read the full story</summary>
               <p className="mt-2 text-ink-muted leading-relaxed">{job.fullStory}</p>
             </details>
+            <div className="mt-5 flex items-center justify-between gap-4 border-t border-racing/10 pt-4">
+              <div>
+                <div className="font-semibold text-racing">
+                  {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)}` : "POA"}
+                </div>
+                <div className="text-xs text-ink-muted">
+                  {typeof job.priceExVat === "number" ? "ex VAT" : "Price confirmed before invoicing"}
+                </div>
+              </div>
+              <OrderButton item={featuredOrderItem(job)} />
+            </div>
           </article>
         ))}
       </div>
