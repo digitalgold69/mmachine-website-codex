@@ -39,19 +39,9 @@ export default async function HomePage() {
           sizes="100vw"
           className="pointer-events-none object-cover object-center opacity-[0.08] lg:hidden"
         />
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block">
-          <Image
-            src="/home/mmachine-hero.png"
-            alt=""
-            fill
-            priority
-            sizes="50vw"
-            className="object-contain object-center"
-          />
-        </div>
-
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
-          <div className="max-w-2xl">
+          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] xl:gap-14">
+            <div className="max-w-2xl">
             <p className="text-xs tracking-[3px] font-semibold text-gold mb-4">
               CLASSIC MINI SPECIALISTS · EST. 1980
             </p>
@@ -71,6 +61,18 @@ export default async function HomePage() {
               <Link href="/catalogue/metals" className="btn-secondary">
                 View metals
               </Link>
+            </div>
+            </div>
+
+            <div className="relative hidden aspect-[3/2] w-full overflow-hidden lg:block">
+              <Image
+                src="/home/mmachine-hero.png"
+                alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
+                fill
+                priority
+                sizes="(min-width: 1280px) 590px, 48vw"
+                className="object-cover object-center"
+              />
             </div>
           </div>
         </div>
