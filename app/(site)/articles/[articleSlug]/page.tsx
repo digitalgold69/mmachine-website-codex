@@ -10,8 +10,6 @@ type PageProps = {
   params: Promise<{ articleSlug: string }>;
 };
 
-export const dynamicParams = false;
-
 export function generateStaticParams() {
   return articles.map((article) => ({ articleSlug: article.slug }));
 }
