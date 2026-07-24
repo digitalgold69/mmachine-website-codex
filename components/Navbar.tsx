@@ -22,7 +22,7 @@ export default function Navbar() {
   useEffect(() => setOpen(false), [pathname]);
 
   return (
-    <nav className="bg-racing text-cream sticky top-0 z-50 border-b border-racing-dark">
+    <nav className="sticky top-0 z-50 border-b border-racing-dark bg-racing text-cream shadow-[0_5px_16px_rgba(0,0,0,0.22)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="header-content-shadow flex min-h-[92px] items-center justify-between py-3 lg:min-h-[100px]">
           <Link href="/" className="flex items-center gap-4 sm:gap-5">

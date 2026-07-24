@@ -57,7 +57,16 @@ body {
 }
 
 .header-content-shadow {
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.48));
+  text-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.72),
+    0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.header-content-shadow img,
+.header-content-shadow svg {
+  filter:
+    drop-shadow(0 3px 2px rgba(0, 0, 0, 0.68))
+    drop-shadow(0 0 5px rgba(0, 0, 0, 0.18));
 }
 
 :where(a, button, input, select, textarea):focus-visible {
