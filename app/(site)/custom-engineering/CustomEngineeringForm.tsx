@@ -395,77 +395,83 @@ export default function CustomEngineeringForm() {
           </p>
         </div>
 
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          className={`mb-5 rounded-xl border-2 border-dashed p-5 text-center transition ${
-            dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-cream"
-          }`}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            className="sr-only"
-            onChange={(event) => addFiles(Array.from(event.target.files || []))}
-          />
-          <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
-            {COMMON_UPLOAD_TYPES.map((type) => (
-              <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
-                {type}
-              </span>
-            ))}
-          </div>
-          <p className="font-semibold text-racing">Drop files here</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
-          </p>
-          <button type="button" onClick={() => inputRef.current?.click()} className="btn-gold mt-4">
-            Browse files
-          </button>
-        </div>
-
-        {files.length > 0 && (
-          <div className="mb-5 rounded-xl border border-racing/10 bg-cream-dark p-3">
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
-              <span>{files.length} {files.length === 1 ? "file" : "files"} selected</span>
-              <span>{fileSize(totalSize)} total</span>
+        <div className="grid gap-5 md:grid-cols-2 md:items-stretch">
+          <div className="min-w-0">
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              className={`flex min-h-[280px] flex-col justify-center rounded-xl border-2 border-dashed p-5 text-center transition ${
+                dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-cream"
+              }`}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(event) => addFiles(Array.from(event.target.files || []))}
+              />
+              <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
+                {COMMON_UPLOAD_TYPES.map((type) => (
+                  <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
+                    {type}
+                  </span>
+                ))}
+              </div>
+              <p className="font-semibold text-racing">Drop files here</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
+              </p>
+              <div>
+                <button type="button" onClick={() => inputRef.current?.click()} className="btn-gold mt-4">
+                  Browse files
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              {files.map((file) => (
-                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-racing">{file.name}</div>
-                    <div className="text-xs text-ink-muted">{fileSize(file.size)}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(file)}
-                    className="shrink-0 text-xs font-semibold text-racing underline hover:text-gold"
-                  >
-                    Remove
-                  </button>
+
+            {files.length > 0 && (
+              <div className="mt-4 rounded-xl border border-racing/10 bg-cream-dark p-3">
+                <div className="mb-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
+                  <span>{files.length} {files.length === 1 ? "file" : "files"} selected</span>
+                  <span>{fileSize(totalSize)} total</span>
                 </div>
-              ))}
-            </div>
+                <div className="space-y-2">
+                  {files.map((file) => (
+                    <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-racing">{file.name}</div>
+                        <div className="text-xs text-ink-muted">{fileSize(file.size)}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(file)}
+                        className="shrink-0 text-xs font-semibold text-racing underline hover:text-gold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
 
-        <div>
-          <label className="label" htmlFor="message">Job details *</label>
-          <textarea
-            ref={messageRef}
-            id="message"
-            name="message"
-            required
-            rows={7}
-            className="input resize-y"
-            placeholder="Describe the part, quantity, material if known, important dimensions and what it needs to do."
-          />
+          <div className="flex min-w-0 flex-col">
+            <label className="label" htmlFor="message">Job details *</label>
+            <textarea
+              ref={messageRef}
+              id="message"
+              name="message"
+              required
+              rows={10}
+              className="input min-h-[280px] flex-1 resize-y"
+              placeholder="Describe the part, quantity, material if known, important dimensions and what it needs to do."
+            />
+          </div>
         </div>
       </section>
 
@@ -478,60 +484,65 @@ export default function CustomEngineeringForm() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="name">Name *</label>
-            <input id="name" name="name" required={step === 2} autoComplete="name" className="input" />
+        <div className="grid gap-5 md:grid-cols-[1.08fr_0.92fr] md:items-start">
+          <div className="min-w-0">
+            <h3 className="mb-4 font-semibold text-racing">Contact details</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="name">Name *</label>
+                <input id="name" name="name" required={step === 2} autoComplete="name" className="input" />
+              </div>
+              <div>
+                <label className="label" htmlFor="company">Company</label>
+                <input id="company" name="company" autoComplete="organization" className="input" />
+              </div>
+              <div>
+                <label className="label" htmlFor="email">Email *</label>
+                <input id="email" name="email" type="email" required={step === 2} autoComplete="email" className="input" />
+              </div>
+              <div>
+                <label className="label" htmlFor="phone">Phone *</label>
+                <input id="phone" name="phone" type="tel" required={step === 2} autoComplete="tel" className="input" />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="label" htmlFor="company">Company</label>
-            <input id="company" name="company" autoComplete="organization" className="input" />
-          </div>
-          <div>
-            <label className="label" htmlFor="email">Email *</label>
-            <input id="email" name="email" type="email" required={step === 2} autoComplete="email" className="input" />
-          </div>
-          <div>
-            <label className="label" htmlFor="phone">Phone *</label>
-            <input id="phone" name="phone" type="tel" required={step === 2} autoComplete="tel" className="input" />
-          </div>
-        </div>
 
-        <div className="mt-5 rounded-xl border border-racing/10 bg-cream-dark p-4">
-          <div className="font-semibold text-racing">Collection from M-Machine</div>
-          <p className="mt-1 text-sm leading-6 text-ink-muted">
-            Collect your finished parts from our Darlington workshop.
-          </p>
-          <label className="mt-4 flex items-start gap-3 rounded-lg bg-white p-3 text-sm text-racing">
-            <input
-              type="checkbox"
-              checked={deliveryRequired}
-              onChange={(event) => setDeliveryRequired(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              Request delivery
-              <span className="block text-xs text-ink-muted">
-                Add your address so we can include carriage in your quote.
+          <div className="min-w-0 rounded-xl border border-racing/10 bg-cream-dark p-4">
+            <h3 className="font-semibold text-racing">Collection or delivery</h3>
+            <p className="mt-1 text-sm leading-6 text-ink-muted">
+              Collect your finished parts from our Darlington workshop.
+            </p>
+            <label className="mt-4 flex items-start gap-3 rounded-lg bg-white p-3 text-sm text-racing">
+              <input
+                type="checkbox"
+                checked={deliveryRequired}
+                onChange={(event) => setDeliveryRequired(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                Request delivery
+                <span className="block text-xs text-ink-muted">
+                  Add your address so we can include carriage in your quote.
+                </span>
               </span>
-            </span>
-          </label>
-        </div>
+            </label>
 
-        {deliveryRequired && (
-          <div className="mt-4">
-            <label className="label" htmlFor="address">Delivery address *</label>
-            <textarea
-              id="address"
-              name="address"
-              rows={4}
-              required
-              className="input resize-y"
-              autoComplete="street-address"
-              placeholder="Full delivery address, including postcode"
-            />
+            {deliveryRequired && (
+              <div className="mt-4 border-t border-racing/10 pt-4">
+                <label className="label" htmlFor="address">Delivery address *</label>
+                <textarea
+                  id="address"
+                  name="address"
+                  rows={3}
+                  required
+                  className="input resize-y"
+                  autoComplete="street-address"
+                  placeholder="Full delivery address, including postcode"
+                />
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </section>
 
       {error && (
