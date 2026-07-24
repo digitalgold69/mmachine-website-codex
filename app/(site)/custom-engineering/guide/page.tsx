@@ -206,8 +206,8 @@ export default function CustomEngineeringGuidePage() {
             <div>
               <h2 className="font-display text-3xl">Ready to request a quote?</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-cream/85">
-                Upload what you have, add one clear description and leave your contact details.
-                Collection is the default, or you can ask us to include delivery.
+                Upload a design, drawing, sketch or photo and tell us what you need. We will get
+                back to you with price, timing and the next steps.
               </p>
             </div>
             <Link href="/custom-engineering#quote-form" className="btn-gold justify-center">

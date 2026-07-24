@@ -99,6 +99,6 @@ export const customFaqs = [
   {
     question: "Can the finished part be delivered?",
     answer:
-      "Yes. Collection is the default, but you can request delivery when submitting the job. We will use the address to include carriage in the quote.",
+      "Yes. We can arrange delivery to your address and include carriage in the quote. You can also collect finished parts from our Darlington workshop.",
   },
 ];

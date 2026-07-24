@@ -500,7 +500,7 @@ export default function CustomEngineeringForm() {
         <div className="mt-5 rounded-xl border border-racing/10 bg-cream-dark p-4">
           <div className="font-semibold text-racing">Collection from M-Machine</div>
           <p className="mt-1 text-sm leading-6 text-ink-muted">
-            Collection is selected by default, so no address is needed.
+            Collect your finished parts from our Darlington workshop.
           </p>
           <label className="mt-4 flex items-start gap-3 rounded-lg bg-white p-3 text-sm text-racing">
             <input
@@ -510,9 +510,9 @@ export default function CustomEngineeringForm() {
               className="mt-1"
             />
             <span>
-              I need delivery
+              Request delivery
               <span className="block text-xs text-ink-muted">
-                Add your address so carriage can be included in the quote.
+                Add your address so we can include carriage in your quote.
               </span>
             </span>
           </label>

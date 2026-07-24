@@ -67,7 +67,29 @@ export default function CustomEngineeringPage() {
           <span>Custom engineering</span>
         </nav>
 
-        <header className="grid gap-8 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
+        <section>
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
+                OUR CAPABILITIES
+              </p>
+              <h2 className="font-display text-3xl text-racing">From drawing to finished part</h2>
+            </div>
+            <Link href="/custom-engineering/guide" className="text-sm font-semibold text-racing underline decoration-gold underline-offset-4 hover:text-gold">
+              Explore our custom engineering guide
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            {customCapabilities.map((item) => (
+              <article key={item.title} className="rounded-xl border border-racing/10 bg-white p-4 sm:p-5">
+                <h3 className="font-display text-lg text-racing sm:text-xl">{item.title}</h3>
+                <p className="mt-2 text-sm leading-5 text-ink-muted sm:mt-3 sm:leading-6">{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <header className="mt-12 grid gap-8 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
           <div>
             <p className="mb-4 text-xs font-semibold uppercase tracking-[3px] text-gold">
               CUSTOM WORKSHOP QUOTES
@@ -79,10 +101,13 @@ export default function CustomEngineeringPage() {
               Send a CAD file, drawing, sketch, photo or written description. We cut, fold,
               machine and fabricate custom parts in our Darlington workshop.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
               <ScrollToQuoteButton className="btn-primary">
                 Start a custom quote
               </ScrollToQuoteButton>
+              <span className="text-sm font-semibold text-racing/70">
+                No credit card required
+              </span>
             </div>
           </div>
 
@@ -102,28 +127,6 @@ export default function CustomEngineeringPage() {
             </p>
           </aside>
         </header>
-
-        <section className="mt-12">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-3xl">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
-                OUR CAPABILITIES
-              </p>
-              <h2 className="font-display text-3xl text-racing">From drawing to finished part</h2>
-            </div>
-            <Link href="/custom-engineering/guide" className="text-sm font-semibold text-racing underline decoration-gold underline-offset-4 hover:text-gold">
-              Explore our custom engineering guide
-            </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {customCapabilities.map((item) => (
-              <article key={item.title} className="rounded-xl border border-racing/10 bg-white p-5">
-                <h3 className="font-display text-xl text-racing">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-ink-muted">{item.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
 
         <section className="mt-12 grid gap-4 md:grid-cols-3">
           {customSteps.map((step) => (
