@@ -79,11 +79,14 @@ export default function CustomEngineeringPage() {
               Explore our custom engineering guide
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+          <div className="hide-scrollbar -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-3 sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-4">
             {customCapabilities.map((item) => (
-              <article key={item.title} className="rounded-xl border border-racing/10 bg-white p-4 sm:p-5">
-                <h3 className="font-display text-lg text-racing sm:text-xl">{item.title}</h3>
-                <p className="mt-2 text-sm leading-5 text-ink-muted sm:mt-3 sm:leading-6">{item.body}</p>
+              <article
+                key={item.title}
+                className="w-[82vw] max-w-[310px] shrink-0 snap-start rounded-xl border border-racing/10 bg-white p-5 md:w-auto md:max-w-none"
+              >
+                <h3 className="font-display text-xl text-racing">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-ink-muted">{item.body}</p>
               </article>
             ))}
           </div>

@@ -60,7 +60,7 @@ export default function ArticlesPage() {
         </p>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {guides.map((guide, index) => (
           <article key={guide.id} className="card flex h-full flex-col bg-white">
             <Link href={guideUrl(guide)} className="group block">

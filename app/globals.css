@@ -174,3 +174,12 @@ body {
   background: linear-gradient(90deg, transparent, rgba(15, 61, 46, 0.15), transparent);
   margin: 48px 0;
 }
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

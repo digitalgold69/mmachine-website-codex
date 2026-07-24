@@ -22,7 +22,8 @@ export default async function HomePage() {
     featuredWork = fallbackFeaturedWork;
   }
 
-  const latestFeatured = featuredWork.slice(0, 3);
+  const latestFeatured = featuredWork.slice(0, 6);
+  const latestGuides = guides.slice(0, 6);
   const miniCount = products.length;
   const metalsCount = metals.length;
   const sectionCount = sections.length;
@@ -319,7 +320,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {guides.map((guide) => (
+          {latestGuides.map((guide) => (
             <article key={guide.id} className="card flex h-full flex-col bg-white">
               <Link href={guideUrl(guide)} className="group flex h-full flex-col">
                 <div className="relative mb-4 aspect-[16/9] overflow-hidden rounded-lg bg-cream-dark">

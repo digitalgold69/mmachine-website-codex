@@ -56,9 +56,9 @@ export default async function FeaturedPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 mb-12 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 mb-12 sm:grid-cols-2 lg:grid-cols-4">
         {featuredWork.length === 0 && (
-          <div className="md:col-span-2 lg:col-span-3 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
+          <div className="sm:col-span-2 lg:col-span-4 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
             New Featured Work will appear here as it is added.
           </div>
         )}
