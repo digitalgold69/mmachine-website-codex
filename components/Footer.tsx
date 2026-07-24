@@ -12,7 +12,7 @@ export default function Footer() {
             <div className="flex items-center gap-3 mb-4">
               <BrandMark className="h-11 w-11" />
               <div>
-                <div className="font-display text-lg">M-Machine</div>
+                <div className="font-logo text-xl">M-Machine</div>
                 <div className="text-xs opacity-70 -mt-1">Est. 1980</div>
               </div>
             </div>
@@ -38,6 +38,7 @@ export default function Footer() {
             <h4 className="font-semibold text-gold mb-3 text-sm">Engineering Guides</h4>
             <ul className="space-y-2 text-sm opacity-80">
               <li><Link href="/articles" className="hover:text-gold">All guides</Link></li>
+              <li><Link href="/custom-engineering/guide" className="hover:text-gold">Custom engineering guide</Link></li>
               {articles.map((article) => (
                 <li key={article.slug}>
                   <Link href={articleUrl(article)} className="hover:text-gold">{article.shortTitle}</Link>

@@ -24,11 +24,11 @@ export default function Navbar() {
   return (
     <nav className="bg-racing text-cream sticky top-0 z-50 border-b border-racing-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[92px] items-center justify-between py-3 lg:min-h-[100px]">
+        <div className="header-content-shadow flex min-h-[92px] items-center justify-between py-3 lg:min-h-[100px]">
           <Link href="/" className="flex items-center gap-4 sm:gap-5">
             <BrandMark priority className="h-[58px] w-[58px] sm:h-[64px] sm:w-[64px]" />
             <div className="leading-tight">
-              <div className="font-display text-2xl font-bold text-white">M-Machine</div>
+              <div className="font-logo text-3xl text-white">M-Machine</div>
               <div className="mt-0.5 text-sm font-medium text-cream/80">Est. 1980</div>
             </div>
           </Link>
@@ -78,7 +78,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div id="mobile-navigation" className="xl:hidden pb-3 space-y-1">
+          <div id="mobile-navigation" className="header-content-shadow xl:hidden pb-3 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}

@@ -80,7 +80,7 @@ function customJobRows(quote: QuoteRequest) {
 
   return [
     { label: "Project", value: custom.projectName },
-    { label: "Material", value: custom.material || "Not sure / advise me" },
+    { label: "Material", value: custom.material },
     { label: "Thickness/spec", value: custom.thickness },
     { label: "Quantity", value: [custom.quantity, custom.units].filter(Boolean).join(" ") },
     { label: "Finish", value: custom.finish },

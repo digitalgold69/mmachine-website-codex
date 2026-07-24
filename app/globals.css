@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Bernstein SF";
+  src: url("/fonts/bernstein-sf-regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 
 :root {
   --racing: #0F3D2E;
@@ -41,6 +48,16 @@ body {
 .font-display {
   font-family: var(--font-display), Georgia, serif;
   letter-spacing: 0;
+}
+
+.font-logo {
+  font-family: "Bernstein SF", var(--font-display), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.header-content-shadow {
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.48));
 }
 
 :where(a, button, input, select, textarea):focus-visible {

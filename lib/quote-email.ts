@@ -99,7 +99,7 @@ function ownerCustomJobDetails(quote: QuoteRequest) {
       const files = custom.files || [];
       const rows = [
         ["Project", custom.projectName || item.description],
-        ["Material", custom.material || "Not sure / advise me"],
+        ["Material", custom.material],
         ["Thickness/spec", custom.thickness],
         ["Quantity", [custom.quantity, custom.units].filter(Boolean).join(" ")],
         ["Finish", custom.finish],

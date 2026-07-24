@@ -163,7 +163,7 @@ export default async function HomePage() {
                 CUSTOM ENGINEERING QUOTES
               </p>
               <h2 className="font-display text-3xl sm:text-4xl leading-tight mb-4">
-                Upload a design. Choose the material. We make the part.
+                Upload a design. Get a quote. We make the part.
               </h2>
               <p className="text-sm leading-7 text-cream/85">
                 Need a one-off bracket, folded panel, cut plate, machined part or finished fabrication?

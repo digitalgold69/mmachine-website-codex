@@ -17,6 +17,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/machines`, priority: 0.8 },
     { url: `${SITE_URL}/machines/classic-mini`, priority: 0.85 },
     { url: `${SITE_URL}/custom-engineering`, priority: 0.85 },
+    { url: `${SITE_URL}/custom-engineering/guide`, priority: 0.75 },
     { url: `${SITE_URL}/featured`, priority: 0.7 },
     { url: `${SITE_URL}/articles`, priority: 0.78 },
     { url: `${SITE_URL}/about`, priority: 0.7 },

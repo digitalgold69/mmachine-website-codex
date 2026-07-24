@@ -8,33 +8,6 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
 const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 const COMMON_UPLOAD_TYPES = ["CAD", "PDF", "Images", "Sketches", "Drawings", "ZIP"];
 
-const materials = [
-  "Aluminium",
-  "Aluminium Bronze/Manganese Bronze",
-  "Brass",
-  "Cast Iron",
-  "Copper",
-  "Gauge Plate",
-  "Nickel Silver",
-  "Phosphor Bronze",
-  "Leaded Gunmetal",
-  "Plastics",
-  "Stainless Steel",
-  "Steel",
-  "Silver steel",
-  "Steel Tube",
-];
-
-const finishOptions = [
-  "Raw / as cut",
-  "Deburred edges",
-  "Powder coated",
-  "Anodised",
-  "Plated",
-  "Brushed or polished",
-  "Not sure yet",
-];
-
 function fileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -129,8 +102,15 @@ function fileFingerprint(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}`;
 }
 
+function requestTitle(message: FormDataEntryValue | null) {
+  const firstLine = String(message || "").trim().split(/\r?\n/, 1)[0];
+  if (!firstLine) return "Custom work request";
+  return firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine;
+}
+
 export default function CustomEngineeringForm() {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const successRef = useRef<HTMLDivElement | null>(null);
   const warningDialogRef = useRef<HTMLDivElement | null>(null);
@@ -138,8 +118,9 @@ export default function CustomEngineeringForm() {
   const [files, setFiles] = useState<File[]>([]);
   const [completedUploads, setCompletedUploads] = useState<Record<string, CompletedUpload>>({});
   const [dragging, setDragging] = useState(false);
-  const [drawingStatus, setDrawingStatus] = useState<"cad" | "help">("cad");
-  const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [deliveryRequired, setDeliveryRequired] = useState(false);
+  const [noFileConfirmed, setNoFileConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ file: string; index: number; total: number; percent: number } | null>(null);
   const [showNoFileWarning, setShowNoFileWarning] = useState(false);
@@ -205,8 +186,17 @@ export default function CustomEngineeringForm() {
       return;
     }
     setFiles(next);
-    if (next.length > 0) setShowNoFileWarning(false);
+    if (next.length > 0) {
+      setShowNoFileWarning(false);
+      setNoFileConfirmed(false);
+    }
     setError("");
+  }
+
+  function removeFile(fileToRemove: File) {
+    const next = files.filter((file) => file !== fileToRemove);
+    setFiles(next);
+    if (next.length === 0) setNoFileConfirmed(false);
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -254,21 +244,21 @@ export default function CustomEngineeringForm() {
             email: form.get("email"),
             phone: form.get("phone"),
             company: form.get("company"),
-            address: form.get("address"),
-            arrangeOwnDelivery,
+            address: deliveryRequired ? form.get("address") : "",
+            arrangeOwnDelivery: !deliveryRequired,
             message: form.get("message"),
           },
           custom: {
-            projectName: form.get("projectName"),
-            material: form.get("material"),
-            thickness: form.get("thickness"),
-            finish: form.get("finish"),
-            quantity: form.get("quantity"),
-            units: form.get("units"),
-            tolerance: form.get("tolerance"),
-            deadline: form.get("deadline"),
-            budget: form.get("budget"),
-            drawingStatus,
+            projectName: requestTitle(form.get("message")),
+            material: "",
+            thickness: "",
+            finish: "",
+            quantity: "",
+            units: "",
+            tolerance: "",
+            deadline: "",
+            budget: "",
+            drawingStatus: files.length > 0 ? "cad" : "help",
           },
           uploadedFiles,
         }),
@@ -282,8 +272,9 @@ export default function CustomEngineeringForm() {
       formElement.reset();
       setFiles([]);
       setCompletedUploads({});
-      setDrawingStatus("cad");
-      setArrangeOwnDelivery(false);
+      setStep(1);
+      setDeliveryRequired(false);
+      setNoFileConfirmed(false);
       if (!data.quoteId) throw new Error("The request was saved without a reference. Please contact M-Machine.");
       setSuccess({ quoteId: data.quoteId });
     } catch (err) {
@@ -294,19 +285,28 @@ export default function CustomEngineeringForm() {
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function showStep(nextStep: 1 | 2) {
+    setStep(nextStep);
+    window.setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
+  function continueToContactDetails() {
     setError("");
-    const formElement = event.currentTarget;
-
-    if (submitting) return;
-
-    if (files.length === 0) {
+    if (!messageRef.current?.reportValidity()) return;
+    if (files.length === 0 && !noFileConfirmed) {
       setShowNoFileWarning(true);
       return;
     }
+    showStep(2);
+  }
 
-    void sendRequest(formElement);
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (submitting) return;
+    void sendRequest(event.currentTarget);
   }
 
   function uploadNow() {
@@ -315,14 +315,9 @@ export default function CustomEngineeringForm() {
   }
 
   function continueWithoutFiles() {
-    const formElement = formRef.current;
-    if (!formElement) return;
-    if (!formElement.reportValidity()) {
-      setShowNoFileWarning(false);
-      return;
-    }
+    setNoFileConfirmed(true);
     setShowNoFileWarning(false);
-    void sendRequest(formElement);
+    showStep(2);
   }
 
   if (success) {
@@ -353,216 +348,191 @@ export default function CustomEngineeringForm() {
 
   return (
     <>
-    <form ref={formRef} onSubmit={submit} className="rounded-2xl border border-racing/10 bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-5">
-        <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Start a custom quote</p>
-        <h2 className="mt-2 font-display text-3xl text-racing">Upload your design</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-muted">
-          Add CAD, photos, PDFs, drawings, ZIP files or anything else that helps us understand the job.
-          Files are optional if you can describe what you need clearly.
-        </p>
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      className="scroll-mt-28 rounded-2xl border border-racing/10 bg-white p-4 shadow-sm sm:p-6"
+    >
+      <div className="sr-only" aria-hidden="true">
+        <label htmlFor="custom-website">Website</label>
+        <input id="custom-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       </div>
 
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        className={`mb-5 rounded-xl border-2 border-dashed p-5 text-center transition ${
-          dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-cream"
-        }`}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          className="sr-only"
-          onChange={(event) => addFiles(Array.from(event.target.files || []))}
-        />
-        <div className="sr-only" aria-hidden="true">
-          <label htmlFor="custom-website">Website</label>
-          <input id="custom-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+      <ol className="mb-7 grid grid-cols-2 overflow-hidden rounded-xl border border-racing/10" aria-label="Quote request steps">
+        {[
+          { number: 1, label: "Job details" },
+          { number: 2, label: "Your details" },
+        ].map((item) => {
+          const active = step === item.number;
+          const complete = step > item.number;
+          return (
+            <li
+              key={item.number}
+              aria-current={active ? "step" : undefined}
+              className={`flex min-h-16 items-center gap-3 px-4 py-3 ${
+                active ? "bg-racing text-cream" : "bg-cream text-racing"
+              }`}
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                  active ? "bg-gold text-cream" : complete ? "bg-racing text-cream" : "bg-white"
+                }`}
+              >
+                {complete ? "OK" : item.number}
+              </span>
+              <span className="text-sm font-semibold">{item.label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      <section className={step === 1 ? "block" : "hidden"} aria-hidden={step !== 1}>
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Step 1 of 2</p>
+          <h2 className="mt-2 font-display text-3xl text-racing">Tell us about the job</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">
+            Add any useful files, then describe what you need made in one clear box.
+          </p>
         </div>
-        <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
-          {COMMON_UPLOAD_TYPES.map((type) => (
-            <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
-              {type}
-            </span>
-          ))}
-        </div>
-        <p className="font-semibold text-racing">Drop files here</p>
-        <p className="mt-1 text-sm text-ink-muted">
-          CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
-        </p>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="btn-gold mt-4"
+
+        <div
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`mb-5 rounded-xl border-2 border-dashed p-5 text-center transition ${
+            dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-cream"
+          }`}
         >
-          Browse files
-        </button>
-      </div>
-
-      {files.length > 0 && (
-        <div className="mb-5 rounded-xl border border-racing/10 bg-cream-dark p-3">
-          <div className="mb-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
-            <span>{files.length} {files.length === 1 ? "file" : "files"} selected</span>
-            <span>{fileSize(totalSize)} total</span>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            className="sr-only"
+            onChange={(event) => addFiles(Array.from(event.target.files || []))}
+          />
+          <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
+            {COMMON_UPLOAD_TYPES.map((type) => (
+              <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
+                {type}
+              </span>
+            ))}
           </div>
-          <div className="space-y-2">
-            {files.map((file) => (
-              <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-                <div className="min-w-0">
-                  <div className="truncate font-medium text-racing">{file.name}</div>
-                  <div className="text-xs text-ink-muted">{fileSize(file.size)}</div>
+          <p className="font-semibold text-racing">Drop files here</p>
+          <p className="mt-1 text-sm text-ink-muted">
+            CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
+          </p>
+          <button type="button" onClick={() => inputRef.current?.click()} className="btn-gold mt-4">
+            Browse files
+          </button>
+        </div>
+
+        {files.length > 0 && (
+          <div className="mb-5 rounded-xl border border-racing/10 bg-cream-dark p-3">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
+              <span>{files.length} {files.length === 1 ? "file" : "files"} selected</span>
+              <span>{fileSize(totalSize)} total</span>
+            </div>
+            <div className="space-y-2">
+              {files.map((file) => (
+                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-racing">{file.name}</div>
+                    <div className="text-xs text-ink-muted">{fileSize(file.size)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file)}
+                    className="shrink-0 text-xs font-semibold text-racing underline hover:text-gold"
+                  >
+                    Remove
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFiles((current) => current.filter((item) => item !== file))}
-                  className="shrink-0 text-xs font-semibold text-racing underline hover:text-gold"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="label" htmlFor="message">Job details *</label>
+          <textarea
+            ref={messageRef}
+            id="message"
+            name="message"
+            required
+            rows={7}
+            className="input resize-y"
+            placeholder="Describe the part, quantity, material if known, important dimensions and what it needs to do."
+          />
+        </div>
+      </section>
+
+      <section className={step === 2 ? "block" : "hidden"} aria-hidden={step !== 2}>
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Step 2 of 2</p>
+          <h2 className="mt-2 font-display text-3xl text-racing">Where should we send the quote?</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">
+            We only use these details to prepare the quote and contact you about this job.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="name">Name *</label>
+            <input id="name" name="name" required={step === 2} autoComplete="name" className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="company">Company</label>
+            <input id="company" name="company" autoComplete="organization" className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="email">Email *</label>
+            <input id="email" name="email" type="email" required={step === 2} autoComplete="email" className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="phone">Phone *</label>
+            <input id="phone" name="phone" type="tel" required={step === 2} autoComplete="tel" className="input" />
           </div>
         </div>
-      )}
 
-      <fieldset className="mb-5 grid gap-3 sm:grid-cols-2">
-        <legend className="label">Drawing status</legend>
-        <label className="rounded-xl border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
-          <input
-            type="radio"
-            name="drawingStatusChoice"
-            checked={drawingStatus === "cad"}
-            onChange={() => setDrawingStatus("cad")}
-            className="mr-2"
-          />
-          I have CAD files
-        </label>
-        <label className="rounded-xl border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
-          <input
-            type="radio"
-            name="drawingStatusChoice"
-            checked={drawingStatus === "help"}
-            onChange={() => setDrawingStatus("help")}
-            className="mr-2"
-          />
-          I need help from a sketch or description
-        </label>
-      </fieldset>
+        <div className="mt-5 rounded-xl border border-racing/10 bg-cream-dark p-4">
+          <div className="font-semibold text-racing">Collection from M-Machine</div>
+          <p className="mt-1 text-sm leading-6 text-ink-muted">
+            Collection is selected by default, so no address is needed.
+          </p>
+          <label className="mt-4 flex items-start gap-3 rounded-lg bg-white p-3 text-sm text-racing">
+            <input
+              type="checkbox"
+              checked={deliveryRequired}
+              onChange={(event) => setDeliveryRequired(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              I need delivery
+              <span className="block text-xs text-ink-muted">
+                Add your address so carriage can be included in the quote.
+              </span>
+            </span>
+          </label>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="projectName">Project or part name *</label>
-          <input id="projectName" name="projectName" required className="input" placeholder="e.g. stainless bracket set, folded aluminium panel" />
-        </div>
-        <div>
-          <label className="label" htmlFor="material">Material</label>
-          <select id="material" name="material" className="input" defaultValue="">
-            <option value="">Not sure / advise me</option>
-            {materials.map((material) => (
-              <option key={material} value={material}>{material}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="thickness">Thickness / specification</label>
-          <input id="thickness" name="thickness" className="input" placeholder="e.g. 3mm, 6082, 304 stainless" />
-        </div>
-        <div>
-          <label className="label" htmlFor="quantity">Quantity</label>
-          <input id="quantity" name="quantity" inputMode="numeric" className="input" placeholder="e.g. 1, 20, 250" />
-        </div>
-        <div>
-          <label className="label" htmlFor="units">Unit</label>
-          <input id="units" name="units" className="input" placeholder="e.g. parts, sets, sheets" />
-        </div>
-        <div>
-          <label className="label" htmlFor="finish">Finish</label>
-          <select id="finish" name="finish" className="input" defaultValue="">
-            <option value="">Not sure / advise me</option>
-            {finishOptions.map((finish) => (
-              <option key={finish} value={finish}>{finish}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="deadline">Needed by</label>
-          <input id="deadline" name="deadline" className="input" placeholder="Date or rough timescale" />
-        </div>
-        <div>
-          <label className="label" htmlFor="tolerance">Tolerance / important dimensions</label>
-          <input id="tolerance" name="tolerance" className="input" placeholder="e.g. tight fit on holes, cosmetic face" />
-        </div>
-        <div>
-          <label className="label" htmlFor="budget">Budget guidance</label>
-          <input id="budget" name="budget" className="input" placeholder="Optional" />
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <label className="label" htmlFor="message">Job details *</label>
-        <textarea
-          id="message"
-          name="message"
-          required
-          rows={5}
-          className="input resize-none"
-          placeholder="Tell us what the part does, any important faces, hole sizes, bends, finishes, delivery needs, or anything not obvious from the file."
-        />
-      </div>
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="name">Name *</label>
-          <input id="name" name="name" required autoComplete="name" className="input" />
-        </div>
-        <div>
-          <label className="label" htmlFor="company">Company</label>
-          <input id="company" name="company" autoComplete="organization" className="input" />
-        </div>
-        <div>
-          <label className="label" htmlFor="email">Email *</label>
-          <input id="email" name="email" type="email" required autoComplete="email" className="input" />
-        </div>
-        <div>
-          <label className="label" htmlFor="phone">Phone *</label>
-          <input id="phone" name="phone" type="tel" required autoComplete="tel" className="input" />
-        </div>
-      </div>
-
-      <div className="mt-5">
-        {!arrangeOwnDelivery && (
-          <>
-          <label className="label" htmlFor="address">Delivery address</label>
-          <textarea
-            id="address"
-            name="address"
-            rows={4}
-            required
-            className="input resize-none"
-            autoComplete="street-address"
-            placeholder="Full delivery address, including postcode"
-          />
-          </>
+        {deliveryRequired && (
+          <div className="mt-4">
+            <label className="label" htmlFor="address">Delivery address *</label>
+            <textarea
+              id="address"
+              name="address"
+              rows={4}
+              required
+              className="input resize-y"
+              autoComplete="street-address"
+              placeholder="Full delivery address, including postcode"
+            />
+          </div>
         )}
-        <label className="mt-3 flex items-start gap-3 rounded-xl border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
-          <input
-            type="checkbox"
-            checked={arrangeOwnDelivery}
-            onChange={(event) => setArrangeOwnDelivery(event.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            I will arrange delivery / collection
-            <span className="block text-xs text-ink-muted">Tick this if you do not need us to quote carriage.</span>
-          </span>
-        </label>
-      </div>
+      </section>
 
       {error && (
         <div className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-800">
@@ -582,14 +552,25 @@ export default function CustomEngineeringForm() {
         </div>
       )}
 
-      <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs leading-5 text-ink-muted">
-          Uploads are optional, but useful photos, drawings or files help us quote accurately.
-        </p>
-        <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
-          {submitting ? (uploadProgress ? "Uploading files..." : "Submitting...") : "Submit custom request"}
-        </button>
-      </div>
+      {step === 1 ? (
+        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-ink-muted">
+            Files are optional when the written details explain the job clearly.
+          </p>
+          <button type="button" onClick={continueToContactDetails} className="btn-primary justify-center">
+            Continue to your details
+          </button>
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button" onClick={() => showStep(1)} className="btn-secondary justify-center" disabled={submitting}>
+            Back to job details
+          </button>
+          <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
+            {submitting ? (uploadProgress ? "Uploading files..." : "Submitting...") : "Submit custom request"}
+          </button>
+        </div>
+      )}
     </form>
     {showNoFileWarning && (
       <div className="fixed inset-0 z-[80] flex items-center justify-center bg-racing/55 px-4 py-6 backdrop-blur-sm">
