@@ -6,7 +6,6 @@ import Link from "next/link";
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
 const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
-const COMMON_UPLOAD_TYPES = ["CAD", "PDF", "Images", "Sketches", "Drawings", "ZIP"];
 
 function fileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
@@ -351,52 +350,74 @@ export default function CustomEngineeringForm() {
     <form
       ref={formRef}
       onSubmit={submit}
-      className="scroll-mt-28 rounded-2xl border border-racing/10 bg-white p-4 shadow-sm sm:p-6"
+      className="scroll-mt-28 overflow-hidden rounded-2xl border border-racing/10 bg-white shadow-[0_18px_45px_rgba(15,61,46,0.08)]"
     >
       <div className="sr-only" aria-hidden="true">
         <label htmlFor="custom-website">Website</label>
         <input id="custom-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       </div>
 
-      <ol className="mb-7 grid grid-cols-2 overflow-hidden rounded-xl border border-racing/10" aria-label="Quote request steps">
-        {[
-          { number: 1, label: "Job details" },
-          { number: 2, label: "Your details" },
-        ].map((item) => {
-          const active = step === item.number;
-          const complete = step > item.number;
-          return (
-            <li
-              key={item.number}
-              aria-current={active ? "step" : undefined}
-              className={`flex min-h-16 items-center gap-3 px-4 py-3 ${
-                active ? "bg-racing text-cream" : "bg-cream text-racing"
-              }`}
-            >
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                  active ? "bg-gold text-cream" : complete ? "bg-racing text-cream" : "bg-white"
+      <div className="border-b border-racing/10 bg-cream-dark/70 px-4 py-4 sm:px-6">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <p className="text-xs font-semibold uppercase tracking-[2px] text-racing">
+            Custom quote
+          </p>
+          <p className="text-xs font-medium text-ink-muted">Step {step} of 2</p>
+        </div>
+        <ol className="grid grid-cols-2 gap-2" aria-label="Quote request steps">
+          {[
+            { number: 1, label: "Job details" },
+            { number: 2, label: "Your details" },
+          ].map((item) => {
+            const active = step === item.number;
+            const complete = step > item.number;
+            return (
+              <li
+                key={item.number}
+                aria-current={active ? "step" : undefined}
+                className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 transition-colors sm:px-4 ${
+                  active
+                    ? "bg-white text-racing shadow-sm ring-1 ring-racing/5"
+                    : "text-ink-muted"
                 }`}
               >
-                {complete ? "OK" : item.number}
-              </span>
-              <span className="text-sm font-semibold">{item.label}</span>
-            </li>
-          );
-        })}
-      </ol>
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    active
+                      ? "bg-gold text-white"
+                      : complete
+                        ? "bg-racing text-white"
+                        : "border border-racing/15 bg-white text-racing"
+                  }`}
+                >
+                  {complete ? "OK" : item.number}
+                </span>
+                <span className="text-sm font-semibold">{item.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       <section className={step === 1 ? "block" : "hidden"} aria-hidden={step !== 1}>
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Step 1 of 2</p>
-          <h2 className="mt-2 font-display text-3xl text-racing">Tell us about the job</h2>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">
-            Add any useful files, then describe what you need made in one clear box.
-          </p>
-        </div>
+        <div className="p-4 sm:p-6">
+          <div className="grid overflow-hidden rounded-xl border border-racing/10 lg:grid-cols-2">
+            <div className="min-w-0 bg-cream/[0.55] p-5 sm:p-6 lg:border-r lg:border-racing/10">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[2px] text-gold">
+                    01 &nbsp; Files
+                  </p>
+                  <span className="shrink-0 rounded-full border border-racing/10 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                    Optional
+                  </span>
+                </div>
+                <h3 className="mt-2 font-display text-2xl text-racing">Add supporting files</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                  Upload a drawing, CAD file, photo or sketch if it helps explain the job.
+                </p>
+              </div>
 
-        <div className="grid gap-5 md:grid-cols-2 md:items-stretch">
-          <div className="min-w-0">
             <div
               onDragOver={(event) => {
                 event.preventDefault();
@@ -404,8 +425,8 @@ export default function CustomEngineeringForm() {
               }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
-              className={`flex min-h-[280px] flex-col justify-center rounded-xl border-2 border-dashed p-5 text-center transition ${
-                dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-cream"
+                className={`flex min-h-[210px] flex-col items-center justify-center rounded-lg border-2 border-dashed px-5 py-6 text-center transition ${
+                dragging ? "border-gold bg-gold/5" : "border-racing/20 bg-white"
               }`}
             >
               <input
@@ -415,22 +436,19 @@ export default function CustomEngineeringForm() {
                 className="sr-only"
                 onChange={(event) => addFiles(Array.from(event.target.files || []))}
               />
-              <div className="mx-auto mb-4 flex flex-wrap justify-center gap-2">
-                {COMMON_UPLOAD_TYPES.map((type) => (
-                  <span key={type} className="rounded-md bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-racing shadow-sm">
-                    {type}
-                  </span>
-                ))}
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-cream-dark text-xl font-semibold text-racing" aria-hidden="true">
+                  +
               </div>
-              <p className="font-semibold text-racing">Drop files here</p>
-              <p className="mt-1 text-sm text-ink-muted">
-                CAD, photos, PDFs, spreadsheets, ZIP files or sketches. Up to {MAX_FILES} files, 2 GB each.
+                <p className="font-semibold text-racing">Drop files here</p>
+                <p className="mt-1 max-w-sm text-sm leading-6 text-ink-muted">
+                  CAD, PDF, images, spreadsheets, sketches or ZIP files
               </p>
-              <div>
-                <button type="button" onClick={() => inputRef.current?.click()} className="btn-gold mt-4">
+                <button type="button" onClick={() => inputRef.current?.click()} className="btn-gold mt-4 justify-center">
                   Browse files
                 </button>
-              </div>
+                <p className="mt-3 text-xs text-ink-muted">
+                  Up to {MAX_FILES} files, 2 GB each
+                </p>
             </div>
 
             {files.length > 0 && (
@@ -458,89 +476,126 @@ export default function CustomEngineeringForm() {
                 </div>
               </div>
             )}
-          </div>
+            </div>
 
-          <div className="flex min-w-0 flex-col">
-            <label className="label" htmlFor="message">Job details *</label>
-            <textarea
-              ref={messageRef}
-              id="message"
-              name="message"
-              required
-              rows={10}
-              className="input min-h-[280px] flex-1 resize-y"
-              placeholder="Describe the part, quantity, material if known, important dimensions and what it needs to do."
-            />
+            <div className="flex min-w-0 flex-col p-5 sm:p-6">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[2px] text-gold">
+                    02 &nbsp; Brief
+                  </p>
+                  <span className="shrink-0 rounded-full bg-racing px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                    Required
+                  </span>
+                </div>
+                <h3 className="mt-2 font-display text-2xl text-racing">Describe the job</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
+                  Tell us what you need made and include the important practical details.
+                </p>
+              </div>
+              <label className="sr-only" htmlFor="message">Job details</label>
+              <textarea
+                ref={messageRef}
+                id="message"
+                name="message"
+                required
+                rows={8}
+                className="input min-h-[210px] flex-1 resize-y !p-4 !leading-6"
+                placeholder="Describe the part, quantity, material if known, important dimensions and what it needs to do."
+              />
+              <p className="mt-3 text-xs leading-5 text-ink-muted">
+                Helpful details include quantity, material, dimensions and intended use.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       <section className={step === 2 ? "block" : "hidden"} aria-hidden={step !== 2}>
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Step 2 of 2</p>
-          <h2 className="mt-2 font-display text-3xl text-racing">Where should we send the quote?</h2>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">
-            We only use these details to prepare the quote and contact you about this job.
-          </p>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-[1.08fr_0.92fr] md:items-start">
-          <div className="min-w-0">
-            <h3 className="mb-4 font-semibold text-racing">Contact details</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="name">Name *</label>
-                <input id="name" name="name" required={step === 2} autoComplete="name" className="input" />
+        <div className="p-4 sm:p-6">
+          <div className="grid overflow-hidden rounded-xl border border-racing/10 lg:grid-cols-[1.08fr_0.92fr]">
+            <div className="min-w-0 p-5 sm:p-6 lg:border-r lg:border-racing/10">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[2px] text-gold">
+                    01 &nbsp; Contact
+                  </p>
+                  <span className="shrink-0 rounded-full bg-racing px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                    Required
+                  </span>
+                </div>
+                <h3 className="mt-2 font-display text-2xl text-racing">Your details</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  Where should we send your quote?
+                </p>
               </div>
-              <div>
-                <label className="label" htmlFor="company">Company</label>
-                <input id="company" name="company" autoComplete="organization" className="input" />
-              </div>
-              <div>
-                <label className="label" htmlFor="email">Email *</label>
-                <input id="email" name="email" type="email" required={step === 2} autoComplete="email" className="input" />
-              </div>
-              <div>
-                <label className="label" htmlFor="phone">Phone *</label>
-                <input id="phone" name="phone" type="tel" required={step === 2} autoComplete="tel" className="input" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="name">Name *</label>
+                  <input id="name" name="name" required={step === 2} autoComplete="name" className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="company">Company</label>
+                  <input id="company" name="company" autoComplete="organization" className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="email">Email *</label>
+                  <input id="email" name="email" type="email" required={step === 2} autoComplete="email" className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="phone">Phone *</label>
+                  <input id="phone" name="phone" type="tel" required={step === 2} autoComplete="tel" className="input" />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="min-w-0 rounded-xl border border-racing/10 bg-cream-dark p-4">
-            <h3 className="font-semibold text-racing">Collection or delivery</h3>
-            <p className="mt-1 text-sm leading-6 text-ink-muted">
-              Collect your finished parts from our Darlington workshop.
-            </p>
-            <label className="mt-4 flex items-start gap-3 rounded-lg bg-white p-3 text-sm text-racing">
-              <input
-                type="checkbox"
-                checked={deliveryRequired}
-                onChange={(event) => setDeliveryRequired(event.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                Request delivery
-                <span className="block text-xs text-ink-muted">
-                  Add your address so we can include carriage in your quote.
-                </span>
-              </span>
-            </label>
-
-            {deliveryRequired && (
-              <div className="mt-4 border-t border-racing/10 pt-4">
-                <label className="label" htmlFor="address">Delivery address *</label>
-                <textarea
-                  id="address"
-                  name="address"
-                  rows={3}
-                  required
-                  className="input resize-y"
-                  autoComplete="street-address"
-                  placeholder="Full delivery address, including postcode"
-                />
+            <div className="min-w-0 bg-cream/[0.55] p-5 sm:p-6">
+              <div className="mb-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[2px] text-gold">
+                  02 &nbsp; Fulfilment
+                </p>
+                <h3 className="mt-2 font-display text-2xl text-racing">Collection or delivery</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  Collect from our Darlington workshop, or ask us to include carriage.
+                </p>
               </div>
-            )}
+
+              <div className="rounded-lg border border-racing/10 bg-white p-4">
+                <p className="text-sm font-semibold text-racing">Collection</p>
+                <p className="mt-1 text-xs leading-5 text-ink-muted">
+                  Your finished parts will be ready to collect from M-Machine.
+                </p>
+              </div>
+              <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-racing/10 bg-white p-4 text-sm text-racing transition hover:border-racing/25">
+                <input
+                  type="checkbox"
+                  checked={deliveryRequired}
+                  onChange={(event) => setDeliveryRequired(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-racing"
+                />
+                <span>
+                  <span className="font-semibold">Request delivery</span>
+                  <span className="mt-1 block text-xs leading-5 text-ink-muted">
+                    Add your address so we can include carriage in your quote.
+                  </span>
+                </span>
+              </label>
+
+              {deliveryRequired && (
+                <div className="mt-4 border-t border-racing/10 pt-4">
+                  <label className="label" htmlFor="address">Delivery address *</label>
+                  <textarea
+                    id="address"
+                    name="address"
+                    rows={3}
+                    required
+                    className="input resize-y"
+                    autoComplete="street-address"
+                    placeholder="Full delivery address, including postcode"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -564,20 +619,19 @@ export default function CustomEngineeringForm() {
       )}
 
       {step === 1 ? (
-        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs leading-5 text-ink-muted">
-            Files are optional when the written details explain the job clearly.
-          </p>
-          <button type="button" onClick={continueToContactDetails} className="btn-primary justify-center">
+        <div className="flex flex-col gap-3 border-t border-racing/10 bg-cream-dark/[0.45] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p className="text-xs leading-5 text-ink-muted">No drawing? Clear written details are fine.</p>
+          <button type="button" onClick={continueToContactDetails} className="btn-primary justify-center sm:min-w-[220px]">
             Continue to your details
+            <span aria-hidden="true">→</span>
           </button>
         </div>
       ) : (
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-3 border-t border-racing/10 bg-cream-dark/[0.45] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <button type="button" onClick={() => showStep(1)} className="btn-secondary justify-center" disabled={submitting}>
             Back to job details
           </button>
-          <button type="submit" disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={submitting} className="btn-primary justify-center sm:min-w-[220px] disabled:cursor-not-allowed disabled:opacity-60">
             {submitting ? (uploadProgress ? "Uploading files..." : "Submitting...") : "Submit custom request"}
           </button>
         </div>
