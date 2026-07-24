@@ -1,5 +1,6 @@
-export type Article = {
-  slug: string;
+export type Guide = {
+  id: string;
+  href: string;
   title: string;
   shortTitle: string;
   description: string;
@@ -7,6 +8,10 @@ export type Article = {
   image: string;
   imageAlt: string;
   readingTime: string;
+};
+
+export type Article = Omit<Guide, "id" | "href"> & {
+  slug: string;
 };
 
 export const articles: Article[] = [
@@ -56,10 +61,34 @@ export const articles: Article[] = [
   },
 ];
 
+export const guides: Guide[] = [
+  {
+    id: "custom-engineering-guide",
+    href: "/custom-engineering/guide",
+    title: "Custom Engineering: From Drawing to Finished Part",
+    shortTitle: "Custom engineering guide",
+    description:
+      "See the files we accept, materials we hold and the cutting, folding, machining and fabrication capabilities available for custom parts.",
+    category: "Custom Engineering",
+    image: "/custom-engineering/cnc-machining.jpg",
+    imageAlt: "CNC machining in the M-Machine workshop",
+    readingTime: "8 min read",
+  },
+  ...articles.map((article) => ({
+    ...article,
+    id: article.slug,
+    href: `/articles/${article.slug}`,
+  })),
+];
+
 export function getArticle(slug: string) {
   return articles.find((article) => article.slug === slug);
 }
 
 export function articleUrl(article: Article) {
   return `/articles/${article.slug}`;
+}
+
+export function guideUrl(guide: Guide) {
+  return guide.href;
 }

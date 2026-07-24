@@ -1,21 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { articleUrl, articles } from "@/lib/articles";
+import { guideUrl, guides } from "@/lib/articles";
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Engineering Guides and Metalworking Articles",
   description:
-    "Practical M-Machine guides to engineering steel grades, BS970 designations, tool-steel heat treatment and dividing-head operation.",
+    "Practical M-Machine guides to custom engineering, steel grades, BS970 designations, tool-steel heat treatment and workshop processes.",
   alternates: { canonical: absoluteUrl("/articles") },
   openGraph: {
     title: "Engineering Guides and Metalworking Articles | M-Machine",
     description:
-      "Practical workshop knowledge covering materials, machining, heat treatment and dividing-head operation.",
+      "Practical workshop knowledge covering custom engineering, materials, machining, heat treatment and dividing-head operation.",
     url: absoluteUrl("/articles"),
     type: "website",
-    images: openGraphImage(articles[0].image, articles[0].imageAlt),
+    images: openGraphImage(guides[0].image, guides[0].imageAlt),
   },
 };
 
@@ -32,11 +32,11 @@ export default function ArticlesPage() {
     url: absoluteUrl("/articles"),
     mainEntity: {
       "@type": "ItemList",
-      itemListElement: articles.map((article, index) => ({
+      itemListElement: guides.map((guide, index) => ({
         "@type": "ListItem",
         position: index + 1,
-        name: article.title,
-        url: absoluteUrl(articleUrl(article)),
+        name: guide.title,
+        url: absoluteUrl(guideUrl(guide)),
       })),
     },
   };
@@ -56,18 +56,18 @@ export default function ArticlesPage() {
         <p className="mb-3 text-xs font-semibold tracking-[3px] text-gold">M-MACHINE INFORMATION LIBRARY</p>
         <h1 className="font-display text-4xl text-racing mb-3">Engineering guides</h1>
         <p className="text-ink-muted leading-8">
-          Practical notes from the workshop on engineering materials, steel specifications, heat treatment and machining.
+          Practical notes from the workshop on custom engineering, materials, steel specifications, heat treatment and machining.
         </p>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {articles.map((article, index) => (
-          <article key={article.slug} className="card flex h-full flex-col bg-white">
-            <Link href={articleUrl(article)} className="group block">
+        {guides.map((guide, index) => (
+          <article key={guide.id} className="card flex h-full flex-col bg-white">
+            <Link href={guideUrl(guide)} className="group block">
               <div className="relative mb-5 aspect-[16/7] overflow-hidden rounded-lg bg-cream-dark">
                 <Image
-                  src={article.image}
-                  alt={article.imageAlt}
+                  src={guide.image}
+                  alt={guide.imageAlt}
                   fill
                   priority={index < 2}
                   sizes="(min-width: 768px) 50vw, 100vw"
@@ -75,14 +75,14 @@ export default function ArticlesPage() {
                 />
               </div>
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold">
-                <span>{article.category}</span>
+                <span>{guide.category}</span>
                 <span aria-hidden="true">&middot;</span>
-                <span className="text-ink-muted">{article.readingTime}</span>
+                <span className="text-ink-muted">{guide.readingTime}</span>
               </div>
-              <h2 className="font-display text-2xl text-racing mb-3 group-hover:text-gold">{article.title}</h2>
-              <p className="text-sm leading-7 text-ink-muted">{article.description}</p>
+              <h2 className="font-display text-2xl text-racing mb-3 group-hover:text-gold">{guide.title}</h2>
+              <p className="text-sm leading-7 text-ink-muted">{guide.description}</p>
               <span className="mt-5 inline-flex text-sm font-semibold text-racing group-hover:text-gold">
-                Read article <span aria-hidden="true" className="ml-1">&rarr;</span>
+                Read guide <span aria-hidden="true" className="ml-1">&rarr;</span>
               </span>
             </Link>
           </article>

@@ -6,7 +6,7 @@ import {
   getAllSeoProducts,
   productUrl,
 } from "@/lib/seo";
-import { articleUrl, articles } from "@/lib/articles";
+import { guideUrl, guides } from "@/lib/articles";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   if (IS_PREVIEW_DEPLOYMENT) return [];
@@ -17,7 +17,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/machines`, priority: 0.8 },
     { url: `${SITE_URL}/machines/classic-mini`, priority: 0.85 },
     { url: `${SITE_URL}/custom-engineering`, priority: 0.85 },
-    { url: `${SITE_URL}/custom-engineering/guide`, priority: 0.75 },
     { url: `${SITE_URL}/featured`, priority: 0.7 },
     { url: `${SITE_URL}/articles`, priority: 0.78 },
     { url: `${SITE_URL}/about`, priority: 0.7 },
@@ -35,10 +34,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.64,
   }));
 
-  const articlePages: MetadataRoute.Sitemap = articles.map((article) => ({
-    url: `${SITE_URL}${articleUrl(article)}`,
+  const guidePages: MetadataRoute.Sitemap = guides.map((guide) => ({
+    url: `${SITE_URL}${guideUrl(guide)}`,
     priority: 0.72,
   }));
 
-  return [...staticPages, ...categoryPages, ...productPages, ...articlePages];
+  return [...staticPages, ...categoryPages, ...productPages, ...guidePages];
 }

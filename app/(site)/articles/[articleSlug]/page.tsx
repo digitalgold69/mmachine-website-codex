@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import ArticleContent from "@/components/ArticleContent";
-import { articleUrl, articles, getArticle } from "@/lib/articles";
+import { articleUrl, articles, getArticle, guideUrl, guides } from "@/lib/articles";
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/lib/seo";
 
 type PageProps = {
@@ -40,7 +40,7 @@ export default async function ArticlePage({ params }: PageProps) {
   if (!article) notFound();
 
   const path = articleUrl(article);
-  const related = articles.filter((entry) => entry.slug !== article.slug);
+  const related = guides.filter((entry) => entry.href !== path);
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Home", path: "/" },
     { name: "Engineering Guides", path: "/articles" },
@@ -116,8 +116,8 @@ export default async function ArticlePage({ params }: PageProps) {
               <h2 className="font-display text-xl text-racing mb-4">More engineering guides</h2>
               <ul className="space-y-4">
                 {related.map((entry) => (
-                  <li key={entry.slug}>
-                    <Link href={articleUrl(entry)} className="group block">
+                  <li key={entry.id}>
+                    <Link href={guideUrl(entry)} className="group block">
                       <span className="block text-xs font-semibold uppercase tracking-wider text-gold">{entry.category}</span>
                       <span className="mt-1 block text-sm font-semibold leading-6 text-racing group-hover:text-gold">
                         {entry.shortTitle}

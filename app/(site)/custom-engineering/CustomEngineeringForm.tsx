@@ -560,13 +560,29 @@ export default function CustomEngineeringForm() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-racing/10 bg-white p-4">
-                <p className="text-sm font-semibold text-racing">Collection</p>
-                <p className="mt-1 text-xs leading-5 text-ink-muted">
-                  Your finished parts will be ready to collect from M-Machine.
-                </p>
-              </div>
-              <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-racing/10 bg-white p-4 text-sm text-racing transition hover:border-racing/25">
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white p-4 text-sm text-racing transition hover:border-racing/25 ${
+                  deliveryRequired ? "border-racing/10" : "border-racing/30 ring-1 ring-racing/10"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={!deliveryRequired}
+                  onChange={() => setDeliveryRequired(false)}
+                  className="mt-1 h-4 w-4 accent-racing"
+                />
+                <span>
+                  <span className="font-semibold">Collection</span>
+                  <span className="mt-1 block text-xs leading-5 text-ink-muted">
+                    Your finished parts will be ready to collect from M-Machine.
+                  </span>
+                </span>
+              </label>
+              <label
+                className={`mt-3 flex cursor-pointer items-start gap-3 rounded-lg border bg-white p-4 text-sm text-racing transition hover:border-racing/25 ${
+                  deliveryRequired ? "border-racing/30 ring-1 ring-racing/10" : "border-racing/10"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={deliveryRequired}

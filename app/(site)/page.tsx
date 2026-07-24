@@ -10,7 +10,7 @@ import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import { featuredOrderItem } from "@/lib/featured-order";
 import { OrderButton } from "@/components/QuoteCart";
-import { articleUrl, articles } from "@/lib/articles";
+import { guideUrl, guides } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
 
@@ -311,31 +311,31 @@ export default async function HomePage() {
           <div>
             <p className="mb-2 text-xs font-semibold tracking-[3px] text-gold">FROM THE WORKSHOP</p>
             <h2 className="font-display text-3xl text-racing mb-2">Engineering guides</h2>
-            <p className="text-ink-muted">Practical guidance on materials, machining and workshop processes.</p>
+            <p className="text-ink-muted">Practical guidance on custom engineering, materials, machining and workshop processes.</p>
           </div>
           <Link href="/articles" className="text-sm font-semibold text-racing hover:text-gold">
             View all guides <span aria-hidden="true">&rarr;</span>
           </Link>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {articles.map((article) => (
-            <article key={article.slug} className="card flex h-full flex-col bg-white">
-              <Link href={articleUrl(article)} className="group flex h-full flex-col">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {guides.map((guide) => (
+            <article key={guide.id} className="card flex h-full flex-col bg-white">
+              <Link href={guideUrl(guide)} className="group flex h-full flex-col">
                 <div className="relative mb-4 aspect-[16/9] overflow-hidden rounded-lg bg-cream-dark">
                   <Image
-                    src={article.image}
-                    alt={article.imageAlt}
+                    src={guide.image}
+                    alt={guide.imageAlt}
                     fill
                     sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
                 </div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">{article.category}</p>
-                <h3 className="font-display text-xl leading-snug text-racing group-hover:text-gold">{article.shortTitle}</h3>
-                <p className="mt-3 text-sm leading-6 text-ink-muted">{article.description}</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">{guide.category}</p>
+                <h3 className="font-display text-xl leading-snug text-racing group-hover:text-gold">{guide.shortTitle}</h3>
+                <p className="mt-3 text-sm leading-6 text-ink-muted">{guide.description}</p>
                 <span className="mt-auto pt-4 text-sm font-semibold text-racing group-hover:text-gold">
-                  Read article <span aria-hidden="true">&rarr;</span>
+                  Read guide <span aria-hidden="true">&rarr;</span>
                 </span>
               </Link>
             </article>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
-import { articleUrl, articles } from "@/lib/articles";
+import { guideUrl, guides } from "@/lib/articles";
 import CurrentYear from "@/components/CurrentYear";
 
 export default function Footer() {
@@ -38,10 +38,9 @@ export default function Footer() {
             <h4 className="font-semibold text-gold mb-3 text-sm">Engineering Guides</h4>
             <ul className="space-y-2 text-sm opacity-80">
               <li><Link href="/articles" className="hover:text-gold">All guides</Link></li>
-              <li><Link href="/custom-engineering/guide" className="hover:text-gold">Custom engineering guide</Link></li>
-              {articles.map((article) => (
-                <li key={article.slug}>
-                  <Link href={articleUrl(article)} className="hover:text-gold">{article.shortTitle}</Link>
+              {guides.map((guide) => (
+                <li key={guide.id}>
+                  <Link href={guideUrl(guide)} className="hover:text-gold">{guide.shortTitle}</Link>
                 </li>
               ))}
             </ul>
