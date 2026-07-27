@@ -12,10 +12,7 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "NEXT_PUBLIC_SITE_URL": "https://mmachine-website-codex.muddy-silence-4f5b.workers.dev",
-    "AWS_SES_REGION": "eu-north-1",
-    "AWS_SES_FROM_EMAIL": "orders@orders.m-machine.co.uk",
-    "AWS_SES_FROM_NAME": "orders@m-machine.co.uk"
+    "NEXT_PUBLIC_SITE_URL": "https://mmachine-website-codex.muddy-silence-4f5b.workers.dev"
   },
   "d1_databases": [
     {
