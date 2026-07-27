@@ -22,6 +22,10 @@ Cloudflare dashboard path:
 
 | Name | Value |
 | --- | --- |
+| `AWS_SES_REGION` | AWS Region where the SES identity is verified |
+| `AWS_SES_ACCESS_KEY_ID` | IAM access key with `ses:SendEmail` |
+| `AWS_SES_SECRET_ACCESS_KEY` | IAM secret key with `ses:SendEmail` |
+| `AWS_SES_FROM_EMAIL` | `orders@m-machine.co.uk` |
 | `QUOTE_OWNER_EMAIL` | Fallback/general owner notification address |
 | `QUOTE_CUSTOM_OWNER_EMAIL` | Custom-work request notification address |
 | `QUOTE_MINI_OWNER_EMAIL` | Mini panel order notification address |
@@ -29,19 +33,15 @@ Cloudflare dashboard path:
 | `QUOTE_FEATURED_OWNER_EMAIL` | Featured-work order notification address |
 | `QUOTE_ENQUIRY_OWNER_EMAIL` | Optional website contact/enquiry notification address |
 
-Cloudflare-native delivery uses the `EMAIL` `send_email` binding in
-`wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;
-override it with `QUOTE_FROM_EMAIL` if needed. The sender domain must be
-onboarded to Cloudflare Email Service before native sending will deliver.
+Email is sent through Amazon SES API v2. Sender defaults to
+`orders@m-machine.co.uk`; set `AWS_SES_FROM_EMAIL` explicitly so the deployed
+environment matches that address. SES must verify either the parent domain
+`m-machine.co.uk` or the exact email identity `orders@m-machine.co.uk` in
+`AWS_SES_REGION`. A verified `orders.m-machine.co.uk` identity only covers
+addresses at that subdomain, such as `sales@orders.m-machine.co.uk`.
 
 Use comma or semicolon separators if an order type should notify more than one
 address.
-
-Keep this during the migration as a controlled fallback:
-
-| Name | Value |
-| --- | --- |
-| `RESEND_API_KEY` | Existing Resend API key |
 
 ## Generate AUTH_SECRET
 

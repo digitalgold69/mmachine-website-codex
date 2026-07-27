@@ -56,27 +56,27 @@ AUTH_SECRET
 Required when email sending goes live:
 
 ```text
+AWS_SES_REGION                 region where the SES identity is verified
+AWS_SES_ACCESS_KEY_ID          IAM access key with ses:SendEmail
+AWS_SES_SECRET_ACCESS_KEY      IAM secret key with ses:SendEmail
+AWS_SES_FROM_EMAIL             orders@m-machine.co.uk
 QUOTE_OWNER_EMAIL              fallback/general owner notification address
 QUOTE_CUSTOM_OWNER_EMAIL       custom-work request notifications
 QUOTE_MINI_OWNER_EMAIL         mini panel order notifications
 QUOTE_METALS_OWNER_EMAIL       metals order notifications
 QUOTE_FEATURED_OWNER_EMAIL     featured-work order notifications
+QUOTE_ENQUIRY_OWNER_EMAIL      optional website enquiry notifications
 ```
 
 Use comma or semicolon separators if an order type should notify more than one
 address.
 
-Cloudflare-native email uses the `EMAIL` `send_email` binding in
-`wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;
-override it with `QUOTE_FROM_EMAIL` if needed. The sender domain must be
-onboarded to Cloudflare Email Service before native sending will deliver.
-
-Keep this as a migration fallback until Cloudflare Email delivery has been
-verified:
-
-```text
-RESEND_API_KEY
-```
+Email is sent through Amazon SES API v2. Sender defaults to
+`orders@m-machine.co.uk`; set `AWS_SES_FROM_EMAIL` explicitly so the deployed
+environment matches that address. SES must verify either the parent domain
+`m-machine.co.uk` or the exact email identity `orders@m-machine.co.uk` in
+`AWS_SES_REGION`. A verified `orders.m-machine.co.uk` identity only covers
+addresses at that subdomain, such as `sales@orders.m-machine.co.uk`.
 
 `NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
 

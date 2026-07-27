@@ -1,10 +1,11 @@
+import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-sdk/client-sesv2";
+import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
-import { getSendEmailBinding, type EmailAddressBinding } from "./cloudflare";
 
 const GBP = "\u00a3";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
 const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
-const DEFAULT_FROM_EMAIL = `M-Machine <${DEFAULT_OWNER_EMAIL}>`;
+const DEFAULT_FROM_EMAIL = "orders@m-machine.co.uk";
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -390,14 +391,9 @@ export function ownerEnquiryRecipients() {
   return recipients.length > 0 ? recipients : ownerFallbackRecipients();
 }
 
-function parseEmailAddress(value: string): EmailAddressBinding {
+function cleanEmailAddress(value: string) {
   const trimmed = value.trim();
-  const match = trimmed.match(/^(.+?)\s*<([^<>@\s]+@[^<>@\s]+)>$/);
-  if (!match) return trimmed;
-  return {
-    name: match[1].replace(/^["']|["']$/g, "").trim(),
-    email: match[2],
-  };
+  return trimmed.match(/<([^<>@\s]+@[^<>@\s]+)>$/)?.[1] || trimmed;
 }
 
 function htmlToText(html: string) {
@@ -416,27 +412,43 @@ function htmlToText(html: string) {
     .trim();
 }
 
-async function sendViaCloudflareEmail(opts: {
+function sesFromEmail() {
+  return cleanEmailAddress(process.env.AWS_SES_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL);
+}
+
+function sesConfig() {
+  const region = process.env.AWS_SES_REGION?.trim() || process.env.AWS_REGION?.trim();
+  const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID?.trim() || process.env.AWS_ACCESS_KEY_ID?.trim();
+  const secretAccessKey =
+    process.env.AWS_SES_SECRET_ACCESS_KEY?.trim() || process.env.AWS_SECRET_ACCESS_KEY?.trim();
+  const sessionToken =
+    process.env.AWS_SES_SESSION_TOKEN?.trim() || process.env.AWS_SESSION_TOKEN?.trim() || undefined;
+  if (!region || !accessKeyId || !secretAccessKey) return null;
+  return { region, credentials: { accessKeyId, secretAccessKey, sessionToken } };
+}
+
+export function buildSesEmailInput(opts: {
   to: string | string[];
-  from: string;
   subject: string;
   html: string;
   replyTo?: string;
-}) {
-  const binding = await getSendEmailBinding().catch(() => undefined);
-  if (!binding) return null;
+}): SendEmailCommandInput {
   const to = uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to));
-  if (to.length === 0) return null;
-
-  const result = await binding.send({
-    to: to.map(parseEmailAddress),
-    from: parseEmailAddress(opts.from),
-    subject: opts.subject,
-    html: opts.html,
-    text: htmlToText(opts.html),
-    replyTo: opts.replyTo ? parseEmailAddress(opts.replyTo) : undefined,
-  });
-  return result.messageId;
+  return {
+    FromEmailAddress: sesFromEmail(),
+    Destination: { ToAddresses: to },
+    ReplyToAddresses: opts.replyTo ? [cleanEmailAddress(opts.replyTo)] : undefined,
+    Content: {
+      Simple: {
+        Subject: { Data: opts.subject, Charset: "UTF-8" },
+        Body: {
+          Html: { Data: opts.html, Charset: "UTF-8" },
+          Text: { Data: htmlToText(opts.html), Charset: "UTF-8" },
+        },
+      },
+    },
+    ConfigurationSetName: process.env.AWS_SES_CONFIGURATION_SET?.trim() || undefined,
+  };
 }
 
 export async function sendQuoteEmail(opts: {
@@ -445,51 +457,21 @@ export async function sendQuoteEmail(opts: {
   html: string;
   replyTo?: string;
 }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.QUOTE_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL;
-
-  try {
-    const messageId = await sendViaCloudflareEmail({
-      to: opts.to,
-      from,
-      subject: opts.subject,
-      html: opts.html,
-      replyTo: opts.replyTo,
-    });
-    if (messageId) return { ok: true, skipped: false, error: null, provider: "cloudflare-email", messageId };
-  } catch (error) {
-    console.error("cloudflare_email_delivery_failed", {
-      error: error instanceof Error ? error.message : "unknown error",
-    });
-  }
-
-  if (!apiKey) {
+  const config = sesConfig();
+  if (!config) {
     return { ok: false, skipped: true, error: "Email sending is unavailable" };
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to)),
-        subject: opts.subject,
-        html: opts.html,
-        reply_to: opts.replyTo,
-      }),
+    const client = new SESv2Client({
+      region: config.region,
+      credentials: config.credentials,
+      requestHandler: new FetchHttpHandler(),
     });
-
-    if (!res.ok) {
-      return { ok: false, skipped: false, error: await res.text() };
-    }
-
-    return { ok: true, skipped: false, error: null, provider: "resend" };
+    const result = await client.send(new SendEmailCommand(buildSesEmailInput(opts)));
+    return { ok: true, skipped: false, error: null, provider: "amazon-ses", messageId: result.MessageId };
   } catch (error) {
-    console.error("email_delivery_failed", {
+    console.error("ses_email_delivery_failed", {
       error: error instanceof Error ? error.message : "unknown error",
     });
     return { ok: false, skipped: false, error: "Email delivery request failed" };

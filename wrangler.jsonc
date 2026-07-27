@@ -30,11 +30,6 @@
       "bucket_name": "mmachine-quote-files"
     }
   ],
-  "send_email": [
-    {
-      "name": "EMAIL"
-    }
-  ],
   "observability": {
     "enabled": true
   }
