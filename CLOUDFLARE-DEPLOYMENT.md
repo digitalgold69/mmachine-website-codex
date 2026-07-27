@@ -56,8 +56,15 @@ AUTH_SECRET
 Required when email sending goes live:
 
 ```text
-QUOTE_OWNER_EMAIL
+QUOTE_OWNER_EMAIL              fallback/general owner notification address
+QUOTE_CUSTOM_OWNER_EMAIL       custom-work request notifications
+QUOTE_MINI_OWNER_EMAIL         mini panel order notifications
+QUOTE_METALS_OWNER_EMAIL       metals order notifications
+QUOTE_FEATURED_OWNER_EMAIL     featured-work order notifications
 ```
+
+Use comma or semicolon separators if an order type should notify more than one
+address.
 
 Cloudflare-native email uses the `EMAIL` `send_email` binding in
 `wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;

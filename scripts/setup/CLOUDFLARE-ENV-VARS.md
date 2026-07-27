@@ -22,12 +22,20 @@ Cloudflare dashboard path:
 
 | Name | Value |
 | --- | --- |
-| `QUOTE_OWNER_EMAIL` | Owner email address for new order requests |
+| `QUOTE_OWNER_EMAIL` | Fallback/general owner notification address |
+| `QUOTE_CUSTOM_OWNER_EMAIL` | Custom-work request notification address |
+| `QUOTE_MINI_OWNER_EMAIL` | Mini panel order notification address |
+| `QUOTE_METALS_OWNER_EMAIL` | Metals order notification address |
+| `QUOTE_FEATURED_OWNER_EMAIL` | Featured-work order notification address |
+| `QUOTE_ENQUIRY_OWNER_EMAIL` | Optional website contact/enquiry notification address |
 
 Cloudflare-native delivery uses the `EMAIL` `send_email` binding in
 `wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;
 override it with `QUOTE_FROM_EMAIL` if needed. The sender domain must be
 onboarded to Cloudflare Email Service before native sending will deliver.
+
+Use comma or semicolon separators if an order type should notify more than one
+address.
 
 Keep this during the migration as a controlled fallback:
 

@@ -1,9 +1,10 @@
-import type { QuoteItem, QuoteRequest } from "./quote-types";
+import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 import { getSendEmailBinding, type EmailAddressBinding } from "./cloudflare";
 
 const GBP = "\u00a3";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
-const DEFAULT_FROM_EMAIL = "M-Machine <sales@m-machine.co.uk>";
+const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
+const DEFAULT_FROM_EMAIL = `M-Machine <${DEFAULT_OWNER_EMAIL}>`;
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -356,6 +357,39 @@ export function buildOwnerEnquiryEmail(enquiry: {
   `;
 }
 
+function splitEmailList(value: string | undefined) {
+  return String(value || "")
+    .split(/[;,]/)
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
+function ownerFallbackRecipients() {
+  const fallback = splitEmailList(process.env.QUOTE_OWNER_EMAIL);
+  return fallback.length > 0 ? fallback : [DEFAULT_OWNER_EMAIL];
+}
+
+function uniqueRecipients(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+export function ownerQuoteRecipients(quote: QuoteRequest) {
+  const envByCatalogue: Record<QuoteCatalogue, string | undefined> = {
+    custom: process.env.QUOTE_CUSTOM_OWNER_EMAIL,
+    featured: process.env.QUOTE_FEATURED_OWNER_EMAIL,
+    metals: process.env.QUOTE_METALS_OWNER_EMAIL,
+    mini: process.env.QUOTE_MINI_OWNER_EMAIL,
+  };
+  const recipients = quote.items.flatMap((item) => splitEmailList(envByCatalogue[item.catalogue]));
+  const unique = uniqueRecipients(recipients);
+  return unique.length > 0 ? unique : ownerFallbackRecipients();
+}
+
+export function ownerEnquiryRecipients() {
+  const recipients = uniqueRecipients(splitEmailList(process.env.QUOTE_ENQUIRY_OWNER_EMAIL));
+  return recipients.length > 0 ? recipients : ownerFallbackRecipients();
+}
+
 function parseEmailAddress(value: string): EmailAddressBinding {
   const trimmed = value.trim();
   const match = trimmed.match(/^(.+?)\s*<([^<>@\s]+@[^<>@\s]+)>$/);
@@ -383,7 +417,7 @@ function htmlToText(html: string) {
 }
 
 async function sendViaCloudflareEmail(opts: {
-  to: string;
+  to: string | string[];
   from: string;
   subject: string;
   html: string;
@@ -391,9 +425,11 @@ async function sendViaCloudflareEmail(opts: {
 }) {
   const binding = await getSendEmailBinding().catch(() => undefined);
   if (!binding) return null;
+  const to = uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to));
+  if (to.length === 0) return null;
 
   const result = await binding.send({
-    to: parseEmailAddress(opts.to),
+    to: to.map(parseEmailAddress),
     from: parseEmailAddress(opts.from),
     subject: opts.subject,
     html: opts.html,
@@ -404,7 +440,7 @@ async function sendViaCloudflareEmail(opts: {
 }
 
 export async function sendQuoteEmail(opts: {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   replyTo?: string;
@@ -440,7 +476,7 @@ export async function sendQuoteEmail(opts: {
       },
       body: JSON.stringify({
         from,
-        to: opts.to,
+        to: uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to)),
         subject: opts.subject,
         html: opts.html,
         reply_to: opts.replyTo,

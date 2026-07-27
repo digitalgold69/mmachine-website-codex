@@ -3,6 +3,12 @@ const path = require("node:path");
 
 process.env.NEXT_PUBLIC_SITE_URL = "https://example.test";
 process.env.VAT_REGISTRATION_NUMBER = "GB123456789";
+process.env.QUOTE_OWNER_EMAIL = "fallback@example.test";
+process.env.QUOTE_CUSTOM_OWNER_EMAIL = "custom@example.test";
+process.env.QUOTE_MINI_OWNER_EMAIL = "mini@example.test";
+process.env.QUOTE_METALS_OWNER_EMAIL = "metals@example.test; metals-backup@example.test";
+process.env.QUOTE_FEATURED_OWNER_EMAIL = "featured@example.test";
+process.env.QUOTE_ENQUIRY_OWNER_EMAIL = "enquiries@example.test";
 
 const jiti = require("jiti")(__filename, {
   alias: {
@@ -15,6 +21,8 @@ const {
   buildCustomerInvoiceEmail,
   buildOwnerEnquiryEmail,
   buildOwnerQuoteEmail,
+  ownerEnquiryRecipients,
+  ownerQuoteRecipients,
 } = jiti("../lib/quote-email.ts");
 
 const quote = {
@@ -77,6 +85,17 @@ const quote = {
   customerEmailSentAt: null,
   ownerEmailSentAt: null,
 };
+
+assert.deepEqual(ownerQuoteRecipients(quote), ["custom@example.test"]);
+assert.deepEqual(ownerQuoteRecipients({
+  ...quote,
+  items: [
+    { ...quote.items[0], catalogue: "mini" },
+    { ...quote.items[0], catalogue: "metals" },
+    { ...quote.items[0], catalogue: "featured" },
+  ],
+}), ["mini@example.test", "metals@example.test", "metals-backup@example.test", "featured@example.test"]);
+assert.deepEqual(ownerEnquiryRecipients(), ["enquiries@example.test"]);
 
 const ownerHtml = buildOwnerQuoteEmail(quote);
 assert.match(ownerHtml, /Alice Buyer/);

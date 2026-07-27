@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildOwnerEnquiryEmail, sendQuoteEmail } from "@/lib/quote-email";
+import { buildOwnerEnquiryEmail, ownerEnquiryRecipients, sendQuoteEmail } from "@/lib/quote-email";
 import { checkRateLimit } from "@/lib/request-limits";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     const sent = await sendQuoteEmail({
-      to: process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk",
+      to: ownerEnquiryRecipients(),
       subject: enquiry.product
         ? `M-Machine product enquiry: ${enquiry.product}`
         : `M-Machine website enquiry: ${enquiry.type || "General question"}`,

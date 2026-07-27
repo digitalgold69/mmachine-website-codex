@@ -4,6 +4,7 @@ import { getQuoteFilesBucket } from "@/lib/cloudflare";
 import {
   buildCustomerInvoiceEmail,
   buildOwnerQuoteEmail,
+  ownerQuoteRecipients,
   sendQuoteEmail,
 } from "@/lib/quote-email";
 import { getQuoteRequest, listActiveQuoteRequests, listPaidQuoteHistory, saveQuoteRequest } from "@/lib/quotes";
@@ -251,9 +252,8 @@ async function persistCustomQuote(
   };
 
   let saved = await saveQuoteRequest(quote);
-  const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
   const email = await sendQuoteEmail({
-    to: ownerEmail,
+    to: ownerQuoteRecipients(quote),
     subject: `New M-Machine custom fabrication request ${quote.id}`,
     html: buildOwnerQuoteEmail(quote),
     replyTo: quote.customer.email,
@@ -582,9 +582,8 @@ export async function POST(req: Request) {
     };
 
     let saved = await saveQuoteRequest(quote);
-    const ownerEmail = process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk";
     const email = await sendQuoteEmail({
-      to: ownerEmail,
+      to: ownerQuoteRecipients(quote),
       subject: featuredOnly
         ? `New M-Machine Featured Work order ${quote.id}`
         : `New M-Machine quote request ${quote.id}`,
@@ -683,7 +682,7 @@ export async function PATCH(req: Request) {
         to: savedDraft.customer.email,
         subject: `M-Machine invoice ${savedDraft.id}`,
         html: buildCustomerInvoiceEmail(savedDraft),
-        replyTo: process.env.QUOTE_OWNER_EMAIL || "sales@m-machine.co.uk",
+        replyTo: ownerQuoteRecipients(savedDraft)[0],
       });
       if (!email.ok) {
         return NextResponse.json(
