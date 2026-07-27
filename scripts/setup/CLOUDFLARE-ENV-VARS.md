@@ -23,8 +23,17 @@ Cloudflare dashboard path:
 | Name | Value |
 | --- | --- |
 | `QUOTE_OWNER_EMAIL` | Owner email address for new order requests |
-| `RESEND_API_KEY` | Resend API key |
-| `QUOTE_FROM_EMAIL` | Verified Resend sender, for example `M-Machine <sales@your-domain.co.uk>` |
+
+Cloudflare-native delivery uses the `EMAIL` `send_email` binding in
+`wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;
+override it with `QUOTE_FROM_EMAIL` if needed. The sender domain must be
+onboarded to Cloudflare Email Service before native sending will deliver.
+
+Keep this during the migration as a controlled fallback:
+
+| Name | Value |
+| --- | --- |
+| `RESEND_API_KEY` | Existing Resend API key |
 
 ## Generate AUTH_SECRET
 
@@ -41,3 +50,4 @@ Run this in PowerShell:
 - When the real domain is connected, update it to the final live domain and redeploy.
 - Order requests and featured-work content are stored in Cloudflare D1.
 - Featured-work images are stored in Cloudflare R2.
+- Custom quote files are stored in the `QUOTE_FILES` R2 bucket.

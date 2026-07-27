@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { QuoteFile } from "@/lib/quote-types";
 
-type UploadSession = {
+export type UploadSession = {
   purpose: "upload";
   key: string;
   uploadId: string;

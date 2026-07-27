@@ -1,7 +1,9 @@
 import type { QuoteItem, QuoteRequest } from "./quote-types";
+import { getSendEmailBinding, type EmailAddressBinding } from "./cloudflare";
 
 const GBP = "\u00a3";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
+const DEFAULT_FROM_EMAIL = "M-Machine <sales@m-machine.co.uk>";
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -354,6 +356,53 @@ export function buildOwnerEnquiryEmail(enquiry: {
   `;
 }
 
+function parseEmailAddress(value: string): EmailAddressBinding {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(.+?)\s*<([^<>@\s]+@[^<>@\s]+)>$/);
+  if (!match) return trimmed;
+  return {
+    name: match[1].replace(/^["']|["']$/g, "").trim(),
+    email: match[2],
+  };
+}
+
+function htmlToText(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|tr|table)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function sendViaCloudflareEmail(opts: {
+  to: string;
+  from: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+}) {
+  const binding = await getSendEmailBinding().catch(() => undefined);
+  if (!binding) return null;
+
+  const result = await binding.send({
+    to: parseEmailAddress(opts.to),
+    from: parseEmailAddress(opts.from),
+    subject: opts.subject,
+    html: opts.html,
+    text: htmlToText(opts.html),
+    replyTo: opts.replyTo ? parseEmailAddress(opts.replyTo) : undefined,
+  });
+  return result.messageId;
+}
+
 export async function sendQuoteEmail(opts: {
   to: string;
   subject: string;
@@ -361,9 +410,24 @@ export async function sendQuoteEmail(opts: {
   replyTo?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.QUOTE_FROM_EMAIL;
+  const from = process.env.QUOTE_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL;
 
-  if (!apiKey || !from) {
+  try {
+    const messageId = await sendViaCloudflareEmail({
+      to: opts.to,
+      from,
+      subject: opts.subject,
+      html: opts.html,
+      replyTo: opts.replyTo,
+    });
+    if (messageId) return { ok: true, skipped: false, error: null, provider: "cloudflare-email", messageId };
+  } catch (error) {
+    console.error("cloudflare_email_delivery_failed", {
+      error: error instanceof Error ? error.message : "unknown error",
+    });
+  }
+
+  if (!apiKey) {
     return { ok: false, skipped: true, error: "Email sending is unavailable" };
   }
 
@@ -387,7 +451,7 @@ export async function sendQuoteEmail(opts: {
       return { ok: false, skipped: false, error: await res.text() };
     }
 
-    return { ok: true, skipped: false, error: null };
+    return { ok: true, skipped: false, error: null, provider: "resend" };
   } catch (error) {
     console.error("email_delivery_failed", {
       error: error instanceof Error ? error.message : "unknown error",

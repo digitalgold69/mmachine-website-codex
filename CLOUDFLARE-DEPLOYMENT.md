@@ -57,8 +57,18 @@ Required when email sending goes live:
 
 ```text
 QUOTE_OWNER_EMAIL
+```
+
+Cloudflare-native email uses the `EMAIL` `send_email` binding in
+`wrangler.jsonc`. Sender defaults to `M-Machine <sales@m-machine.co.uk>`;
+override it with `QUOTE_FROM_EMAIL` if needed. The sender domain must be
+onboarded to Cloudflare Email Service before native sending will deliver.
+
+Keep this as a migration fallback until Cloudflare Email delivery has been
+verified:
+
+```text
 RESEND_API_KEY
-QUOTE_FROM_EMAIL
 ```
 
 `NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
@@ -72,6 +82,8 @@ D1 database name: mmachine-runtime
 D1 binding: DB
 R2 bucket name: mmachine-featured-images
 R2 binding: FEATURED_IMAGES
+R2 bucket name: mmachine-quote-files
+R2 binding: QUOTE_FILES
 ```
 
 After creating the D1 database, put its `database_id` into `wrangler.jsonc`.

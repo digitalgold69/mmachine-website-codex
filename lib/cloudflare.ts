@@ -49,8 +49,25 @@ export type R2MultipartUploadBinding = {
   complete: (parts: R2UploadedPartBinding[]) => Promise<{ size: number }>;
 };
 
+export type EmailAddressBinding = string | { email: string; name?: string };
+
+export type SendEmailBinding = {
+  send: (message: {
+    to: EmailAddressBinding | EmailAddressBinding[];
+    from: EmailAddressBinding;
+    subject: string;
+    html?: string;
+    text?: string;
+    cc?: EmailAddressBinding | EmailAddressBinding[];
+    bcc?: EmailAddressBinding | EmailAddressBinding[];
+    replyTo?: EmailAddressBinding;
+    headers?: Record<string, string>;
+  }) => Promise<{ messageId: string }>;
+};
+
 export type MMachineCloudflareEnv = {
   DB?: D1DatabaseBinding;
+  EMAIL?: SendEmailBinding;
   FEATURED_IMAGES?: R2BucketBinding;
   QUOTE_FILES?: R2BucketBinding;
 };
@@ -82,4 +99,9 @@ export async function getQuoteFilesBucket(): Promise<R2BucketBinding> {
     throw new Error("Cloudflare R2 binding QUOTE_FILES is missing.");
   }
   return env.QUOTE_FILES;
+}
+
+export async function getSendEmailBinding(): Promise<SendEmailBinding | undefined> {
+  const env = await getCloudflareEnv();
+  return env.EMAIL;
 }
