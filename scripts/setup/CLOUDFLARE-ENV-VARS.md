@@ -22,11 +22,8 @@ Cloudflare dashboard path:
 
 | Name | Value |
 | --- | --- |
-| `AWS_SES_REGION` | AWS Region where the SES identity is verified |
 | `AWS_SES_ACCESS_KEY_ID` | IAM access key with `ses:SendEmail` |
 | `AWS_SES_SECRET_ACCESS_KEY` | IAM secret key with `ses:SendEmail` |
-| `AWS_SES_FROM_EMAIL` | `orders@orders.m-machine.co.uk` |
-| `AWS_SES_FROM_NAME` | `orders@m-machine.co.uk` |
 | `QUOTE_OWNER_EMAIL` | Fallback/general owner notification address |
 | `QUOTE_CUSTOM_OWNER_EMAIL` | Custom-work request notification address |
 | `QUOTE_MINI_OWNER_EMAIL` | Mini panel order notification address |
@@ -41,12 +38,18 @@ address under the verified `orders.m-machine.co.uk` identity. Most inboxes show
 the display name from `AWS_SES_FROM_NAME`, while expanded message details still
 show the real authenticated sender address.
 
+The non-secret SES values `AWS_SES_REGION`, `AWS_SES_FROM_EMAIL`, and
+`AWS_SES_FROM_NAME` are committed in `wrangler.jsonc`. `AWS_SES_REGION` must
+match the AWS Region where the SES identity appears under Verified identities.
+For this Worker it is currently set to `eu-north-1`.
+
 Use comma or semicolon separators if an order type should notify more than one
 address.
 
 Deploy with `npm run cf:deploy` or otherwise pass `--keep-vars` to Wrangler.
-Without `--keep-vars`, a deployment can replace dashboard-managed runtime
-variables with only the values committed in `wrangler.jsonc`.
+`wrangler.jsonc` also sets `keep_vars: true`. Without that protection, a
+deployment can replace dashboard-managed runtime variables with only the values
+committed in `wrangler.jsonc`.
 
 After signing in to the owner dashboard, open `/api/email-health` to confirm the
 sanitized SES configuration. An authenticated POST to the same endpoint with

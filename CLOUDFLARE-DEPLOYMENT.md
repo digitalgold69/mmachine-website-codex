@@ -41,8 +41,9 @@ npx wrangler login
 npm run cf:deploy
 ```
 
-`npm run cf:deploy` passes `--keep-vars` through to Wrangler so runtime
-variables and secrets set in the Cloudflare dashboard are preserved.
+`npm run cf:deploy` passes `--keep-vars` through to Wrangler, and
+`wrangler.jsonc` also sets `keep_vars: true`, so runtime variables and secrets
+set in the Cloudflare dashboard are preserved.
 
 ## Environment Variables
 
@@ -59,11 +60,8 @@ AUTH_SECRET
 Required when email sending goes live:
 
 ```text
-AWS_SES_REGION                 region where the SES identity is verified
 AWS_SES_ACCESS_KEY_ID          IAM access key with ses:SendEmail
 AWS_SES_SECRET_ACCESS_KEY      IAM secret key with ses:SendEmail
-AWS_SES_FROM_EMAIL             orders@orders.m-machine.co.uk
-AWS_SES_FROM_NAME              orders@m-machine.co.uk
 QUOTE_OWNER_EMAIL              fallback/general owner notification address
 QUOTE_CUSTOM_OWNER_EMAIL       custom-work request notifications
 QUOTE_MINI_OWNER_EMAIL         mini panel order notifications
@@ -81,6 +79,11 @@ the address inside the angle brackets, so `AWS_SES_FROM_EMAIL` must be an
 address under the verified `orders.m-machine.co.uk` identity. Most inboxes show
 the display name from `AWS_SES_FROM_NAME`, while expanded message details still
 show the real authenticated sender address.
+
+The non-secret SES values `AWS_SES_REGION`, `AWS_SES_FROM_EMAIL`, and
+`AWS_SES_FROM_NAME` are committed in `wrangler.jsonc`. `AWS_SES_REGION` must
+match the AWS Region where the SES identity appears under Verified identities.
+For this Worker it is currently set to `eu-north-1`.
 
 `NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
 
