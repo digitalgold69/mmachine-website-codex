@@ -59,7 +59,8 @@ Required when email sending goes live:
 AWS_SES_REGION                 region where the SES identity is verified
 AWS_SES_ACCESS_KEY_ID          IAM access key with ses:SendEmail
 AWS_SES_SECRET_ACCESS_KEY      IAM secret key with ses:SendEmail
-AWS_SES_FROM_EMAIL             orders@m-machine.co.uk
+AWS_SES_FROM_EMAIL             orders@orders.m-machine.co.uk
+AWS_SES_FROM_NAME              orders@m-machine.co.uk
 QUOTE_OWNER_EMAIL              fallback/general owner notification address
 QUOTE_CUSTOM_OWNER_EMAIL       custom-work request notifications
 QUOTE_MINI_OWNER_EMAIL         mini panel order notifications
@@ -72,11 +73,11 @@ Use comma or semicolon separators if an order type should notify more than one
 address.
 
 Email is sent through Amazon SES API v2. Sender defaults to
-`orders@m-machine.co.uk`; set `AWS_SES_FROM_EMAIL` explicitly so the deployed
-environment matches that address. SES must verify either the parent domain
-`m-machine.co.uk` or the exact email identity `orders@m-machine.co.uk` in
-`AWS_SES_REGION`. A verified `orders.m-machine.co.uk` identity only covers
-addresses at that subdomain, such as `sales@orders.m-machine.co.uk`.
+`"orders@m-machine.co.uk" <orders@orders.m-machine.co.uk>`. SES authenticates
+the address inside the angle brackets, so `AWS_SES_FROM_EMAIL` must be an
+address under the verified `orders.m-machine.co.uk` identity. Most inboxes show
+the display name from `AWS_SES_FROM_NAME`, while expanded message details still
+show the real authenticated sender address.
 
 `NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
 

@@ -9,7 +9,8 @@ process.env.QUOTE_MINI_OWNER_EMAIL = "mini@example.test";
 process.env.QUOTE_METALS_OWNER_EMAIL = "metals@example.test; metals-backup@example.test";
 process.env.QUOTE_FEATURED_OWNER_EMAIL = "featured@example.test";
 process.env.QUOTE_ENQUIRY_OWNER_EMAIL = "enquiries@example.test";
-process.env.AWS_SES_FROM_EMAIL = "M-Machine <orders@m-machine.co.uk>";
+process.env.AWS_SES_FROM_EMAIL = "orders@orders.m-machine.co.uk";
+process.env.AWS_SES_FROM_NAME = "orders@m-machine.co.uk";
 
 const jiti = require("jiti")(__filename, {
   alias: {
@@ -105,7 +106,7 @@ const sesInput = buildSesEmailInput({
   html: "<p>Hello &amp; welcome</p>",
   replyTo: ownerQuoteRecipients(quote)[0],
 });
-assert.equal(sesInput.FromEmailAddress, "orders@m-machine.co.uk");
+assert.equal(sesInput.FromEmailAddress, "\"orders@m-machine.co.uk\" <orders@orders.m-machine.co.uk>");
 assert.deepEqual(sesInput.Destination?.ToAddresses, ["custom@example.test"]);
 assert.deepEqual(sesInput.ReplyToAddresses, ["custom@example.test"]);
 assert.equal(sesInput.Content?.Simple?.Subject?.Charset, "UTF-8");

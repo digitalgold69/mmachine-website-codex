@@ -5,7 +5,8 @@ import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 const GBP = "\u00a3";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
 const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
-const DEFAULT_FROM_EMAIL = "orders@m-machine.co.uk";
+const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
+const DEFAULT_FROM_NAME = "orders@m-machine.co.uk";
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -412,8 +413,16 @@ function htmlToText(html: string) {
     .trim();
 }
 
-function sesFromEmail() {
-  return cleanEmailAddress(process.env.AWS_SES_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL);
+function quoteDisplayName(value: string) {
+  return `"${value.replace(/["\\]/g, "\\$&")}"`;
+}
+
+function sesFromEmailAddress() {
+  const configured = process.env.AWS_SES_FROM_EMAIL?.trim();
+  if (configured?.includes("<")) return configured;
+  const email = cleanEmailAddress(configured || DEFAULT_FROM_EMAIL);
+  const name = process.env.AWS_SES_FROM_NAME?.trim() || DEFAULT_FROM_NAME;
+  return `${quoteDisplayName(name)} <${email}>`;
 }
 
 function sesConfig() {
@@ -435,7 +444,7 @@ export function buildSesEmailInput(opts: {
 }): SendEmailCommandInput {
   const to = uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to));
   return {
-    FromEmailAddress: sesFromEmail(),
+    FromEmailAddress: sesFromEmailAddress(),
     Destination: { ToAddresses: to },
     ReplyToAddresses: opts.replyTo ? [cleanEmailAddress(opts.replyTo)] : undefined,
     Content: {
