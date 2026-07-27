@@ -46,15 +46,12 @@ export async function POST(request: Request) {
     replyTo: recipients[0],
   });
 
-  return NextResponse.json(
-    {
-      ok: sent.ok,
-      route,
-      recipients,
-      fromEmailAddress: setup.fromEmailAddress,
-      senderEmailAddress: setup.senderEmailAddress,
-      result: sent,
-    },
-    { status: sent.ok ? 200 : 502 }
-  );
+  return NextResponse.json({
+    ok: sent.ok,
+    route,
+    recipients,
+    fromEmailAddress: setup.fromEmailAddress,
+    senderEmailAddress: setup.senderEmailAddress,
+    result: sent,
+  });
 }
