@@ -44,6 +44,16 @@ show the real authenticated sender address.
 Use comma or semicolon separators if an order type should notify more than one
 address.
 
+Deploy with `npm run cf:deploy` or otherwise pass `--keep-vars` to Wrangler.
+Without `--keep-vars`, a deployment can replace dashboard-managed runtime
+variables with only the values committed in `wrangler.jsonc`.
+
+After signing in to the owner dashboard, open `/api/email-health` to confirm the
+sanitized SES configuration. An authenticated POST to the same endpoint with
+`{"route":"custom"}` sends a controlled test to that route's configured
+recipient. Supported routes are `custom`, `mini`, `metals`, `featured`,
+`enquiry`, and `fallback`.
+
 ## Generate AUTH_SECRET
 
 Run this in PowerShell:

@@ -41,6 +41,9 @@ npx wrangler login
 npm run cf:deploy
 ```
 
+`npm run cf:deploy` passes `--keep-vars` through to Wrangler so runtime
+variables and secrets set in the Cloudflare dashboard are preserved.
+
 ## Environment Variables
 
 Copy the environment variables from the current deployment host into Cloudflare Workers.
@@ -81,6 +84,17 @@ show the real authenticated sender address.
 
 `NEXT_PUBLIC_SITE_URL` should be the Cloudflare placeholder URL during testing. Change it to the real domain once the final domain is connected.
 
+After signing in to the owner dashboard, open `/api/email-health` to check the
+sanitized SES configuration. Send a controlled authenticated POST to the same
+endpoint with:
+
+```powershell
+Invoke-WebRequest -Method Post -Uri "https://<site>/api/email-health" -ContentType "application/json" -Body '{"route":"custom"}' -WebSession $session
+```
+
+Supported routes are `custom`, `mini`, `metals`, `featured`, `enquiry`, and
+`fallback`.
+
 ## Cloudflare Storage
 
 Create these before deploying the D1/R2 version:
@@ -110,7 +124,7 @@ Use:
 
 ```text
 Build command: npm run cf:build
-Deploy command: npx wrangler deploy
+Deploy command: npm run deploy
 Non-production branch deploy command: npm run upload
 ```
 

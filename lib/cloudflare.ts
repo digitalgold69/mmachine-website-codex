@@ -50,14 +50,36 @@ export type R2MultipartUploadBinding = {
 };
 
 export type MMachineCloudflareEnv = {
+  [key: string]: unknown;
   DB?: D1DatabaseBinding;
   FEATURED_IMAGES?: R2BucketBinding;
   QUOTE_FILES?: R2BucketBinding;
+  AUTH_SECRET?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_REGION?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_SES_ACCESS_KEY_ID?: string;
+  AWS_SES_CONFIGURATION_SET?: string;
+  AWS_SES_FROM_EMAIL?: string;
+  AWS_SES_FROM_NAME?: string;
+  AWS_SES_REGION?: string;
+  AWS_SES_SECRET_ACCESS_KEY?: string;
+  AWS_SES_SESSION_TOKEN?: string;
+  AWS_SESSION_TOKEN?: string;
+  NEXT_PUBLIC_SITE_URL?: string;
+  OWNER_PASSWORD?: string;
+  QUOTE_CUSTOM_OWNER_EMAIL?: string;
+  QUOTE_ENQUIRY_OWNER_EMAIL?: string;
+  QUOTE_FEATURED_OWNER_EMAIL?: string;
+  QUOTE_METALS_OWNER_EMAIL?: string;
+  QUOTE_MINI_OWNER_EMAIL?: string;
+  QUOTE_OWNER_EMAIL?: string;
+  VAT_REGISTRATION_NUMBER?: string;
 };
 
 export async function getCloudflareEnv(): Promise<MMachineCloudflareEnv> {
   const context = await getCloudflareContext({ async: true });
-  return context.env as MMachineCloudflareEnv;
+  return { ...context.env } as MMachineCloudflareEnv;
 }
 
 export async function getD1(): Promise<D1DatabaseBinding> {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildOwnerEnquiryEmail, ownerEnquiryRecipients, sendQuoteEmail } from "@/lib/quote-email";
+import { buildOwnerEnquiryEmail, ownerEnquiryRecipientsForRuntime, sendQuoteEmail } from "@/lib/quote-email";
 import { checkRateLimit } from "@/lib/request-limits";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     const sent = await sendQuoteEmail({
-      to: ownerEnquiryRecipients(),
+      to: await ownerEnquiryRecipientsForRuntime(),
       subject: enquiry.product
         ? `M-Machine product enquiry: ${enquiry.product}`
         : `M-Machine website enquiry: ${enquiry.type || "General question"}`,
@@ -65,6 +65,11 @@ export async function POST(request: Request) {
       console.error("website_enquiry_email_failed", {
         skipped: sent.skipped,
         error: sent.error,
+        code: sent.code,
+        missing: sent.missing,
+        detail: sent.detail
+          ? { name: sent.detail.name, statusCode: sent.detail.statusCode, requestId: sent.detail.requestId }
+          : undefined,
       });
       return NextResponse.json(
         { error: "Your message could not be sent just now. Please try again or call 01325 381302." },

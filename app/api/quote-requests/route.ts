@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { requireLogin } from "@/lib/auth";
 import { getQuoteFilesBucket } from "@/lib/cloudflare";
 import {
-  buildCustomerInvoiceEmail,
-  buildOwnerQuoteEmail,
-  ownerQuoteRecipients,
+  buildCustomerInvoiceEmailForRuntime,
+  buildOwnerQuoteEmailForRuntime,
+  ownerQuoteRecipientsForRuntime,
   sendQuoteEmail,
 } from "@/lib/quote-email";
 import { getQuoteRequest, listActiveQuoteRequests, listPaidQuoteHistory, saveQuoteRequest } from "@/lib/quotes";
@@ -252,10 +252,11 @@ async function persistCustomQuote(
   };
 
   let saved = await saveQuoteRequest(quote);
+  const recipients = await ownerQuoteRecipientsForRuntime(quote);
   const email = await sendQuoteEmail({
-    to: ownerQuoteRecipients(quote),
+    to: recipients,
     subject: `New M-Machine custom fabrication request ${quote.id}`,
-    html: buildOwnerQuoteEmail(quote),
+    html: await buildOwnerQuoteEmailForRuntime(quote),
     replyTo: quote.customer.email,
   });
   if (email.ok) {
@@ -263,6 +264,16 @@ async function persistCustomQuote(
       ...saved,
       ownerEmailSentAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    });
+  } else {
+    console.error("owner_quote_email_failed", {
+      quoteId: quote.id,
+      skipped: email.skipped,
+      code: email.code,
+      missing: email.missing,
+      detail: email.detail
+        ? { name: email.detail.name, statusCode: email.detail.statusCode, requestId: email.detail.requestId }
+        : undefined,
     });
   }
 
@@ -582,12 +593,13 @@ export async function POST(req: Request) {
     };
 
     let saved = await saveQuoteRequest(quote);
+    const recipients = await ownerQuoteRecipientsForRuntime(quote);
     const email = await sendQuoteEmail({
-      to: ownerQuoteRecipients(quote),
+      to: recipients,
       subject: featuredOnly
         ? `New M-Machine Featured Work order ${quote.id}`
         : `New M-Machine quote request ${quote.id}`,
-      html: buildOwnerQuoteEmail(quote),
+      html: await buildOwnerQuoteEmailForRuntime(quote),
       replyTo: quote.customer.email,
     });
     if (email.ok) {
@@ -595,6 +607,16 @@ export async function POST(req: Request) {
         ...saved,
         ownerEmailSentAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+      });
+    } else {
+      console.error("owner_quote_email_failed", {
+        quoteId: quote.id,
+        skipped: email.skipped,
+        code: email.code,
+        missing: email.missing,
+        detail: email.detail
+          ? { name: email.detail.name, statusCode: email.detail.statusCode, requestId: email.detail.requestId }
+          : undefined,
       });
     }
     return NextResponse.json({ ok: true, quoteId: saved.id, ownerEmailSent: email.ok });
@@ -678,13 +700,23 @@ export async function PATCH(req: Request) {
       }
 
       const savedDraft = await saveQuoteRequest(next);
+      const replyTo = (await ownerQuoteRecipientsForRuntime(savedDraft))[0];
       const email = await sendQuoteEmail({
         to: savedDraft.customer.email,
         subject: `M-Machine invoice ${savedDraft.id}`,
-        html: buildCustomerInvoiceEmail(savedDraft),
-        replyTo: ownerQuoteRecipients(savedDraft)[0],
+        html: await buildCustomerInvoiceEmailForRuntime(savedDraft),
+        replyTo,
       });
       if (!email.ok) {
+        console.error("customer_invoice_email_failed", {
+          quoteId: savedDraft.id,
+          skipped: email.skipped,
+          code: email.code,
+          missing: email.missing,
+          detail: email.detail
+            ? { name: email.detail.name, statusCode: email.detail.statusCode, requestId: email.detail.requestId }
+            : undefined,
+        });
         return NextResponse.json(
           {
             error: "Invoice changes were saved, but the email could not be sent. Please try again later.",

@@ -1,15 +1,67 @@
 import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-sdk/client-sesv2";
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
+import { getCloudflareEnv } from "./cloudflare";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 
 const GBP = "\u00a3";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk").replace(/\/+$/, "");
+const DEFAULT_SITE_URL = "https://m-machine-metals.co.uk";
 const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
 const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
 const DEFAULT_FROM_NAME = "orders@m-machine.co.uk";
 
+type EmailEnv = Record<string, unknown>;
+type SesConfigValues = {
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+};
+
+export type EmailDeliveryResult =
+  | {
+      ok: true;
+      skipped: false;
+      error: null;
+      provider: "amazon-ses";
+      messageId?: string;
+    }
+  | {
+      ok: false;
+      skipped: boolean;
+      error: string;
+      code: string;
+      missing?: string[];
+      detail?: {
+        name: string;
+        message: string;
+        statusCode?: number;
+        requestId?: string;
+      };
+    };
+
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
+
+function envValue(env: EmailEnv | undefined, key: string) {
+  const runtimeValue = env?.[key];
+  if (typeof runtimeValue === "string") return runtimeValue.trim();
+  if (typeof runtimeValue === "number" || typeof runtimeValue === "boolean") {
+    return String(runtimeValue).trim();
+  }
+  return process.env[key]?.trim() || "";
+}
+
+async function emailRuntimeEnv(): Promise<EmailEnv> {
+  try {
+    return await getCloudflareEnv();
+  } catch {
+    return process.env;
+  }
+}
+
+function siteUrl(env: EmailEnv = process.env) {
+  return (envValue(env, "NEXT_PUBLIC_SITE_URL") || DEFAULT_SITE_URL).replace(/\/+$/, "");
+}
 
 export const escapeHtml = (value: string | number | null | undefined) =>
   String(value ?? "")
@@ -49,15 +101,15 @@ const lineExVat = (item: QuoteItem) =>
 const numericTotal = (items: QuoteItem[]) =>
   items.reduce((sum, item) => sum + (lineExVat(item) ?? 0), 0);
 
-function fileDownloadUrl(key: string) {
-  return `${SITE_URL}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
+function fileDownloadUrl(key: string, env: EmailEnv = process.env) {
+  return `${siteUrl(env)}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-function dashboardUrl() {
-  return `${SITE_URL}/dashboard/orders`;
+function dashboardUrl(env: EmailEnv = process.env) {
+  return `${siteUrl(env)}/dashboard/orders`;
 }
 
-function customSummary(item: QuoteItem, includeFileLinks = false) {
+function customSummary(item: QuoteItem, includeFileLinks = false, env: EmailEnv = process.env) {
   const custom = item.custom;
   if (!custom) return "";
   const files = custom.files || [];
@@ -82,7 +134,7 @@ function customSummary(item: QuoteItem, includeFileLinks = false) {
           ? `<div style="margin-top:8px"><strong>Uploaded files:</strong><br>${files
               .map(
                 (file) =>
-                  `<a href="${escapeHtml(fileDownloadUrl(file.key))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
+                  `<a href="${escapeHtml(fileDownloadUrl(file.key, env))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
               )
               .join("<br>")}</div>`
           : files.length
@@ -93,7 +145,7 @@ function customSummary(item: QuoteItem, includeFileLinks = false) {
   `;
 }
 
-function ownerCustomJobDetails(quote: QuoteRequest) {
+function ownerCustomJobDetails(quote: QuoteRequest, env: EmailEnv = process.env) {
   const customItems = quote.items.filter((item) => item.catalogue === "custom" && item.custom);
   if (customItems.length === 0) return "";
 
@@ -144,7 +196,7 @@ function ownerCustomJobDetails(quote: QuoteRequest) {
               ? `<div style="margin-top:12px"><strong style="color:#6b5a46">Uploaded files:</strong><br>${files
                   .map(
                     (file) =>
-                      `<a href="${escapeHtml(fileDownloadUrl(file.key))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
+                      `<a href="${escapeHtml(fileDownloadUrl(file.key, env))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
                   )
                   .join("<br>")}</div>`
               : `<div style="margin-top:12px;color:#6b5a46"><strong>No files uploaded.</strong></div>`
@@ -165,14 +217,14 @@ export function quoteTotals(quote: QuoteRequest) {
   return { goodsExVat, carriageExVat, extraChargesExVat, totalExVat, vat, totalIncVat };
 }
 
-function quoteRows(items: QuoteItem[]) {
+function quoteRows(items: QuoteItem[], env: EmailEnv = process.env) {
   return items
     .map(
       (item) => `
         <tr>
           <td>${escapeHtml(item.qty)}</td>
           <td>${escapeHtml(itemReference(item))}</td>
-          <td>${escapeHtml(itemName(item))}${item.catalogue === "custom" ? customSummary(item, true) : ""}</td>
+          <td>${escapeHtml(itemName(item))}${item.catalogue === "custom" ? customSummary(item, true, env) : ""}</td>
           <td>${escapeHtml(item.unit || "")}</td>
           <td style="text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
           <td style="text-align:right">${escapeHtml(money(lineExVat(item)))}</td>
@@ -181,8 +233,8 @@ function quoteRows(items: QuoteItem[]) {
     .join("");
 }
 
-export function buildOwnerQuoteEmail(quote: QuoteRequest) {
-  const rows = quoteRows(quote.items);
+export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
+  const rows = quoteRows(quote.items, env);
   return `
     <h2>New M-Machine order request: ${escapeHtml(quote.id)}</h2>
     <p><strong>Order type:</strong> ${escapeHtml(orderType(quote))}</p>
@@ -201,7 +253,7 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
         ? ""
         : `<p><strong>Customer note:</strong><br>${escapeHtml(quote.customer.message || "").replace(/\n/g, "<br>")}</p>`
     }
-    ${ownerCustomJobDetails(quote)}
+    ${ownerCustomJobDetails(quote, env)}
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
       <thead>
         <tr><th>Qty</th><th>Code / Shape</th><th>Description</th><th>Unit</th><th>Each ex VAT</th><th>Line ex VAT</th></tr>
@@ -209,12 +261,16 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest) {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin:22px 0">
-      <a href="${escapeHtml(dashboardUrl())}" style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">
+      <a href="${escapeHtml(dashboardUrl(env))}" style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">
         View in dashboard
       </a>
     </p>
     <p>Review and edit this in the owner dashboard before emailing the completed invoice to the buyer.</p>
   `;
+}
+
+export async function buildOwnerQuoteEmailForRuntime(quote: QuoteRequest) {
+  return buildOwnerQuoteEmail(quote, await emailRuntimeEnv());
 }
 
 function formatDate(value: string | null | undefined) {
@@ -224,7 +280,7 @@ function formatDate(value: string | null | undefined) {
   }).format(value ? new Date(value) : new Date());
 }
 
-function invoiceRows(items: QuoteItem[]) {
+function invoiceRows(items: QuoteItem[], env: EmailEnv = process.env) {
   return items
     .map((item) => {
       const line = lineExVat(item);
@@ -235,7 +291,7 @@ function invoiceRows(items: QuoteItem[]) {
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca">
             <strong style="color:#0f3d2e">${escapeHtml(item.description)}</strong>
             <div style="color:#6b5a46;font-size:12px;margin-top:3px">${escapeHtml(itemName(item))}</div>
-            ${item.catalogue === "custom" ? customSummary(item, false) : ""}
+            ${item.catalogue === "custom" ? customSummary(item, false, env) : ""}
           </td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca">${escapeHtml(item.unit || "")}</td>
           <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
@@ -245,9 +301,9 @@ function invoiceRows(items: QuoteItem[]) {
     .join("");
 }
 
-export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
+export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
   const totals = quoteTotals(quote);
-  const vatRegistrationNumber = process.env.VAT_REGISTRATION_NUMBER?.trim();
+  const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
   return `
     <div style="margin:0;background:#fbf8f1;padding:28px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
       <div style="max-width:780px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:14px;overflow:hidden">
@@ -297,7 +353,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
                 <th style="padding:10px;text-align:right">Line ex VAT</th>
               </tr>
             </thead>
-            <tbody>${invoiceRows(quote.items)}</tbody>
+            <tbody>${invoiceRows(quote.items, env)}</tbody>
           </table>
 
           <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:360px;margin:24px 0 0 auto;font-size:14px">
@@ -325,6 +381,10 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest) {
 }
 
 export const buildCustomerQuoteEmail = buildCustomerInvoiceEmail;
+
+export async function buildCustomerInvoiceEmailForRuntime(quote: QuoteRequest) {
+  return buildCustomerInvoiceEmail(quote, await emailRuntimeEnv());
+}
 
 export function buildOwnerEnquiryEmail(enquiry: {
   name: string;
@@ -359,15 +419,15 @@ export function buildOwnerEnquiryEmail(enquiry: {
   `;
 }
 
-function splitEmailList(value: string | undefined) {
+function splitEmailList(value: unknown) {
   return String(value || "")
     .split(/[;,]/)
     .map((email) => email.trim())
     .filter(Boolean);
 }
 
-function ownerFallbackRecipients() {
-  const fallback = splitEmailList(process.env.QUOTE_OWNER_EMAIL);
+function ownerFallbackRecipients(env: EmailEnv = process.env) {
+  const fallback = splitEmailList(envValue(env, "QUOTE_OWNER_EMAIL"));
   return fallback.length > 0 ? fallback : [DEFAULT_OWNER_EMAIL];
 }
 
@@ -375,21 +435,33 @@ function uniqueRecipients(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-export function ownerQuoteRecipients(quote: QuoteRequest) {
-  const envByCatalogue: Record<QuoteCatalogue, string | undefined> = {
-    custom: process.env.QUOTE_CUSTOM_OWNER_EMAIL,
-    featured: process.env.QUOTE_FEATURED_OWNER_EMAIL,
-    metals: process.env.QUOTE_METALS_OWNER_EMAIL,
-    mini: process.env.QUOTE_MINI_OWNER_EMAIL,
+function ownerRecipientsForCatalogue(catalogue: QuoteCatalogue, env: EmailEnv = process.env) {
+  const envByCatalogue: Record<QuoteCatalogue, string> = {
+    custom: "QUOTE_CUSTOM_OWNER_EMAIL",
+    featured: "QUOTE_FEATURED_OWNER_EMAIL",
+    metals: "QUOTE_METALS_OWNER_EMAIL",
+    mini: "QUOTE_MINI_OWNER_EMAIL",
   };
-  const recipients = quote.items.flatMap((item) => splitEmailList(envByCatalogue[item.catalogue]));
-  const unique = uniqueRecipients(recipients);
-  return unique.length > 0 ? unique : ownerFallbackRecipients();
+  return uniqueRecipients(splitEmailList(envValue(env, envByCatalogue[catalogue])));
 }
 
-export function ownerEnquiryRecipients() {
-  const recipients = uniqueRecipients(splitEmailList(process.env.QUOTE_ENQUIRY_OWNER_EMAIL));
-  return recipients.length > 0 ? recipients : ownerFallbackRecipients();
+export function ownerQuoteRecipients(quote: QuoteRequest, env: EmailEnv = process.env) {
+  const recipients = quote.items.flatMap((item) => ownerRecipientsForCatalogue(item.catalogue, env));
+  const unique = uniqueRecipients(recipients);
+  return unique.length > 0 ? unique : ownerFallbackRecipients(env);
+}
+
+export async function ownerQuoteRecipientsForRuntime(quote: QuoteRequest) {
+  return ownerQuoteRecipients(quote, await emailRuntimeEnv());
+}
+
+export function ownerEnquiryRecipients(env: EmailEnv = process.env) {
+  const recipients = uniqueRecipients(splitEmailList(envValue(env, "QUOTE_ENQUIRY_OWNER_EMAIL")));
+  return recipients.length > 0 ? recipients : ownerFallbackRecipients(env);
+}
+
+export async function ownerEnquiryRecipientsForRuntime() {
+  return ownerEnquiryRecipients(await emailRuntimeEnv());
 }
 
 function cleanEmailAddress(value: string) {
@@ -417,23 +489,47 @@ function quoteDisplayName(value: string) {
   return `"${value.replace(/["\\]/g, "\\$&")}"`;
 }
 
-function sesFromEmailAddress() {
-  const configured = process.env.AWS_SES_FROM_EMAIL?.trim();
+function sesFromEmailAddress(env: EmailEnv = process.env) {
+  const configured = envValue(env, "AWS_SES_FROM_EMAIL");
   if (configured?.includes("<")) return configured;
   const email = cleanEmailAddress(configured || DEFAULT_FROM_EMAIL);
-  const name = process.env.AWS_SES_FROM_NAME?.trim() || DEFAULT_FROM_NAME;
+  const name = envValue(env, "AWS_SES_FROM_NAME") || DEFAULT_FROM_NAME;
   return `${quoteDisplayName(name)} <${email}>`;
 }
 
-function sesConfig() {
-  const region = process.env.AWS_SES_REGION?.trim() || process.env.AWS_REGION?.trim();
-  const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID?.trim() || process.env.AWS_ACCESS_KEY_ID?.trim();
-  const secretAccessKey =
-    process.env.AWS_SES_SECRET_ACCESS_KEY?.trim() || process.env.AWS_SECRET_ACCESS_KEY?.trim();
-  const sessionToken =
-    process.env.AWS_SES_SESSION_TOKEN?.trim() || process.env.AWS_SESSION_TOKEN?.trim() || undefined;
-  if (!region || !accessKeyId || !secretAccessKey) return null;
-  return { region, credentials: { accessKeyId, secretAccessKey, sessionToken } };
+function sesConfigValues(env: EmailEnv = process.env): SesConfigValues {
+  return {
+    region: envValue(env, "AWS_SES_REGION") || envValue(env, "AWS_REGION"),
+    accessKeyId: envValue(env, "AWS_SES_ACCESS_KEY_ID") || envValue(env, "AWS_ACCESS_KEY_ID"),
+    secretAccessKey: envValue(env, "AWS_SES_SECRET_ACCESS_KEY") || envValue(env, "AWS_SECRET_ACCESS_KEY"),
+    sessionToken: envValue(env, "AWS_SES_SESSION_TOKEN") || envValue(env, "AWS_SESSION_TOKEN") || undefined,
+  };
+}
+
+function missingSesConfig(values: SesConfigValues) {
+  const missing: string[] = [];
+  if (!values.region) missing.push("AWS_SES_REGION");
+  if (!values.accessKeyId) missing.push("AWS_SES_ACCESS_KEY_ID");
+  if (!values.secretAccessKey) missing.push("AWS_SES_SECRET_ACCESS_KEY");
+  return missing;
+}
+
+function sesConfig(env: EmailEnv = process.env) {
+  const values = sesConfigValues(env);
+  const missing = missingSesConfig(values);
+  if (missing.length > 0) return { values, missing, config: null };
+  return {
+    values,
+    missing,
+    config: {
+      region: values.region,
+      credentials: {
+        accessKeyId: values.accessKeyId,
+        secretAccessKey: values.secretAccessKey,
+        sessionToken: values.sessionToken,
+      },
+    },
+  };
 }
 
 export function buildSesEmailInput(opts: {
@@ -441,10 +537,10 @@ export function buildSesEmailInput(opts: {
   subject: string;
   html: string;
   replyTo?: string;
-}): SendEmailCommandInput {
+}, env: EmailEnv = process.env): SendEmailCommandInput {
   const to = uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to));
   return {
-    FromEmailAddress: sesFromEmailAddress(),
+    FromEmailAddress: sesFromEmailAddress(env),
     Destination: { ToAddresses: to },
     ReplyToAddresses: opts.replyTo ? [cleanEmailAddress(opts.replyTo)] : undefined,
     Content: {
@@ -456,7 +552,57 @@ export function buildSesEmailInput(opts: {
         },
       },
     },
-    ConfigurationSetName: process.env.AWS_SES_CONFIGURATION_SET?.trim() || undefined,
+    ConfigurationSetName: envValue(env, "AWS_SES_CONFIGURATION_SET") || undefined,
+  };
+}
+
+export function buildEmailSetupStatus(env: EmailEnv = process.env) {
+  const config = sesConfig(env);
+  const fallbackRecipients = ownerFallbackRecipients(env);
+  const withFallback = (recipients: string[]) => (recipients.length > 0 ? recipients : fallbackRecipients);
+  return {
+    provider: "amazon-ses" as const,
+    configured: config.missing.length === 0,
+    missing: config.missing,
+    region: config.values.region || null,
+    fromEmailAddress: sesFromEmailAddress(env),
+    senderEmailAddress: cleanEmailAddress(sesFromEmailAddress(env)),
+    configurationSetConfigured: Boolean(envValue(env, "AWS_SES_CONFIGURATION_SET")),
+    recipients: {
+      fallback: fallbackRecipients,
+      custom: withFallback(ownerRecipientsForCatalogue("custom", env)),
+      mini: withFallback(ownerRecipientsForCatalogue("mini", env)),
+      metals: withFallback(ownerRecipientsForCatalogue("metals", env)),
+      featured: withFallback(ownerRecipientsForCatalogue("featured", env)),
+      enquiry: ownerEnquiryRecipients(env),
+    },
+  };
+}
+
+export async function emailSetupStatus() {
+  return buildEmailSetupStatus(await emailRuntimeEnv());
+}
+
+function emailErrorDetail(error: unknown) {
+  const maybeError = error as {
+    name?: unknown;
+    message?: unknown;
+    $metadata?: {
+      httpStatusCode?: unknown;
+      requestId?: unknown;
+    };
+  };
+  return {
+    name: typeof maybeError.name === "string" ? maybeError.name : "EmailDeliveryError",
+    message:
+      typeof maybeError.message === "string"
+        ? maybeError.message
+        : error instanceof Error
+          ? error.message
+          : "unknown error",
+    statusCode:
+      typeof maybeError.$metadata?.httpStatusCode === "number" ? maybeError.$metadata.httpStatusCode : undefined,
+    requestId: typeof maybeError.$metadata?.requestId === "string" ? maybeError.$metadata.requestId : undefined,
   };
 }
 
@@ -465,24 +611,35 @@ export async function sendQuoteEmail(opts: {
   subject: string;
   html: string;
   replyTo?: string;
-}) {
-  const config = sesConfig();
-  if (!config) {
-    return { ok: false, skipped: true, error: "Email sending is unavailable" };
+}): Promise<EmailDeliveryResult> {
+  const env = await emailRuntimeEnv();
+  const config = sesConfig(env);
+  if (!config.config) {
+    return {
+      ok: false,
+      skipped: true,
+      error: "Email sending is unavailable",
+      code: "missing_config",
+      missing: config.missing,
+    };
   }
 
   try {
     const client = new SESv2Client({
-      region: config.region,
-      credentials: config.credentials,
+      region: config.config.region,
+      credentials: config.config.credentials,
       requestHandler: new FetchHttpHandler(),
     });
-    const result = await client.send(new SendEmailCommand(buildSesEmailInput(opts)));
+    const result = await client.send(new SendEmailCommand(buildSesEmailInput(opts, env)));
     return { ok: true, skipped: false, error: null, provider: "amazon-ses", messageId: result.MessageId };
   } catch (error) {
+    const detail = emailErrorDetail(error);
     console.error("ses_email_delivery_failed", {
-      error: error instanceof Error ? error.message : "unknown error",
+      error: detail.message,
+      name: detail.name,
+      statusCode: detail.statusCode,
+      requestId: detail.requestId,
     });
-    return { ok: false, skipped: false, error: "Email delivery request failed" };
+    return { ok: false, skipped: false, error: "Email delivery request failed", code: detail.name, detail };
   }
 }
