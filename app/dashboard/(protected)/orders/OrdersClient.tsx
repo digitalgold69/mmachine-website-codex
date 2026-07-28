@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 const GBP = "\u00a3";
@@ -223,8 +224,10 @@ function OrderCardSection({
   isSaving,
   onSelect,
   onMarkPaid,
+  onDelete,
   dateForQuote,
   dateLabel,
+  showDelete = true,
 }: {
   title: string;
   quotes: QuoteRequest[];
@@ -234,8 +237,10 @@ function OrderCardSection({
   isSaving: boolean;
   onSelect: (id: string) => void;
   onMarkPaid: (quote: QuoteRequest) => void;
+  onDelete: (quote: QuoteRequest) => void;
   dateForQuote: (quote: QuoteRequest) => string | null | undefined;
   dateLabel: string;
+  showDelete?: boolean;
 }) {
   return (
     <section className="rounded-xl border border-racing/10 bg-white p-4">
@@ -258,9 +263,11 @@ function OrderCardSection({
               isSaving={isSaving}
               onSelect={onSelect}
               onMarkPaid={onMarkPaid}
+              onDelete={onDelete}
               dateLabel={dateLabel}
               dateValue={dateForQuote(quote)}
               showMarkPaid={!isPaidQuote(quote)}
+              showDelete={showDelete && !isPaidQuote(quote)}
             />
           ))}
         </div>
@@ -276,9 +283,11 @@ function OrderCard({
   isSaving,
   onSelect,
   onMarkPaid,
+  onDelete,
   dateLabel,
   dateValue,
   showMarkPaid,
+  showDelete,
 }: {
   quote: QuoteRequest;
   selectedId: string;
@@ -286,9 +295,11 @@ function OrderCard({
   isSaving: boolean;
   onSelect: (id: string) => void;
   onMarkPaid: (quote: QuoteRequest) => void;
+  onDelete: (quote: QuoteRequest) => void;
   dateLabel: string;
   dateValue: string | null | undefined;
   showMarkPaid: boolean;
+  showDelete: boolean;
 }) {
   const quoteTotals = totals(quote);
   const cardSaving = savingAction.startsWith(`${quote.id}:`);
@@ -343,16 +354,31 @@ function OrderCard({
               ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
               : "Not invoiced"}
         </div>
-        {showMarkPaid && (
-          <button
-            type="button"
-            onClick={() => onMarkPaid(quote)}
-            disabled={isSaving}
-            aria-label={`Mark order ${quote.id} as paid`}
-            className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
-          </button>
+        {(showDelete || showMarkPaid) && (
+          <div className="flex shrink-0 items-center gap-2">
+            {showDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(quote)}
+                disabled={isSaving}
+                aria-label={`Delete order ${quote.id}`}
+                className="rounded-lg px-2 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Delete
+              </button>
+            )}
+            {showMarkPaid && (
+              <button
+                type="button"
+                onClick={() => onMarkPaid(quote)}
+                disabled={isSaving}
+                aria-label={`Mark order ${quote.id} as paid`}
+                className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
+              </button>
+            )}
+          </div>
         )}
       </div>
     </article>
@@ -372,6 +398,9 @@ export default function OrdersClient({
   initialHistoryCount: number;
   initialMonthStats: Record<string, { salesValue: number; salesCount: number }>;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [quotes, setQuotes] = useState(initialQuotes);
   const [historyRows, setHistoryRows] = useState(initialQuotes.filter(isPaidQuote));
   const [historyCount, setHistoryCount] = useState(initialHistoryCount);
@@ -380,6 +409,7 @@ export default function OrdersClient({
   const [historyRevision, setHistoryRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<QuoteRequest | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<QuoteRequest | null>(null);
   const [query, setQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [monthFilter, setMonthFilter] = useState(initialMonth);
@@ -388,8 +418,11 @@ export default function OrdersClient({
   const [message, setMessage] = useState(initialError);
   const [actionNotice, setActionNotice] = useState<{ quoteId: string; tone: "success" | "error"; text: string } | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
-  const invoiceRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null);
+  const missingDeepLinkNoticeRef = useRef("");
   const firstHistoryLoad = useRef(true);
+  const requestedQuoteId = searchParams.get("quote") || searchParams.get("order") || "";
 
   const sortedQuotes = useMemo(
     () => [...quotes].sort((a, b) => Date.parse(historyDate(b)) - Date.parse(historyDate(a))),
@@ -436,6 +469,30 @@ export default function OrdersClient({
 
     return [...groups.values()];
   }, [monthStats, pageQuotes]);
+
+  const replaceQuoteParam = useCallback((quoteId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("quote");
+    params.delete("order");
+    if (quoteId) params.set("quote", quoteId);
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const openInvoice = useCallback((quote: QuoteRequest, syncUrl = true) => {
+    setSelectedId(quote.id);
+    setDraft(cloneQuote(quote));
+    setMessage("");
+    setActionNotice(null);
+    if (syncUrl) replaceQuoteParam(quote.id);
+  }, [replaceQuoteParam]);
+
+  const closeInvoice = useCallback(() => {
+    setSelectedId("");
+    setDraft(null);
+    setActionNotice(null);
+    replaceQuoteParam(null);
+  }, [replaceQuoteParam]);
 
   useEffect(() => {
     if (firstHistoryLoad.current) {
@@ -496,6 +553,46 @@ export default function OrdersClient({
   }, [page, pageCount]);
 
   useEffect(() => {
+    if (!requestedQuoteId) return;
+
+    const existing = quotes.find((quote) => quote.id === requestedQuoteId);
+    if (existing) {
+      missingDeepLinkNoticeRef.current = "";
+      if (selectedId !== existing.id || draft?.id !== existing.id) {
+        openInvoice(existing, false);
+      }
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/quote-requests?quote=${encodeURIComponent(requestedQuoteId)}`, {
+          signal: controller.signal,
+        });
+        const data = await response.json() as { error?: string; quote?: QuoteRequest };
+        if (!response.ok || !data.quote) {
+          throw new Error(data.error || "Linked order could not be loaded.");
+        }
+        setQuotes((current) => current.some((quote) => quote.id === data.quote!.id) ? current : [data.quote!, ...current]);
+        openInvoice(data.quote, false);
+        missingDeepLinkNoticeRef.current = "";
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        if (missingDeepLinkNoticeRef.current !== requestedQuoteId) {
+          missingDeepLinkNoticeRef.current = requestedQuoteId;
+          setMessage((error as Error).message || "Linked order could not be loaded.");
+        }
+      }
+    }, 20);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [draft?.id, openInvoice, quotes, requestedQuoteId, selectedId]);
+
+  useEffect(() => {
     const quote = quotes.find((q) => q.id === selectedId);
     if (quote?.status === "new") {
       void markViewed(quote);
@@ -503,8 +600,50 @@ export default function OrdersClient({
   }, [quotes, selectedId]);
 
   useEffect(() => {
-    if (draft) invoiceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [draft?.id]);
+    if (!draft) return;
+
+    const dialog = modalRef.current;
+    if (!dialog) return;
+
+    modalReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusableSelector =
+      'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+    window.setTimeout(() => focusable()[0]?.focus(), 0);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeInvoice();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      modalReturnFocusRef.current?.focus();
+    };
+  }, [closeInvoice, draft?.id]);
 
   useEffect(() => {
     if (!monthFilter) return;
@@ -519,10 +658,11 @@ export default function OrdersClient({
 
   function selectQuote(id: string) {
     const quote = quotes.find((q) => q.id === id);
-    setSelectedId(id);
-    setDraft(quote ? cloneQuote(quote) : null);
-    setMessage("");
-    setActionNotice(null);
+    if (quote) {
+      openInvoice(quote);
+      return;
+    }
+    setMessage("That order could not be found.");
   }
 
   function patchDraft(patch: Partial<QuoteRequest>) {
@@ -538,7 +678,19 @@ export default function OrdersClient({
     });
   }
 
+  function removeQuoteFromDashboard(id: string) {
+    setQuotes((current) => current.filter((quote) => quote.id !== id));
+    setHistoryRows((current) => current.filter((quote) => quote.id !== id));
+    if (selectedId === id) closeInvoice();
+  }
+
   function updateQuote(updated: QuoteRequest) {
+    if (updated.status === "closed") {
+      removeQuoteFromDashboard(updated.id);
+      setHistoryRevision((value) => value + 1);
+      return;
+    }
+
     setQuotes((current) => {
       const exists = current.some((quote) => quote.id === updated.id);
       return exists
@@ -596,10 +748,17 @@ export default function OrdersClient({
       if (!data.quote) throw new Error("Save completed without returning the order.");
       const updated = data.quote;
       updateQuote(updated);
+      if (updated.status === "closed") {
+        setMessage(`Deleted ${updated.id}.`);
+        return;
+      }
+      const wasPreviouslySent = Boolean(quote.customerEmailSentAt || quote.invoiceSentAt);
       const text = options.markPaid
         ? "Order marked as paid."
         : options.emailCustomer
-          ? "Invoice emailed to customer and marked as invoice sent."
+          ? wasPreviouslySent
+            ? "Updated invoice emailed to customer."
+            : "Invoice emailed to customer and marked as invoice sent."
           : "Order saved.";
 
       if (selectedId === updated.id) {
@@ -628,7 +787,31 @@ export default function OrdersClient({
     await patchQuote(quote, { markPaid: true, label: "paid" });
   }
 
+  async function deleteQuote(quote: QuoteRequest) {
+    setSavingAction(`${quote.id}:delete`);
+    setMessage("");
+    setActionNotice(null);
+    try {
+      const res = await fetch("/api/quote-requests", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: quote.id }),
+      });
+      const data = await res.json() as { error?: string; quote?: QuoteRequest };
+      if (!res.ok) throw new Error(data.error || "Order could not be deleted.");
+      if (data.quote) updateQuote(data.quote);
+      else removeQuoteFromDashboard(quote.id);
+      setPendingDelete(null);
+      setMessage(`Deleted ${quote.id}.`);
+    } catch (err) {
+      setMessage((err as Error).message || "Order could not be deleted.");
+    } finally {
+      setSavingAction("");
+    }
+  }
+
   const draftTotals = draft ? totals(draft) : null;
+  const draftInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt || draft.invoiceSentAt) : false;
   const invoiceReady = draft
     ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
     : false;
@@ -662,6 +845,7 @@ export default function OrdersClient({
           isSaving={isSaving}
           onSelect={selectQuote}
           onMarkPaid={markPaid}
+          onDelete={setPendingDelete}
           dateLabel="Submitted"
           dateForQuote={(quote) => quote.submittedAt}
         />
@@ -675,6 +859,7 @@ export default function OrdersClient({
           isSaving={isSaving}
           onSelect={selectQuote}
           onMarkPaid={markPaid}
+          onDelete={setPendingDelete}
           dateLabel="Invoice sent"
           dateForQuote={(quote) => quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt}
         />
@@ -761,9 +946,11 @@ export default function OrdersClient({
                       isSaving={isSaving}
                       onSelect={selectQuote}
                       onMarkPaid={markPaid}
+                      onDelete={setPendingDelete}
                       dateLabel="Paid"
                       dateValue={quote.paidAt || quote.updatedAt}
                       showMarkPaid={false}
+                      showDelete={false}
                     />
                   ))}
                 </div>
@@ -795,334 +982,410 @@ export default function OrdersClient({
         </div>
 
         {draft && selected && (
-          <div ref={invoiceRef} className="min-w-0 scroll-mt-6 bg-white rounded-xl border border-racing/10 p-5">
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div>
-                <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice editor</div>
-                <div className="mt-1">
-                  <OrderTypePill quote={draft} />
-                </div>
-                <h2 className="font-display text-2xl text-racing">{draft.customer.name}</h2>
-                <div className="text-sm text-ink-muted">
-                  {draft.id} / submitted {formatDateTime(draft.submittedAt)}
-                </div>
-                <div className="text-sm text-ink-muted">
-                  {draft.customer.email} / {draft.customer.phone}
-                </div>
-                {draft.customer.company && (
-                  <div className="text-sm text-ink-muted">{draft.customer.company}</div>
-                )}
-                <div className="mt-3 rounded-lg bg-cream-dark p-3 text-sm text-ink">
-                  <div className="label mb-1">Delivery</div>
-                  {draft.customer.arrangeOwnDelivery ? (
-                    <p>Customer will arrange delivery / collection.</p>
-                  ) : (
-                    <p className="whitespace-pre-wrap">
-                      {draft.customer.address || "No delivery address supplied"}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex min-w-[180px] flex-col gap-3">
-                <div>
-                  <label className="label" htmlFor="status">Status</label>
-                  <select
-                    id="status"
-                    value={draft.status}
-                    onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
-                    className="input"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedId("");
-                    setDraft(null);
-                  }}
-                  className="btn-secondary justify-center py-2"
-                >
-                  Close invoice
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-5 grid sm:grid-cols-3 gap-3">
-              <div className="rounded-lg bg-cream-dark p-3">
-                <div className="text-xs uppercase tracking-wider text-ink-muted">Current status</div>
-                <div className="mt-2"><StatusPill status={draft.status} /></div>
-              </div>
-              <div className="rounded-lg bg-cream-dark p-3">
-                <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice sent</div>
-                <div className="mt-1 text-sm font-semibold text-racing">
-                  {draft.invoiceSentAt ? formatDateTime(draft.invoiceSentAt) : "Not sent yet"}
-                </div>
-              </div>
-              <div className="rounded-lg bg-cream-dark p-3">
-                <div className="text-xs uppercase tracking-wider text-ink-muted">Payment</div>
-                <div className="mt-1 text-sm font-semibold text-racing">
-                  {draft.paidAt ? `Paid ${formatDateTime(draft.paidAt)}` : "Awaiting payment"}
-                </div>
-              </div>
-            </div>
-
-            {quoteKind(draft) === "custom" && (
-              <div className="mb-5 rounded-xl border border-racing/10 bg-cream-dark p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-ink-muted">Custom job details</div>
-                    <h3 className="font-display text-xl text-racing">
-                      {firstCustomItem(draft)?.custom?.projectName || "Custom fabrication request"}
-                    </h3>
+          <div
+            className="fixed inset-0 z-[90] bg-racing-dark/65 p-2 sm:p-5"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeInvoice();
+            }}
+          >
+            <div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="invoice-editor-title"
+              className="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:h-[calc(100vh-2.5rem)]"
+            >
+              <div className="shrink-0 border-b border-racing/10 px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <OrderTypePill quote={draft} />
+                      <StatusPill status={draft.status} />
+                    </div>
+                    <h2 id="invoice-editor-title" className="mt-1 truncate font-display text-2xl text-racing">
+                      {draft.customer.name}
+                    </h2>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
+                      <span>{draft.id}</span>
+                      <span>Submitted {formatDateTime(draft.submittedAt)}</span>
+                      <span>{draft.customer.email}</span>
+                    </div>
                   </div>
-                  {draftFiles.length > 0 && (
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-racing">
-                      {draftFiles.length} {draftFiles.length === 1 ? "file" : "files"} attached
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-end gap-2 sm:justify-end">
+                    <div className="w-44">
+                      <label className="label !mb-1" htmlFor="status">Status</label>
+                      <select
+                        id="status"
+                        value={draft.status}
+                        onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
+                        className="input h-9 py-1 text-sm"
+                      >
+                        {STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button type="button" onClick={closeInvoice} className="btn-secondary px-3 py-2 text-sm">
+                      Close
+                    </button>
+                  </div>
                 </div>
-                {customJobRows(draft).length > 0 && (
-                  <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {customJobRows(draft).map((row) => (
-                      <div key={row.label} className="rounded-lg bg-white p-3">
-                        <dt className="text-xs uppercase tracking-wider text-ink-muted">{row.label}</dt>
-                        <dd className="mt-1 text-sm font-semibold text-racing">{row.value}</dd>
+                {draftInvoiceWasSent && (
+                  <div className="mt-3 rounded-lg bg-cream-dark px-3 py-2 text-xs font-semibold text-racing">
+                    Customer invoice last emailed {formatDateTime(draft.customerEmailSentAt || draft.invoiceSentAt)}.
+                    Edits can be sent with the updated invoice button.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="min-w-0 space-y-4">
+                    <section className="grid gap-3 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <div className="label !mb-1">Customer</div>
+                        <div className="font-semibold text-racing">{draft.customer.name}</div>
+                        <div className="break-all text-ink-muted">{draft.customer.email}</div>
+                        <div className="text-ink-muted">{draft.customer.phone || "No phone supplied"}</div>
+                        {draft.customer.company && <div className="text-ink-muted">{draft.customer.company}</div>}
                       </div>
-                    ))}
-                  </dl>
-                )}
-                {draft.customer.message && (
-                  <div className="mt-4 rounded-lg bg-white p-3 text-sm">
-                    <div className="text-xs uppercase tracking-wider text-ink-muted">Job details from customer</div>
-                    <p className="mt-2 whitespace-pre-wrap leading-6 text-ink">{draft.customer.message}</p>
+                      <div>
+                        <div className="label !mb-1">Delivery</div>
+                        {draft.customer.arrangeOwnDelivery ? (
+                          <p>Customer will arrange delivery / collection.</p>
+                        ) : (
+                          <p className="whitespace-pre-wrap">{draft.customer.address || "No delivery address supplied"}</p>
+                        )}
+                      </div>
+                    </section>
+
+                    {quoteKind(draft) === "custom" && (
+                      <section className="rounded-lg border border-racing/10 p-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-xs uppercase tracking-wider text-ink-muted">Custom job details</div>
+                            <h3 className="font-display text-xl text-racing">
+                              {firstCustomItem(draft)?.custom?.projectName || "Custom fabrication request"}
+                            </h3>
+                          </div>
+                          {draftFiles.length > 0 && (
+                            <span className="rounded-full bg-cream-dark px-3 py-1 text-xs font-semibold text-racing">
+                              {draftFiles.length} {draftFiles.length === 1 ? "file" : "files"}
+                            </span>
+                          )}
+                        </div>
+                        {customJobRows(draft).length > 0 && (
+                          <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {customJobRows(draft).map((row) => (
+                              <div key={row.label} className="rounded-md bg-cream-dark px-3 py-2">
+                                <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
+                                <dd className="mt-0.5 text-sm font-semibold text-racing">{row.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                        {draft.customer.message && (
+                          <div className="mt-3 rounded-md bg-cream-dark px-3 py-2 text-sm">
+                            <div className="label !mb-1">Job details from customer</div>
+                            <p className="whitespace-pre-wrap leading-6 text-ink">{draft.customer.message}</p>
+                          </div>
+                        )}
+                      </section>
+                    )}
+
+                    {draft.customer.message && quoteKind(draft) !== "custom" && (
+                      <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
+                        <div className="label !mb-1">Customer note</div>
+                        <p className="whitespace-pre-wrap">{draft.customer.message}</p>
+                      </section>
+                    )}
+
+                    {draftFiles.length > 0 && (
+                      <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
+                        <div className="label !mb-2">Uploaded design files</div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {draftFiles.map((file) => (
+                            <a
+                              key={file.key}
+                              href={fileHref(file.key)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-w-0 rounded-md bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
+                            >
+                              <span className="block truncate">{file.name}</span>
+                              <span className="block text-xs font-normal text-ink-muted">
+                                {Math.ceil(file.size / 1024)} KB
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    <section className="overflow-x-auto rounded-lg border border-racing/10">
+                      <table className="w-full min-w-[780px] table-fixed text-sm">
+                        <colgroup>
+                          <col className="w-[70px]" />
+                          <col className="w-[130px]" />
+                          <col />
+                          <col className="w-[100px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[110px]" />
+                        </colgroup>
+                        <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Qty</th>
+                            <th className="px-3 py-2 text-left">Part no.</th>
+                            <th className="px-3 py-2 text-left">Item</th>
+                            <th className="px-3 py-2 text-left">Unit</th>
+                            <th className="px-3 py-2 text-right">Each ex VAT</th>
+                            <th className="px-3 py-2 text-right">Line ex VAT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {draft.items.map((item, index) => (
+                            <tr key={item.key} className="border-t border-racing/5">
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={item.qty}
+                                  onChange={(e) => {
+                                    const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
+                                    patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
+                                  }}
+                                  className="h-9 w-full rounded-md border border-racing/20 bg-white px-2 text-center font-semibold text-racing"
+                                />
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  value={item.code || ""}
+                                  onChange={(e) => patchItem(index, { code: e.target.value })}
+                                  className="input h-9 font-mono text-xs"
+                                  placeholder={
+                                    item.catalogue === "custom"
+                                      ? "Custom ref"
+                                      : item.catalogue === "featured"
+                                        ? "Featured ref"
+                                        : item.catalogue === "mini"
+                                          ? "Mini part no."
+                                          : "Metal code"
+                                  }
+                                />
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  value={item.description}
+                                  onChange={(e) => patchItem(index, { description: e.target.value })}
+                                  className="input h-9"
+                                />
+                                <div className="mt-1 text-xs text-ink-muted">{itemDetails(item)}</div>
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  value={item.unit || ""}
+                                  onChange={(e) => patchItem(index, { unit: e.target.value })}
+                                  className="input h-9"
+                                />
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.unitPriceExVat ?? ""}
+                                  onChange={(e) =>
+                                    patchItem(index, {
+                                      unitPriceExVat: e.target.value === "" ? null : Number(e.target.value),
+                                      unitPriceIncVat: e.target.value === "" ? null : Number(e.target.value) * 1.2,
+                                    })
+                                  }
+                                  className="input h-9 text-right"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold text-racing align-top">
+                                {money(lineExVat(item))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
                   </div>
-                )}
-              </div>
-            )}
 
-            {draft.customer.message && quoteKind(draft) !== "custom" && (
-              <div className="mb-5 rounded-lg bg-cream-dark p-4 text-sm">
-                <div className="label mb-1">Customer note</div>
-                <p className="whitespace-pre-wrap">{draft.customer.message}</p>
-              </div>
-            )}
+                  <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
+                    <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-xs uppercase tracking-wider text-ink-muted">Invoice state</span>
+                        <StatusPill status={draft.status} />
+                      </div>
+                      <div className="space-y-1 text-ink-muted">
+                        <div className="flex justify-between gap-3">
+                          <span>Invoice</span>
+                          <strong className="text-right text-racing">
+                            {draft.invoiceSentAt ? formatDateTime(draft.invoiceSentAt) : "Not sent"}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span>Payment</span>
+                          <strong className="text-right text-racing">
+                            {draft.paidAt ? formatDateTime(draft.paidAt) : "Awaiting"}
+                          </strong>
+                        </div>
+                      </div>
+                    </section>
 
-            {draftFiles.length > 0 && (
-              <div className="mb-5 rounded-lg bg-cream-dark p-4 text-sm">
-                <div className="label mb-2">Uploaded design files</div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {draftFiles.map((file) => (
-                    <a
-                      key={file.key}
-                      href={fileHref(file.key)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-0 rounded-lg bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
-                    >
-                      <span className="block truncate">{file.name}</span>
-                      <span className="block text-xs font-normal text-ink-muted">
-                        {Math.ceil(file.size / 1024)} KB
-                      </span>
-                    </a>
-                  ))}
+                    <section className="rounded-lg border border-racing/10 p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label" htmlFor="carriage">Carriage ex VAT</label>
+                          <input
+                            id="carriage"
+                            type="number"
+                            step="0.01"
+                            value={draft.carriageExVat ?? ""}
+                            onChange={(e) => patchDraft({ carriageExVat: e.target.value === "" ? null : Number(e.target.value) })}
+                            className="input h-9"
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="extra-charges">Extra charges ex VAT</label>
+                          <input
+                            id="extra-charges"
+                            type="number"
+                            step="0.01"
+                            value={draft.extraChargesExVat ?? ""}
+                            onChange={(e) => patchDraft({ extraChargesExVat: e.target.value === "" ? null : Number(e.target.value) })}
+                            className="input h-9"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1 rounded-md bg-cream-dark p-3 text-sm">
+                        <div className="flex justify-between gap-3"><span>Goods ex VAT</span><strong>{money(draftTotals?.goods)}</strong></div>
+                        <div className="flex justify-between gap-3"><span>VAT</span><strong>{money(draftTotals?.vat)}</strong></div>
+                        <div className="flex justify-between gap-3"><span>Total ex VAT</span><strong>{money(draftTotals?.totalEx)}</strong></div>
+                        <div className="flex justify-between gap-3 text-racing"><span>Total inc VAT</span><strong>{money(draftTotals?.totalInc)}</strong></div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <label className="label" htmlFor="customer-message">Message to customer</label>
+                      <textarea
+                        id="customer-message"
+                        value={draft.customerMessage || ""}
+                        onChange={(e) => patchDraft({ customerMessage: e.target.value })}
+                        rows={4}
+                        className="input resize-none text-sm"
+                        placeholder="Delivery timing, collection notes, payment instructions, etc."
+                      />
+                    </section>
+
+                    <section>
+                      <label className="label" htmlFor="owner-notes">Owner notes</label>
+                      <textarea
+                        id="owner-notes"
+                        value={draft.ownerNotes || ""}
+                        onChange={(e) => patchDraft({ ownerNotes: e.target.value })}
+                        rows={4}
+                        className="input resize-none text-sm"
+                        placeholder="Private notes for the owner dashboard"
+                      />
+                    </section>
+
+                    {actionNotice && actionNotice.quoteId === draft.id && (
+                      <div
+                        className={`rounded-lg border p-3 text-sm ${
+                          actionNotice.tone === "error"
+                            ? "border-red-200 bg-red-50 text-red-800"
+                            : "border-racing/10 bg-cream-dark text-racing"
+                        }`}
+                      >
+                        {actionNotice.text}
+                      </div>
+                    )}
+
+                    {!invoiceReady && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        Add an ex VAT price to every invoice line before emailing it to the customer.
+                      </div>
+                    )}
+                  </aside>
                 </div>
               </div>
-            )}
 
-            <div className="overflow-x-auto border border-racing/10 rounded-lg">
-              <table className="w-full min-w-[930px] table-fixed">
-                <colgroup>
-                  <col className="w-[90px]" />
-                  <col className="w-[150px]" />
-                  <col />
-                  <col className="w-[120px]" />
-                  <col className="w-[130px]" />
-                  <col className="w-[120px]" />
-                </colgroup>
-                <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
-                  <tr>
-                    <th className="text-left px-3 py-2">Qty</th>
-                    <th className="text-left px-3 py-2">Part no.</th>
-                    <th className="text-left px-3 py-2">Item</th>
-                    <th className="text-left px-3 py-2">Unit</th>
-                    <th className="text-right px-3 py-2">Each ex VAT</th>
-                    <th className="text-right px-3 py-2">Line ex VAT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {draft.items.map((item, index) => (
-                    <tr key={item.key} className="border-t border-racing/5">
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={item.qty}
-                          onChange={(e) => {
-                            const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
-                            patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
-                          }}
-                          className="h-9 w-full rounded-md border border-racing/20 bg-white px-2 text-center font-semibold text-racing"
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          value={item.code || ""}
-                          onChange={(e) => patchItem(index, { code: e.target.value })}
-                          className="input h-9 font-mono text-xs"
-                          placeholder={
-                            item.catalogue === "custom"
-                              ? "Custom ref"
-                              : item.catalogue === "featured"
-                                ? "Featured ref"
-                              : item.catalogue === "mini"
-                                ? "Mini part no."
-                                : "Metal code"
-                          }
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          value={item.description}
-                          onChange={(e) => patchItem(index, { description: e.target.value })}
-                          className="input"
-                        />
-                        <div className="mt-1 text-xs text-ink-muted">{itemDetails(item)}</div>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          value={item.unit || ""}
-                          onChange={(e) => patchItem(index, { unit: e.target.value })}
-                          className="input h-9"
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.unitPriceExVat ?? ""}
-                          onChange={(e) =>
-                            patchItem(index, {
-                              unitPriceExVat: e.target.value === "" ? null : Number(e.target.value),
-                              unitPriceIncVat: e.target.value === "" ? null : Number(e.target.value) * 1.2,
-                            })
-                          }
-                          className="input h-9 text-right"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold text-racing align-top">
-                        {money(lineExVat(item))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4 mt-5">
-              <div>
-                <label className="label" htmlFor="customer-message">Message to customer</label>
-                <textarea
-                  id="customer-message"
-                  value={draft.customerMessage || ""}
-                  onChange={(e) => patchDraft({ customerMessage: e.target.value })}
-                  rows={5}
-                  className="input resize-none"
-                  placeholder="Delivery timing, collection notes, payment instructions, etc."
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="owner-notes">Owner notes</label>
-                <textarea
-                  id="owner-notes"
-                  value={draft.ownerNotes || ""}
-                  onChange={(e) => patchDraft({ ownerNotes: e.target.value })}
-                  rows={5}
-                  className="input resize-none"
-                  placeholder="Private notes for the owner dashboard"
-                />
+              <div className="shrink-0 border-t border-racing/10 px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {draft.status !== "paid" && (
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => setPendingDelete(draft)}
+                      className="mr-auto rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Delete job
+                    </button>
+                  )}
+                  {draft.status !== "paid" && (
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => markPaid(draft)}
+                      className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingAction === `${draft.id}:paid` ? "Saving..." : "Mark Paid"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => saveDraft(false)}
+                    className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingAction === `${draft.id}:save` ? "Saving..." : "Save draft"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSaving || !invoiceReady}
+                    onClick={() => saveDraft(true)}
+                    className="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingAction === `${draft.id}:email`
+                      ? "Sending..."
+                      : draftInvoiceWasSent
+                        ? "Send updated invoice"
+                        : "Email invoice to buyer"}
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-              <div>
-                <label className="label" htmlFor="carriage">Carriage ex VAT</label>
-                <input
-                  id="carriage"
-                  type="number"
-                  step="0.01"
-                  value={draft.carriageExVat ?? ""}
-                  onChange={(e) => patchDraft({ carriageExVat: e.target.value === "" ? null : Number(e.target.value) })}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="extra-charges">Extra charges ex VAT</label>
-                <input
-                  id="extra-charges"
-                  type="number"
-                  step="0.01"
-                  value={draft.extraChargesExVat ?? ""}
-                  onChange={(e) => patchDraft({ extraChargesExVat: e.target.value === "" ? null : Number(e.target.value) })}
-                  className="input"
-                />
-              </div>
-              <div className="lg:col-span-3 bg-cream-dark rounded-lg p-3 text-sm">
-                <div className="flex justify-between"><span>Goods ex VAT</span><strong>{money(draftTotals?.goods)}</strong></div>
-                <div className="flex justify-between"><span>VAT</span><strong>{money(draftTotals?.vat)}</strong></div>
-                <div className="flex justify-between"><span>Total ex VAT</span><strong>{money(draftTotals?.totalEx)}</strong></div>
-                <div className="flex justify-between text-racing"><span>Total inc VAT</span><strong>{money(draftTotals?.totalInc)}</strong></div>
-              </div>
-            </div>
-
-            {actionNotice && actionNotice.quoteId === draft.id && (
-              <div
-                className={`mt-5 rounded-lg border p-3 text-sm ${
-                  actionNotice.tone === "error"
-                    ? "border-red-200 bg-red-50 text-red-800"
-                    : "border-racing/10 bg-cream-dark text-racing"
-                }`}
-              >
-                {actionNotice.text}
-              </div>
-            )}
-
-            {!invoiceReady && (
-              <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                Add an ex VAT price to every invoice line before emailing it to the customer.
-              </div>
-            )}
-
-            <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-5">
-              {draft.status !== "paid" && (
+        {pendingDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-racing-dark/60 px-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h2 id="delete-order-title" className="font-display text-2xl text-racing">Delete this job?</h2>
+              <p className="mt-3 text-sm leading-6 text-ink-muted">
+                {pendingDelete.id} for {pendingDelete.customer.name} will be removed from the active dashboard and kept as closed in the order records.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
+                  onClick={() => setPendingDelete(null)}
                   disabled={isSaving}
-                  onClick={() => markPaid(draft)}
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {savingAction === `${draft.id}:paid` ? "Saving..." : "Mark Paid"}
+                  Cancel
                 </button>
-              )}
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => saveDraft(false)}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingAction === `${draft.id}:save` ? "Saving..." : "Save draft"}
-              </button>
-              <button
-                type="button"
-                disabled={isSaving || !invoiceReady}
-                onClick={() => saveDraft(true)}
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingAction === `${draft.id}:email` ? "Sending..." : "Email invoice to buyer"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => deleteQuote(pendingDelete)}
+                  disabled={isSaving}
+                  className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingAction === `${pendingDelete.id}:delete` ? "Deleting..." : "Delete job"}
+                </button>
+              </div>
             </div>
           </div>
         )}

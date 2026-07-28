@@ -450,6 +450,13 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
+    const quoteIdParam = asString(url.searchParams.get("quote"), 160);
+    if (quoteIdParam) {
+      const quote = await getQuoteRequest(quoteIdParam);
+      if (!quote) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+      return NextResponse.json({ quote });
+    }
+
     if (url.searchParams.get("history") === "paid") {
       const page = Math.max(1, Math.floor(Number(url.searchParams.get("page")) || 1));
       const pageSize = Math.max(1, Math.min(50, Math.floor(Number(url.searchParams.get("pageSize")) || 8)));
@@ -700,10 +707,11 @@ export async function PATCH(req: Request) {
       }
 
       const savedDraft = await saveQuoteRequest(next);
+      const isUpdatedInvoice = Boolean(savedDraft.customerEmailSentAt || savedDraft.invoiceSentAt);
       const replyTo = (await ownerQuoteRecipientsForRuntime(savedDraft))[0];
       const email = await sendQuoteEmail({
         to: savedDraft.customer.email,
-        subject: `M-Machine invoice ${savedDraft.id}`,
+        subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${savedDraft.id}`,
         html: await buildCustomerInvoiceEmailForRuntime(savedDraft),
         replyTo,
       });
@@ -755,5 +763,38 @@ export async function PATCH(req: Request) {
       error: err instanceof Error ? err.message : "unknown error",
     });
     return NextResponse.json({ error: "Order could not be saved. Please try again." }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  const auth = await requireLogin();
+  if (auth) return auth;
+
+  let body: { id?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+
+  const id = asString(body.id, 160);
+  if (!id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
+
+  try {
+    const current = await getQuoteRequest(id);
+    if (!current) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+
+    const closed = await saveQuoteRequest({
+      ...current,
+      status: "closed",
+      updatedAt: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ ok: true, quote: closed });
+  } catch (err) {
+    console.error("quote_delete_failed", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
+    return NextResponse.json({ error: "Order could not be deleted. Please try again." }, { status: 500 });
   }
 }

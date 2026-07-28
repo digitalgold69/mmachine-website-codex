@@ -105,8 +105,9 @@ function fileDownloadUrl(key: string, env: EmailEnv = process.env) {
   return `${siteUrl(env)}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-function dashboardUrl(env: EmailEnv = process.env) {
-  return `${siteUrl(env)}/dashboard/orders`;
+function dashboardUrl(env: EmailEnv = process.env, quoteId?: string) {
+  const base = `${siteUrl(env)}/dashboard/orders`;
+  return quoteId ? `${base}?quote=${encodeURIComponent(quoteId)}` : base;
 }
 
 function customSummary(item: QuoteItem, includeFileLinks = false, env: EmailEnv = process.env) {
@@ -145,68 +146,6 @@ function customSummary(item: QuoteItem, includeFileLinks = false, env: EmailEnv 
   `;
 }
 
-function ownerCustomJobDetails(quote: QuoteRequest, env: EmailEnv = process.env) {
-  const customItems = quote.items.filter((item) => item.catalogue === "custom" && item.custom);
-  if (customItems.length === 0) return "";
-
-  return customItems
-    .map((item) => {
-      const custom = item.custom;
-      if (!custom) return "";
-      const files = custom.files || [];
-      const rows = [
-        ["Project", custom.projectName || item.description],
-        ["Material", custom.material],
-        ["Thickness/spec", custom.thickness],
-        ["Quantity", [custom.quantity, custom.units].filter(Boolean).join(" ")],
-        ["Finish", custom.finish],
-        ["Tolerance", custom.tolerance],
-        ["Needed by", custom.deadline],
-        ["Budget", custom.budget],
-        [
-          "Drawing status",
-          custom.drawingStatus === "help"
-            ? "Customer needs help from a sketch/description"
-            : files.length
-              ? "Files supplied"
-              : "No file supplied",
-        ],
-      ].filter(([, value]) => value);
-
-      return `
-        <div style="margin:18px 0;padding:16px;border:1px solid #eadfca;border-radius:12px;background:#fbf8f1">
-          <h3 style="margin:0 0 10px;color:#0f3d2e">Custom job details</h3>
-          <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px">
-            <tbody>
-              ${rows
-                .map(
-                  ([label, value]) =>
-                    `<tr><td style="width:150px;color:#6b5a46"><strong>${escapeHtml(label)}</strong></td><td>${escapeHtml(value)}</td></tr>`
-                )
-                .join("")}
-            </tbody>
-          </table>
-          ${
-            quote.customer.message
-              ? `<div style="margin-top:12px"><strong style="color:#6b5a46">Job details from customer:</strong><br>${escapeHtml(quote.customer.message).replace(/\n/g, "<br>")}</div>`
-              : ""
-          }
-          ${
-            files.length
-              ? `<div style="margin-top:12px"><strong style="color:#6b5a46">Uploaded files:</strong><br>${files
-                  .map(
-                    (file) =>
-                      `<a href="${escapeHtml(fileDownloadUrl(file.key, env))}" style="color:#0f3d2e">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)`
-                  )
-                  .join("<br>")}</div>`
-              : `<div style="margin-top:12px;color:#6b5a46"><strong>No files uploaded.</strong></div>`
-          }
-        </div>
-      `;
-    })
-    .join("");
-}
-
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = numericTotal(quote.items);
   const carriageExVat = quote.carriageExVat ?? 0;
@@ -217,55 +156,73 @@ export function quoteTotals(quote: QuoteRequest) {
   return { goodsExVat, carriageExVat, extraChargesExVat, totalExVat, vat, totalIncVat };
 }
 
-function quoteRows(items: QuoteItem[], env: EmailEnv = process.env) {
+function ownerItemList(items: QuoteItem[], env: EmailEnv = process.env) {
   return items
-    .map(
-      (item) => `
-        <tr>
-          <td>${escapeHtml(item.qty)}</td>
-          <td>${escapeHtml(itemReference(item))}</td>
-          <td>${escapeHtml(itemName(item))}${item.catalogue === "custom" ? customSummary(item, true, env) : ""}</td>
-          <td>${escapeHtml(item.unit || "")}</td>
-          <td style="text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
-          <td style="text-align:right">${escapeHtml(money(lineExVat(item)))}</td>
-        </tr>`
-    )
+    .map((item) => {
+      const name = itemName(item);
+      const detail = name && name !== item.description ? name : "";
+      return `
+        <li style="margin:0 0 12px;padding:14px 16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff;list-style:none">
+          <strong style="display:block;color:#0f3d2e;font-size:15px">${escapeHtml(item.description || name)}</strong>
+          ${detail ? `<div style="margin-top:3px;color:#6b5a46;font-size:13px">${escapeHtml(detail)}</div>` : ""}
+          <div style="margin-top:8px;color:#4d3f31;font-size:13px">
+            Qty ${escapeHtml(item.qty)}
+            ${itemReference(item) ? ` / Ref ${escapeHtml(itemReference(item))}` : ""}
+            ${item.unit ? ` / Unit ${escapeHtml(item.unit)}` : ""}
+          </div>
+          ${item.catalogue === "custom" ? customSummary(item, true, env) : ""}
+        </li>
+      `;
+    })
     .join("");
 }
 
 export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
-  const rows = quoteRows(quote.items, env);
+  const dashboardLink = dashboardUrl(env, quote.id);
   return `
-    <h2>New M-Machine order request: ${escapeHtml(quote.id)}</h2>
-    <p><strong>Order type:</strong> ${escapeHtml(orderType(quote))}</p>
-    <p><strong>Name:</strong> ${escapeHtml(quote.customer.name)}</p>
-    <p><strong>Email:</strong> ${escapeHtml(quote.customer.email)}</p>
-    <p><strong>Phone:</strong> ${escapeHtml(quote.customer.phone)}</p>
-    <p><strong>Company:</strong> ${escapeHtml(quote.customer.company || "")}</p>
-    <p><strong>Delivery:</strong> ${quote.customer.arrangeOwnDelivery ? "Customer will arrange delivery or collection" : "Delivery quote required"}</p>
-    ${
-      quote.customer.arrangeOwnDelivery
-        ? ""
-        : `<p><strong>Delivery address:</strong><br>${escapeHtml(quote.customer.address || "").replace(/\n/g, "<br>")}</p>`
-    }
-    ${
-      quote.items.some((item) => item.catalogue === "custom")
-        ? ""
-        : `<p><strong>Customer note:</strong><br>${escapeHtml(quote.customer.message || "").replace(/\n/g, "<br>")}</p>`
-    }
-    ${ownerCustomJobDetails(quote, env)}
-    <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
-      <thead>
-        <tr><th>Qty</th><th>Code / Shape</th><th>Description</th><th>Unit</th><th>Each ex VAT</th><th>Line ex VAT</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p style="margin:22px 0">
-      <a href="${escapeHtml(dashboardUrl(env))}" style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">
-        View in dashboard
-      </a>
-    </p>
-    <p>Review and edit this in the owner dashboard before emailing the completed invoice to the buyer.</p>
+    <div style="margin:0;padding:24px;background:#fbf8f1;font-family:Arial,sans-serif;color:#2c2c2a">
+      <div style="max-width:680px;margin:0 auto">
+        <h2 style="margin:0 0 8px;color:#0f3d2e">New M-Machine order request</h2>
+        <p style="margin:0 0 18px;color:#6b5a46">${escapeHtml(quote.id)} / ${escapeHtml(orderType(quote))} / submitted ${escapeHtml(formatDate(quote.submittedAt))}</p>
+
+        <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
+          <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Customer</strong>
+          <div>${escapeHtml(quote.customer.name)}</div>
+          <div><a href="mailto:${escapeHtml(quote.customer.email)}" style="color:#0f3d2e">${escapeHtml(quote.customer.email)}</a></div>
+          <div>${escapeHtml(quote.customer.phone)}</div>
+          ${quote.customer.company ? `<div>${escapeHtml(quote.customer.company)}</div>` : ""}
+        </div>
+
+        <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
+          <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Delivery</strong>
+          ${
+            quote.customer.arrangeOwnDelivery
+              ? "Customer will arrange delivery or collection."
+              : `<span style="white-space:pre-line">${escapeHtml(quote.customer.address || "Delivery quote required")}</span>`
+          }
+        </div>
+
+        ${
+          quote.customer.message
+            ? `<div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
+                <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Customer note</strong>
+                <div style="white-space:pre-line;line-height:1.5">${escapeHtml(quote.customer.message)}</div>
+              </div>`
+            : ""
+        }
+
+        <div style="margin:0 0 18px">
+          <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Included details</strong>
+          <ul style="margin:0;padding:0">${ownerItemList(quote.items, env)}</ul>
+        </div>
+
+        <p style="margin:22px 0">
+          <a href="${escapeHtml(dashboardLink)}" style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">
+            Open this order in dashboard
+          </a>
+        </p>
+      </div>
+    </div>
   `;
 }
 
@@ -280,23 +237,37 @@ function formatDate(value: string | null | undefined) {
   }).format(value ? new Date(value) : new Date());
 }
 
-function invoiceRows(items: QuoteItem[], env: EmailEnv = process.env) {
+function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
   return items
     .map((item) => {
       const line = lineExVat(item);
       return `
-        <tr>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:center">${escapeHtml(item.qty)}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;font-family:monospace;color:#0f3d2e">${escapeHtml(itemReference(item))}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca">
-            <strong style="color:#0f3d2e">${escapeHtml(item.description)}</strong>
-            <div style="color:#6b5a46;font-size:12px;margin-top:3px">${escapeHtml(itemName(item))}</div>
+        <div style="margin:0 0 12px;border:1px solid #eadfca;border-radius:10px;background:#ffffff;overflow:hidden">
+          <div style="padding:13px 14px;background:#fbf8f1">
+            <strong style="display:block;color:#0f3d2e;font-size:15px;line-height:1.35">${escapeHtml(item.description)}</strong>
+            <div style="margin-top:4px;color:#6b5a46;font-size:12px;line-height:1.4">
+              ${escapeHtml(itemReference(item))}
+              ${item.unit ? ` / ${escapeHtml(item.unit)}` : ""}
+            </div>
             ${item.catalogue === "custom" ? customSummary(item, false, env) : ""}
-          </td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca">${escapeHtml(item.unit || "")}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:right">${escapeHtml(money(item.unitPriceExVat))}</td>
-          <td style="padding:12px 10px;border-bottom:1px solid #eadfca;text-align:right;font-weight:700;color:#0f3d2e">${escapeHtml(money(line))}</td>
-        </tr>`;
+          </div>
+          <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;font-size:14px">
+            <tbody>
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Qty</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(item.qty)}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Each ex VAT</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700">${escapeHtml(money(item.unitPriceExVat))}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Line ex VAT</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
     })
     .join("");
 }
@@ -304,57 +275,52 @@ function invoiceRows(items: QuoteItem[], env: EmailEnv = process.env) {
 export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
   const totals = quoteTotals(quote);
   const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
+  const isUpdatedInvoice = Boolean(quote.customerEmailSentAt || quote.invoiceSentAt);
+  const title = isUpdatedInvoice ? "Updated invoice" : "Order invoice";
+  const invoiceDate = quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt || new Date().toISOString();
   return `
-    <div style="margin:0;background:#fbf8f1;padding:28px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
-      <div style="max-width:780px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:14px;overflow:hidden">
-        <div style="background:#0f3d2e;color:#fbf8f1;padding:24px 28px">
+    <div style="margin:0;background:#fbf8f1;padding:18px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:12px;overflow:hidden">
+        <div style="background:#0f3d2e;color:#fbf8f1;padding:20px">
           <div style="font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:#DF1718">M-Machine</div>
-          <h1 style="margin:6px 0 0;font-family:Georgia,serif;font-size:32px;font-weight:600">Order invoice</h1>
-          <div style="margin-top:8px;color:#d8e7df">Invoice ${escapeHtml(quote.id)} / ${escapeHtml(formatDate(new Date().toISOString()))}</div>
+          <h1 style="margin:6px 0 0;font-family:Georgia,serif;font-size:28px;font-weight:600">${title}</h1>
+          <div style="margin-top:8px;color:#d8e7df">Invoice ${escapeHtml(quote.id)} / ${escapeHtml(formatDate(invoiceDate))}</div>
         </div>
 
-        <div style="padding:24px 28px">
+        <div style="padding:20px">
           <p style="margin:0 0 16px">Hello ${escapeHtml(quote.customer.name)},</p>
-          <p style="margin:0 0 18px;line-height:1.55">Thank you for your order request. We have reviewed it and added any carriage or extra charges below. Payment is arranged manually with M-Machine.</p>
+          <p style="margin:0 0 18px;line-height:1.55">
+            ${
+              isUpdatedInvoice
+                ? "We have updated your invoice details below. Payment is arranged manually with M-Machine."
+                : "Thank you for your order request. We have reviewed it and added any carriage or extra charges below. Payment is arranged manually with M-Machine."
+            }
+          </p>
           ${
             quote.customerMessage
-              ? `<div style="margin:0 0 22px;padding:14px 16px;background:#f5efe0;border-radius:10px;line-height:1.55">${escapeHtml(quote.customerMessage).replace(/\n/g, "<br>")}</div>`
+              ? `<div style="margin:0 0 18px;padding:14px 16px;background:#f5efe0;border-radius:10px;line-height:1.55">${escapeHtml(quote.customerMessage).replace(/\n/g, "<br>")}</div>`
               : ""
           }
 
-          <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:22px">
-            <div style="min-width:220px">
-              <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#6b5a46">Customer</div>
-              <strong style="display:block;color:#0f3d2e;margin-top:4px">${escapeHtml(quote.customer.name)}</strong>
-              <div>${escapeHtml(quote.customer.email)}</div>
-              <div>${escapeHtml(quote.customer.phone)}</div>
-              ${quote.customer.company ? `<div>${escapeHtml(quote.customer.company)}</div>` : ""}
-              ${
-                quote.customer.arrangeOwnDelivery
-                  ? `<div style="margin-top:8px;color:#6b5a46">Customer will arrange delivery or collection</div>`
-                  : `<div style="margin-top:8px;white-space:pre-line">${escapeHtml(quote.customer.address || "")}</div>`
-              }
-            </div>
-            <div>
-              <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#6b5a46">Reference</div>
-              <strong style="display:block;color:#0f3d2e;margin-top:4px">${escapeHtml(quote.id)}</strong>
-              <div>${escapeHtml(formatDate(quote.submittedAt))}</div>
-            </div>
-          </div>
-
-          <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px">
-            <thead>
-              <tr style="background:#f5efe0;color:#4d3f31;text-transform:uppercase;font-size:11px;letter-spacing:.8px">
-                <th style="padding:10px;text-align:center">Qty</th>
-                <th style="padding:10px;text-align:left">Code / Shape</th>
-                <th style="padding:10px;text-align:left">Item</th>
-                <th style="padding:10px;text-align:left">Unit</th>
-                <th style="padding:10px;text-align:right">Each ex VAT</th>
-                <th style="padding:10px;text-align:right">Line ex VAT</th>
+          <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;margin-bottom:18px;font-size:14px">
+            <tbody>
+              <tr>
+                <td style="padding:8px 0;color:#6b5a46;width:38%">Customer</td>
+                <td style="padding:8px 0;text-align:right;font-weight:700;color:#0f3d2e">${escapeHtml(quote.customer.name)}</td>
               </tr>
-            </thead>
-            <tbody>${invoiceRows(quote.items, env)}</tbody>
+              <tr>
+                <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Reference</td>
+                <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(quote.id)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Submitted</td>
+                <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca">${escapeHtml(formatDate(quote.submittedAt))}</td>
+              </tr>
+            </tbody>
           </table>
+
+          <h2 style="margin:0 0 10px;color:#0f3d2e;font-size:18px">Items</h2>
+          ${invoiceLineCards(quote.items, env)}
 
           <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:360px;margin:24px 0 0 auto;font-size:14px">
             <tbody>

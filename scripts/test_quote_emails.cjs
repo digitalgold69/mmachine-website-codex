@@ -130,12 +130,13 @@ const ownerHtml = buildOwnerQuoteEmail(quote);
 assert.match(ownerHtml, /Alice Buyer/);
 assert.match(ownerHtml, /alice@example\.test/);
 assert.match(ownerHtml, /01325 000000/);
-assert.match(ownerHtml, /Custom job details/);
 assert.match(ownerHtml, /Mild steel/);
 assert.match(ownerHtml, /Laser cutting, Folding/);
-assert.match(ownerHtml, /View in dashboard/);
-assert.match(ownerHtml, /https:\/\/example\.test\/dashboard\/orders/);
+assert.match(ownerHtml, /Included details/);
+assert.match(ownerHtml, /Open this order in dashboard/);
+assert.match(ownerHtml, /https:\/\/example\.test\/dashboard\/orders\?quote=Q-CF-TEST/);
 assert.match(ownerHtml, /https:\/\/example\.test\/api\/quote-files\/quote-uploads\/session-1\/drawing%201\.dxf/);
+assert.doesNotMatch(ownerHtml, /Each ex VAT/);
 
 const enquiryHtml = buildOwnerEnquiryEmail({
   name: "Bob Enquirer",
@@ -157,10 +158,19 @@ assert.match(enquiryHtml, /https:\/\/example\.test\/products\/mini-rear-panel/);
 const customerHtml = buildCustomerInvoiceEmail(quote);
 assert.match(customerHtml, /Hello Alice Buyer/);
 assert.match(customerHtml, /Order invoice/);
+assert.match(customerHtml, /Items/);
 assert.match(customerHtml, /Q-CF-TEST/);
-assert.match(customerHtml, /Alice Works/);
 assert.match(customerHtml, /Please approve before fabrication/);
 assert.match(customerHtml, /Total inc VAT/);
 assert.match(customerHtml, /GB123456789/);
 
-console.log("ok - quote and enquiry email templates include customer, job, dashboard, file, and invoice details");
+const updatedCustomerHtml = buildCustomerInvoiceEmail({
+  ...quote,
+  status: "invoice_sent",
+  invoiceSentAt: "2026-07-27T14:00:00.000Z",
+  customerEmailSentAt: "2026-07-27T14:00:00.000Z",
+});
+assert.match(updatedCustomerHtml, /Updated invoice/);
+assert.match(updatedCustomerHtml, /updated your invoice details/);
+
+console.log("ok - quote and enquiry email templates include routed recipients, focused dashboard links, and clean invoice details");
