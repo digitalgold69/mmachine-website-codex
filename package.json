@@ -18,7 +18,7 @@
     "test:emails": "node scripts/test_quote_emails.cjs",
     "test:config": "node scripts/test_wrangler_config.cjs",
     "daily-sync": "npm run sync-data && npm run sync-excel && npm run export-pdfs && npm run version-catalogues && npm run validate-sync",
-    "deploy": "opennextjs-cloudflare deploy -- --keep-vars",
+    "deploy": "wrangler deploy --keep-vars --x-autoconfig=false",
     "upload": "opennextjs-cloudflare upload -- --keep-vars",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",

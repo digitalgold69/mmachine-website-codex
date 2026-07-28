@@ -4,6 +4,8 @@ const path = require("node:path");
 
 const wranglerPath = path.resolve(__dirname, "..", "wrangler.jsonc");
 const config = JSON.parse(fs.readFileSync(wranglerPath, "utf8"));
+const packagePath = path.resolve(__dirname, "..", "package.json");
+const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
 
 assert.equal(config.keep_vars, true, "wrangler.jsonc must keep dashboard-managed Cloudflare variables");
 
@@ -25,6 +27,14 @@ assert.deepEqual(
   overwrittenRecipients,
   [],
   `Do not define ${overwrittenRecipients.join(", ")} in wrangler.jsonc; edit these in Cloudflare Variables and Secrets instead`
+);
+
+const deployScript = packageJson.scripts?.deploy || "";
+assert.match(deployScript, /--keep-vars/, "deploy script must preserve Cloudflare dashboard variables");
+assert.match(
+  deployScript,
+  /--x-autoconfig=false/,
+  "deploy script must bypass Wrangler OpenNext auto-detection on Windows"
 );
 
 console.log("ok - wrangler config preserves dashboard-managed recipient variables");
