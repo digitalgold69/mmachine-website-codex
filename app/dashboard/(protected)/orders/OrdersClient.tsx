@@ -9,6 +9,38 @@ const PAGE_SIZE = 8;
 const TZ = "Europe/London";
 
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
+type AddLineCatalogue = "mini" | "metals";
+
+type CatalogueSearchProduct = {
+  id: string;
+  code: string;
+  name?: string;
+  section?: string;
+  fits?: string;
+  category?: string;
+  form?: string;
+  metal?: string;
+  spec?: string;
+  size?: string;
+  unit?: string;
+  sourceSheet?: string;
+  description?: string;
+  priceExVat: number | null;
+  priceIncVat: number | null;
+};
+
+type ProductsResponse = {
+  products?: CatalogueSearchProduct[];
+  count?: number;
+  error?: string;
+};
+
+type ManualLineDraft = {
+  qty: string;
+  item: string;
+  unit: string;
+  priceExVat: string;
+};
 
 const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
   { value: "new", label: "New" },
@@ -25,6 +57,13 @@ const TIME_FILTERS: { value: TimeFilter; label: string }[] = [
   { value: "month", label: "This month" },
   { value: "year", label: "This year" },
 ];
+
+const BLANK_MANUAL_LINE: ManualLineDraft = {
+  qty: "1",
+  item: "",
+  unit: "each",
+  priceExVat: "",
+};
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   new: "bg-gold/15 text-gold",
@@ -86,10 +125,6 @@ function compactText(value: string | null | undefined) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
-function sameText(a: string | null | undefined, b: string | null | undefined) {
-  return compactText(a).toLowerCase() === compactText(b).toLowerCase();
-}
-
 function firstText(...values: Array<string | null | undefined>) {
   return values.map(compactText).find(Boolean) || "";
 }
@@ -99,61 +134,101 @@ function customBrief(quote: QuoteRequest) {
   return firstText(quote.customer.message, item?.custom?.projectName, item?.description);
 }
 
-function customBriefForContext(quote: QuoteRequest) {
-  const brief = customBrief(quote);
-  if (!brief) return "";
-  const duplicateLine = quote.items.some((item) =>
-    item.catalogue === "custom" && (sameText(item.description, brief) || sameText(item.custom?.projectName, brief))
-  );
-  return duplicateLine ? "" : brief;
-}
-
-function invoiceReferenceLabel(item: QuoteItem) {
-  if (item.catalogue === "custom") return "";
-  if (item.catalogue === "featured") return "Featured ref";
-  if (item.catalogue === "metals") return "Metal ref";
-  return "Part no.";
-}
-
-function invoiceReferencePlaceholder(item: QuoteItem) {
-  if (item.catalogue === "featured") return "Featured ref";
-  if (item.catalogue === "metals") return "Metal code";
-  return "Mini part no.";
-}
-
-function invoiceLineTypeLabel(item: QuoteItem) {
-  if (item.catalogue === "custom") return "Custom work";
-  if (item.catalogue === "featured") return "Featured work";
-  if (item.catalogue === "metals") return "Metal";
-  return "Mini panel";
-}
-
-function invoiceLineContext(item: QuoteItem) {
-  if (item.catalogue === "custom") {
-    const custom = item.custom;
-    const quantity = custom?.quantity || String(item.qty || "");
-    return [
-      custom?.material,
-      custom?.thickness,
-      custom?.services?.length ? custom.services.join(", ") : "",
-      custom?.finish,
-      quantity ? `Qty ${quantity}${custom?.units ? ` ${custom.units}` : ""}` : "",
-    ].filter(Boolean).join(" / ");
-  }
-
+function invoiceItemTitle(item: QuoteItem) {
+  if (item.catalogue === "custom") return "Custom Job";
   if (item.catalogue === "metals") {
-    return [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" / ");
+    return [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ") || item.description || "Metal";
   }
+  return item.description || itemName(item);
+}
 
-  if (item.catalogue === "featured") {
-    return "Featured Work order line";
+function invoiceLineSubtitle(item: QuoteItem) {
+  if (item.catalogue === "custom") return "Custom fabrication quote";
+  if (item.catalogue === "metals") {
+    return item.code || [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" / ") || "Metal";
   }
-
-  return item.code ? `Mini panel ${item.code}` : "Mini panel order line";
+  if (item.catalogue === "featured") return item.code || "Featured Work";
+  return item.code || "Mini panel";
 }
 
 function totalsReadyText(value: number | null | undefined, hasPoaItems: boolean) {
   return hasPoaItems ? "Add prices" : money(value);
+}
+
+function defaultAddLineCatalogue(quote: QuoteRequest): AddLineCatalogue {
+  return quote.items.some((item) => item.catalogue === "metals") ? "metals" : "mini";
+}
+
+function isOwnerAddedLine(item: QuoteItem) {
+  return item.key.startsWith("owner-") || item.key.startsWith("manual-");
+}
+
+function lineKey(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function clampQty(value: string | number) {
+  const parsed = Math.floor(Number(String(value).replace(/[^\d]/g, "")) || 1);
+  return Math.max(1, Math.min(999, parsed));
+}
+
+function priceFromInput(value: string) {
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function incVatFromExVat(value: number | null) {
+  return typeof value === "number" ? Number((value * 1.2).toFixed(2)) : null;
+}
+
+function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
+  if (catalogue === "metals") {
+    return [product.form, product.metal, product.spec, product.size].filter(Boolean).join(" - ") || product.name || product.description || "Metal";
+  }
+  return product.name || product.description || product.code || "Mini panel";
+}
+
+function catalogueResultSubtitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
+  if (catalogue === "metals") {
+    return [product.code, product.unit, product.sourceSheet].filter(Boolean).join(" / ");
+  }
+  return [product.code, product.fits, product.section ? `Section ${product.section}` : ""].filter(Boolean).join(" / ");
+}
+
+function quoteItemFromCatalogueProduct(product: CatalogueSearchProduct, catalogue: AddLineCatalogue): QuoteItem {
+  const unitPriceExVat = typeof product.priceExVat === "number" ? product.priceExVat : null;
+  const unitPriceIncVat = typeof product.priceIncVat === "number" ? product.priceIncVat : incVatFromExVat(unitPriceExVat);
+
+  if (catalogue === "metals") {
+    return {
+      key: lineKey(`owner-metals-${product.id}`),
+      catalogue: "metals",
+      productId: product.id,
+      code: product.code,
+      description: catalogueResultTitle(product, "metals"),
+      shape: product.form,
+      metal: product.metal,
+      spec: product.spec,
+      size: product.size,
+      unit: product.unit || "each",
+      qty: 1,
+      unitPriceExVat,
+      unitPriceIncVat,
+    };
+  }
+
+  return {
+    key: lineKey(`owner-mini-${product.id}`),
+    catalogue: "mini",
+    productId: product.id,
+    code: product.code,
+    description: catalogueResultTitle(product, "mini"),
+    unit: "each",
+    qty: 1,
+    unitPriceExVat,
+    unitPriceIncVat,
+  };
 }
 
 function orderCardSummary(quote: QuoteRequest) {
@@ -192,6 +267,10 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
   if (kinds.has("featured")) return "featured";
   if (kinds.has("metals")) return "metals";
   return "mini";
+}
+
+function customFiles(quote: QuoteRequest) {
+  return quote.items.flatMap((item) => item.custom?.files || []);
 }
 
 function fileHref(key: string) {
@@ -474,6 +553,14 @@ export default function OrdersClient({
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
   const [actionNotice, setActionNotice] = useState<{ quoteId: string; tone: "success" | "error"; text: string } | null>(null);
+  const [addLineOpen, setAddLineOpen] = useState(false);
+  const [addLineCatalogue, setAddLineCatalogue] = useState<AddLineCatalogue>("mini");
+  const [addLineQuery, setAddLineQuery] = useState("");
+  const [addLineResults, setAddLineResults] = useState<CatalogueSearchProduct[]>([]);
+  const [addLineCount, setAddLineCount] = useState(0);
+  const [addLineLoading, setAddLineLoading] = useState(false);
+  const [addLineError, setAddLineError] = useState("");
+  const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const historyRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -613,6 +700,54 @@ export default function OrdersClient({
   }, [page, pageCount]);
 
   useEffect(() => {
+    if (!draft) return;
+    setAddLineOpen(false);
+    setAddLineCatalogue(defaultAddLineCatalogue(draft));
+    setAddLineQuery("");
+    setAddLineResults([]);
+    setAddLineCount(0);
+    setAddLineError("");
+    setManualLine(BLANK_MANUAL_LINE);
+  }, [draft?.id]);
+
+  useEffect(() => {
+    if (!addLineOpen) return;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setAddLineLoading(true);
+      setAddLineError("");
+      try {
+        const params = new URLSearchParams({
+          catalogue: addLineCatalogue,
+          q: addLineQuery.trim(),
+          offset: "0",
+          limit: "8",
+        });
+        if (addLineCatalogue === "metals") params.set("category", "all");
+        const response = await fetch(`/api/products?${params}`, { signal: controller.signal });
+        const data = await response.json() as ProductsResponse;
+        if (!response.ok) throw new Error(data.error || "Catalogue search could not be loaded.");
+        setAddLineResults(data.products || []);
+        setAddLineCount(Number(data.count || 0));
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setAddLineResults([]);
+          setAddLineCount(0);
+          setAddLineError("Catalogue search could not be loaded. Please try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setAddLineLoading(false);
+      }
+    }, addLineQuery.trim() ? 220 : 20);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [addLineCatalogue, addLineOpen, addLineQuery]);
+
+  useEffect(() => {
     if (!requestedQuoteId) {
       closingQuoteIdRef.current = "";
       return;
@@ -740,6 +875,46 @@ export default function OrdersClient({
       ...draft,
       items: draft.items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
     });
+  }
+
+  function addCatalogueLine(product: CatalogueSearchProduct) {
+    if (!draft) return;
+    const item = quoteItemFromCatalogueProduct(product, addLineCatalogue);
+    setDraft({ ...draft, items: [...draft.items, item] });
+    setActionNotice(null);
+  }
+
+  function addManualLine() {
+    if (!draft) return;
+    const description = manualLine.item.trim();
+    if (!description) {
+      setAddLineError("Enter an item description before adding the manual line.");
+      return;
+    }
+
+    const unitPriceExVat = priceFromInput(manualLine.priceExVat);
+    const item: QuoteItem = {
+      key: lineKey(`manual-${addLineCatalogue}`),
+      catalogue: addLineCatalogue,
+      productId: lineKey("manual-product"),
+      code: "",
+      description,
+      unit: manualLine.unit.trim() || "each",
+      qty: clampQty(manualLine.qty),
+      unitPriceExVat,
+      unitPriceIncVat: incVatFromExVat(unitPriceExVat),
+    };
+    setDraft({ ...draft, items: [...draft.items, item] });
+    setManualLine(BLANK_MANUAL_LINE);
+    setAddLineError("");
+    setActionNotice(null);
+  }
+
+  function removeDraftLine(index: number) {
+    if (!draft) return;
+    const item = draft.items[index];
+    if (!item || !isOwnerAddedLine(item)) return;
+    setDraft({ ...draft, items: draft.items.filter((_, i) => i !== index) });
   }
 
   function removeQuoteFromDashboard(id: string) {
@@ -1073,6 +1248,8 @@ export default function OrdersClient({
                       <span>{draft.id}</span>
                       <span>Submitted {formatDateTime(draft.submittedAt)}</span>
                       <span>{draft.customer.email}</span>
+                      {draft.customer.phone && <span>{draft.customer.phone}</span>}
+                      {draft.customer.company && <span>{draft.customer.company}</span>}
                     </div>
                   </div>
                   <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto sm:justify-end">
@@ -1105,40 +1282,35 @@ export default function OrdersClient({
               <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="min-w-0 space-y-4">
-                    <section className="grid gap-3 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm sm:grid-cols-2">
-                      <div>
-                        <div className="label !mb-1">Customer</div>
-                        <div className="font-semibold text-racing">{draft.customer.name}</div>
-                        <div className="break-all text-ink-muted">{draft.customer.email}</div>
-                        <div className="text-ink-muted">{draft.customer.phone || "No phone supplied"}</div>
-                        {draft.customer.company && <div className="text-ink-muted">{draft.customer.company}</div>}
-                      </div>
-                      <div>
-                        <div className="label !mb-1">Delivery</div>
-                        {draft.customer.arrangeOwnDelivery ? (
-                          <p>Customer will arrange delivery / collection.</p>
-                        ) : (
-                          <p className="whitespace-pre-wrap">{draft.customer.address || "No delivery address supplied"}</p>
-                        )}
-                      </div>
+                    <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
+                      <div className="label !mb-1">Delivery</div>
+                      {draft.customer.arrangeOwnDelivery ? (
+                        <p>Customer will arrange delivery / collection.</p>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{draft.customer.address || "No delivery address supplied"}</p>
+                      )}
                     </section>
 
-                    {quoteKind(draft) === "custom" && (customBriefForContext(draft) || customJobRows(draft).length > 0) && (
+                    {quoteKind(draft) === "custom" && (
                       <section className="rounded-lg border border-racing/10 p-3">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <div className="text-xs uppercase tracking-wider text-ink-muted">Custom request</div>
-                            <h3 className="font-display text-xl text-racing">Job details</h3>
+                            <div className="text-xs uppercase tracking-wider text-ink-muted">Custom work context</div>
+                            <h3 className="font-display text-xl text-racing">Customer job description</h3>
                           </div>
+                          {customFiles(draft).length > 0 && (
+                            <span className="rounded-full bg-cream-dark px-3 py-1 text-xs font-semibold text-racing">
+                              {customFiles(draft).length} {customFiles(draft).length === 1 ? "file" : "files"}
+                            </span>
+                          )}
                         </div>
-                        {customBriefForContext(draft) && (
-                          <div className="mb-3 rounded-md bg-cream-dark px-3 py-2 text-sm">
-                            <div className="label !mb-1">Job brief</div>
-                            <p className="whitespace-pre-wrap leading-6 text-ink">{customBriefForContext(draft)}</p>
-                          </div>
-                        )}
+                        <div className="rounded-md bg-cream-dark px-3 py-2 text-sm">
+                          <p className="whitespace-pre-wrap leading-6 text-ink">
+                            {customBrief(draft) || "No job description supplied."}
+                          </p>
+                        </div>
                         {customJobRows(draft).length > 0 && (
-                          <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                             {customJobRows(draft).map((row) => (
                               <div key={row.label} className="rounded-md bg-cream-dark px-3 py-2">
                                 <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
@@ -1146,6 +1318,27 @@ export default function OrdersClient({
                               </div>
                             ))}
                           </dl>
+                        )}
+                        {customFiles(draft).length > 0 && (
+                          <div className="mt-3 rounded-md bg-cream-dark p-3 text-sm">
+                            <div className="label !mb-2">Uploaded design files</div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {customFiles(draft).map((file) => (
+                                <a
+                                  key={file.key}
+                                  href={fileHref(file.key)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="min-w-0 rounded-md bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
+                                >
+                                  <span className="block truncate">{file.name}</span>
+                                  <span className="block text-xs font-normal text-ink-muted">
+                                    {Math.ceil(file.size / 1024)} KB
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </section>
                     )}
@@ -1159,60 +1352,46 @@ export default function OrdersClient({
 
                     <section className="rounded-lg border border-racing/10">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-racing/10 bg-cream-dark px-3 py-2">
-                        <div>
-                          <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice lines</div>
-                          <div className="text-sm font-semibold text-racing">
-                            {quoteKind(draft) === "custom" ? "Customer-facing wording and price" : "Check quantities and pricing"}
-                          </div>
-                        </div>
+                        <div className="text-sm font-semibold text-racing">Invoice</div>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-racing">
                           {draft.items.length} {draft.items.length === 1 ? "line" : "lines"}
                         </span>
                       </div>
 
+                      <div className="hidden grid-cols-[72px_minmax(0,1fr)_92px_132px] gap-3 border-b border-racing/10 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted lg:grid">
+                        <div>Qty</div>
+                        <div>Item</div>
+                        <div>Unit</div>
+                        <div className="text-right">Price ex VAT</div>
+                      </div>
+
                       <div className="divide-y divide-racing/10">
                         {draft.items.map((item, index) => {
-                          const referenceLabel = invoiceReferenceLabel(item);
-                          const files = item.custom?.files || [];
+                          const ownerAdded = isOwnerAddedLine(item);
                           return (
-                            <div key={item.key} className="p-3">
-                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-                                    {invoiceLineTypeLabel(item)}
-                                  </div>
-                                  {invoiceLineContext(item) && (
-                                    <div className="mt-0.5 truncate text-xs text-ink-muted">
-                                      {invoiceLineContext(item)}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="rounded-full bg-cream-dark px-3 py-1 text-sm font-semibold text-racing">
-                                  {invoiceMoney(lineExVat(item))}
-                                </div>
-                              </div>
-
-                              <div className="grid gap-3 lg:grid-cols-[84px_minmax(0,1fr)_96px_140px]">
-                                <div>
-                                  <label className="label" htmlFor={`qty-${draft.id}-${index}`}>Qty</label>
+                            <div key={item.key} className="grid gap-3 p-3 lg:grid-cols-[72px_minmax(0,1fr)_92px_132px] lg:items-start">
+                              <div>
+                                <label className="label lg:hidden" htmlFor={`qty-${draft.id}-${index}`}>Qty</label>
+                                {ownerAdded ? (
                                   <input
                                     id={`qty-${draft.id}-${index}`}
                                     type="text"
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     value={item.qty}
-                                    onChange={(e) => {
-                                      const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
-                                      patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
-                                    }}
+                                    onChange={(e) => patchItem(index, { qty: clampQty(e.target.value) })}
                                     className="input text-center font-semibold text-racing"
                                   />
-                                </div>
+                                ) : (
+                                  <div className="rounded-md border border-racing/10 bg-cream-dark px-3 py-2 text-center font-semibold text-racing">
+                                    {item.qty}
+                                  </div>
+                                )}
+                              </div>
 
-                                <div className="min-w-0">
-                                  <label className="label" htmlFor={`description-${draft.id}-${index}`}>
-                                    {item.catalogue === "custom" ? "Invoice wording" : "Item"}
-                                  </label>
+                              <div className="min-w-0">
+                                <label className="label lg:hidden" htmlFor={`description-${draft.id}-${index}`}>Item</label>
+                                {ownerAdded ? (
                                   <textarea
                                     id={`description-${draft.id}-${index}`}
                                     value={item.description}
@@ -1220,75 +1399,215 @@ export default function OrdersClient({
                                     rows={2}
                                     className="input min-h-[74px] resize-y text-sm leading-5"
                                   />
-                                </div>
+                                ) : (
+                                  <div className="rounded-md border border-racing/10 bg-white px-3 py-2">
+                                    <div className="font-semibold leading-5 text-racing">{invoiceItemTitle(item)}</div>
+                                    <div className="mt-1 text-xs text-ink-muted">{invoiceLineSubtitle(item)}</div>
+                                  </div>
+                                )}
+                              </div>
 
-                                <div>
-                                  <label className="label" htmlFor={`unit-${draft.id}-${index}`}>Unit</label>
+                              <div>
+                                <label className="label lg:hidden" htmlFor={`unit-${draft.id}-${index}`}>Unit</label>
+                                {ownerAdded ? (
                                   <input
                                     id={`unit-${draft.id}-${index}`}
                                     value={item.unit || ""}
                                     onChange={(e) => patchItem(index, { unit: e.target.value })}
                                     className="input"
                                   />
-                                </div>
-
-                                <div>
-                                  <label className="label" htmlFor={`price-${draft.id}-${index}`}>Price ex VAT</label>
-                                  <input
-                                    id={`price-${draft.id}-${index}`}
-                                    type="number"
-                                    step="0.01"
-                                    value={item.unitPriceExVat ?? ""}
-                                    onChange={(e) =>
-                                      patchItem(index, {
-                                        unitPriceExVat: e.target.value === "" ? null : Number(e.target.value),
-                                        unitPriceIncVat: e.target.value === "" ? null : Number(e.target.value) * 1.2,
-                                      })
-                                    }
-                                    className="input text-right"
-                                    placeholder="0.00"
-                                  />
-                                </div>
+                                ) : (
+                                  <div className="rounded-md border border-racing/10 bg-cream-dark px-3 py-2 text-sm text-racing">
+                                    {item.unit || "each"}
+                                  </div>
+                                )}
                               </div>
 
-                              {referenceLabel && (
-                                <div className="mt-3 max-w-sm">
-                                  <label className="label" htmlFor={`code-${draft.id}-${index}`}>{referenceLabel}</label>
-                                  <input
-                                    id={`code-${draft.id}-${index}`}
-                                    value={item.code || ""}
-                                    onChange={(e) => patchItem(index, { code: e.target.value })}
-                                    className="input font-mono text-sm"
-                                    placeholder={invoiceReferencePlaceholder(item)}
-                                  />
+                              <div>
+                                <label className="label lg:hidden" htmlFor={`price-${draft.id}-${index}`}>Price ex VAT</label>
+                                <input
+                                  id={`price-${draft.id}-${index}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={item.unitPriceExVat ?? ""}
+                                  onChange={(e) => {
+                                    const unitPriceExVat = e.target.value === "" ? null : Number(e.target.value);
+                                    patchItem(index, {
+                                      unitPriceExVat,
+                                      unitPriceIncVat: incVatFromExVat(unitPriceExVat),
+                                    });
+                                  }}
+                                  className="input text-right"
+                                  placeholder="0.00"
+                                />
+                                <div className="mt-1 text-right text-xs font-semibold text-ink-muted">
+                                  Line {invoiceMoney(lineExVat(item))}
                                 </div>
-                              )}
-
-                              {files.length > 0 && (
-                                <div className="mt-3 rounded-md bg-cream-dark p-3 text-sm">
-                                  <div className="label !mb-2">Uploaded design files</div>
-                                  <div className="grid gap-2 sm:grid-cols-2">
-                                    {files.map((file) => (
-                                      <a
-                                        key={file.key}
-                                        href={fileHref(file.key)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="min-w-0 rounded-md bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
-                                      >
-                                        <span className="block truncate">{file.name}</span>
-                                        <span className="block text-xs font-normal text-ink-muted">
-                                          {Math.ceil(file.size / 1024)} KB
-                                        </span>
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                                {ownerAdded && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeDraftLine(index)}
+                                    className="mt-1 text-xs font-semibold text-red-700 hover:underline"
+                                  >
+                                    Remove line
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
+                    </section>
+
+                    <section className="rounded-lg border border-racing/10 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-racing">Add new line</div>
+                        <button
+                          type="button"
+                          onClick={() => setAddLineOpen((open) => !open)}
+                          className="btn-secondary px-3 py-2 text-sm"
+                          aria-expanded={addLineOpen}
+                        >
+                          {addLineOpen ? "Hide" : "Add New Line"}
+                        </button>
+                      </div>
+
+                      {addLineOpen && (
+                        <div className="mt-3 space-y-3 border-t border-racing/10 pt-3">
+                          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+                            <div>
+                              <label className="label" htmlFor="add-line-catalogue">Part type</label>
+                              <select
+                                id="add-line-catalogue"
+                                value={addLineCatalogue}
+                                onChange={(event) => {
+                                  setAddLineCatalogue(event.target.value as AddLineCatalogue);
+                                  setAddLineQuery("");
+                                }}
+                                className="input"
+                              >
+                                <option value="mini">Mini panels</option>
+                                <option value="metals">Metals</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label" htmlFor="add-line-search">Search catalogue</label>
+                              <input
+                                id="add-line-search"
+                                type="search"
+                                value={addLineQuery}
+                                onChange={(event) => setAddLineQuery(event.target.value)}
+                                className="input"
+                                placeholder={addLineCatalogue === "metals" ? "Shape, metal, spec, size, or code" : "Part number, title, or fitment"}
+                              />
+                            </div>
+                          </div>
+
+                          {addLineError && (
+                            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                              {addLineError}
+                            </div>
+                          )}
+
+                          <div className="rounded-md border border-racing/10">
+                            <div className="flex items-center justify-between gap-3 border-b border-racing/10 bg-cream-dark px-3 py-2 text-xs text-ink-muted">
+                              <span>{addLineLoading ? "Searching..." : `${addLineResults.length} of ${addLineCount} matches`}</span>
+                              {addLineQuery.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAddLineQuery("")}
+                                  className="font-semibold text-racing hover:text-gold"
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                            <div className="max-h-56 overflow-y-auto divide-y divide-racing/10">
+                              {addLineResults.map((product) => (
+                                <button
+                                  type="button"
+                                  key={`${addLineCatalogue}-${product.id}`}
+                                  onClick={() => addCatalogueLine(product)}
+                                  className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-semibold text-racing">
+                                      {catalogueResultTitle(product, addLineCatalogue)}
+                                    </span>
+                                    <span className="block truncate text-xs text-ink-muted">
+                                      {catalogueResultSubtitle(product, addLineCatalogue)}
+                                    </span>
+                                  </span>
+                                  <span className="text-sm font-semibold text-racing sm:text-right">
+                                    {money(product.priceExVat)}
+                                  </span>
+                                  <span className="rounded-md bg-racing px-3 py-1 text-center text-xs font-semibold text-cream">
+                                    Add
+                                  </span>
+                                </button>
+                              ))}
+                              {!addLineLoading && addLineResults.length === 0 && (
+                                <div className="px-3 py-4 text-sm text-ink-muted">
+                                  No catalogue lines match that search.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-md bg-cream-dark p-3">
+                            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                              Manual line
+                            </div>
+                            <div className="grid gap-3 lg:grid-cols-[72px_minmax(0,1fr)_92px_132px_auto] lg:items-end">
+                              <div>
+                                <label className="label" htmlFor="manual-line-qty">Qty</label>
+                                <input
+                                  id="manual-line-qty"
+                                  value={manualLine.qty}
+                                  onChange={(event) => setManualLine((line) => ({ ...line, qty: event.target.value }))}
+                                  className="input text-center font-semibold text-racing"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                />
+                              </div>
+                              <div>
+                                <label className="label" htmlFor="manual-line-item">Item</label>
+                                <input
+                                  id="manual-line-item"
+                                  value={manualLine.item}
+                                  onChange={(event) => setManualLine((line) => ({ ...line, item: event.target.value }))}
+                                  className="input"
+                                  placeholder="Description shown on invoice"
+                                />
+                              </div>
+                              <div>
+                                <label className="label" htmlFor="manual-line-unit">Unit</label>
+                                <input
+                                  id="manual-line-unit"
+                                  value={manualLine.unit}
+                                  onChange={(event) => setManualLine((line) => ({ ...line, unit: event.target.value }))}
+                                  className="input"
+                                />
+                              </div>
+                              <div>
+                                <label className="label" htmlFor="manual-line-price">Price ex VAT</label>
+                                <input
+                                  id="manual-line-price"
+                                  type="number"
+                                  step="0.01"
+                                  value={manualLine.priceExVat}
+                                  onChange={(event) => setManualLine((line) => ({ ...line, priceExVat: event.target.value }))}
+                                  className="input text-right"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <button type="button" onClick={addManualLine} className="btn-primary px-4 py-2 text-sm">
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </section>
                   </div>
 

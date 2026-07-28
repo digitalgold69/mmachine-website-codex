@@ -160,6 +160,8 @@ assert.match(customerHtml, /Hello Alice Buyer/);
 assert.match(customerHtml, /Order invoice/);
 assert.match(customerHtml, /Items/);
 assert.match(customerHtml, /Q-CF-TEST/);
+assert.match(customerHtml, /Custom Job/);
+assert.doesNotMatch(customerHtml, /Drawing status/);
 assert.match(customerHtml, /Please approve before fabrication/);
 assert.match(customerHtml, /Total inc VAT/);
 assert.match(customerHtml, /GB123456789/);

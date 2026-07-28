@@ -80,6 +80,8 @@ const itemName = (item: QuoteItem) => {
   return item.description;
 };
 
+const invoiceItemName = (item: QuoteItem) => item.catalogue === "custom" ? "Custom Job" : itemName(item);
+
 function itemReference(item: QuoteItem) {
   if (item.catalogue === "custom") return "Custom";
   if (item.catalogue === "metals") return item.shape || item.code || "Metal";
@@ -123,13 +125,6 @@ function customSummary(item: QuoteItem, includeFileLinks = false, env: EmailEnv 
       ${custom.tolerance ? `<div><strong>Tolerance:</strong> ${escapeHtml(custom.tolerance)}</div>` : ""}
       ${custom.deadline ? `<div><strong>Needed by:</strong> ${escapeHtml(custom.deadline)}</div>` : ""}
       ${custom.budget ? `<div><strong>Budget:</strong> ${escapeHtml(custom.budget)}</div>` : ""}
-      <div><strong>Drawing status:</strong> ${
-        custom.drawingStatus === "help"
-          ? "Customer needs help from a sketch/description"
-          : files.length
-            ? "Files supplied"
-            : "No file supplied"
-      }</div>
       ${
         includeFileLinks && files.length
           ? `<div style="margin-top:8px"><strong>Uploaded files:</strong><br>${files
@@ -244,7 +239,7 @@ function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
       return `
         <div style="margin:0 0 12px;border:1px solid #eadfca;border-radius:10px;background:#ffffff;overflow:hidden">
           <div style="padding:13px 14px;background:#fbf8f1">
-            <strong style="display:block;color:#0f3d2e;font-size:15px;line-height:1.35">${escapeHtml(item.description)}</strong>
+            <strong style="display:block;color:#0f3d2e;font-size:15px;line-height:1.35">${escapeHtml(invoiceItemName(item))}</strong>
             <div style="margin-top:4px;color:#6b5a46;font-size:12px;line-height:1.4">
               ${escapeHtml(itemReference(item))}
               ${item.unit ? ` / ${escapeHtml(item.unit)}` : ""}
