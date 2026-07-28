@@ -42,12 +42,11 @@ the display name from `AWS_SES_FROM_NAME`, while expanded message details still
 show the real authenticated sender address.
 
 Manage the SES settings and recipient-routing addresses in Cloudflare Workers
-Settings -> Variables and Secrets. The recipient-routing keys are also declared
-in `wrangler.jsonc` with safe defaults so Cloudflare recreates them if they are
-ever removed. You do not need to edit `wrangler.jsonc` for normal email address
-changes. If Cloudflare prompts you to update the Wrangler config file to keep
-local development in sync, that is optional for this project as long as the
-deployed Worker has the variables in Cloudflare.
+Settings -> Variables and Secrets. Do not put the `QUOTE_*_EMAIL` recipient
+values in `wrangler.jsonc`; values in `wrangler.jsonc` are deploy-time values
+and can overwrite edits made in Cloudflare. If Cloudflare prompts you to update
+the Wrangler config file to keep local development in sync, do not copy
+recipient email values into `wrangler.jsonc` for this project.
 
 `AWS_SES_REGION` must match the AWS Region where the SES identity appears under
 Verified identities. Use `eu-north-1` only if the identity is in Europe

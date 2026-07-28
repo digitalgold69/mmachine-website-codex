@@ -12,13 +12,7 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "NEXT_PUBLIC_SITE_URL": "https://mmachine-website-codex.muddy-silence-4f5b.workers.dev",
-    "QUOTE_OWNER_EMAIL": "sales@m-machine.co.uk",
-    "QUOTE_CUSTOM_OWNER_EMAIL": "sales@m-machine.co.uk",
-    "QUOTE_MINI_OWNER_EMAIL": "sales@m-machine.co.uk",
-    "QUOTE_METALS_OWNER_EMAIL": "sales@m-machine.co.uk",
-    "QUOTE_FEATURED_OWNER_EMAIL": "sales@m-machine.co.uk",
-    "QUOTE_ENQUIRY_OWNER_EMAIL": "sales@m-machine.co.uk"
+    "NEXT_PUBLIC_SITE_URL": "https://mmachine-website-codex.muddy-silence-4f5b.workers.dev"
   },
   "d1_databases": [
     {
