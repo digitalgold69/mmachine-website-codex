@@ -163,6 +163,17 @@ function isOwnerAddedLine(item: QuoteItem) {
   return item.key.startsWith("owner-") || item.key.startsWith("manual-");
 }
 
+function isManualLine(item: QuoteItem) {
+  return item.key.startsWith("manual-");
+}
+
+function isCatalogueProductLine(item: QuoteItem, catalogue: AddLineCatalogue, product: CatalogueSearchProduct) {
+  return item.catalogue === catalogue && (
+    item.productId === product.id ||
+    (Boolean(product.code) && item.code === product.code)
+  );
+}
+
 function lineKey(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -560,6 +571,7 @@ export default function OrdersClient({
   const [addLineCount, setAddLineCount] = useState(0);
   const [addLineLoading, setAddLineLoading] = useState(false);
   const [addLineError, setAddLineError] = useState("");
+  const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const historyRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -707,6 +719,7 @@ export default function OrdersClient({
     setAddLineResults([]);
     setAddLineCount(0);
     setAddLineError("");
+    setAddLineNotice(null);
     setManualLine(BLANK_MANUAL_LINE);
   }, [draft?.id]);
 
@@ -746,6 +759,12 @@ export default function OrdersClient({
       controller.abort();
     };
   }, [addLineCatalogue, addLineOpen, addLineQuery]);
+
+  useEffect(() => {
+    if (!addLineNotice) return;
+    const timeout = window.setTimeout(() => setAddLineNotice(null), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [addLineNotice]);
 
   useEffect(() => {
     if (!requestedQuoteId) {
@@ -880,7 +899,23 @@ export default function OrdersClient({
   function addCatalogueLine(product: CatalogueSearchProduct) {
     if (!draft) return;
     const item = quoteItemFromCatalogueProduct(product, addLineCatalogue);
+    const existingIndex = draft.items.findIndex((current) => isCatalogueProductLine(current, addLineCatalogue, product));
+    if (existingIndex >= 0) {
+      setDraft({
+        ...draft,
+        items: draft.items.map((current, index) =>
+          index === existingIndex ? { ...current, qty: clampQty(current.qty + 1) } : current
+        ),
+      });
+      setAddLineNotice({ catalogue: addLineCatalogue, productId: product.id, text: "Qty +1" });
+      setAddLineError("");
+      setActionNotice(null);
+      return;
+    }
+
     setDraft({ ...draft, items: [...draft.items, item] });
+    setAddLineNotice({ catalogue: addLineCatalogue, productId: product.id, text: "Added" });
+    setAddLineError("");
     setActionNotice(null);
   }
 
@@ -906,6 +941,7 @@ export default function OrdersClient({
     };
     setDraft({ ...draft, items: [...draft.items, item] });
     setManualLine(BLANK_MANUAL_LINE);
+    setAddLineNotice({ catalogue: addLineCatalogue, productId: item.productId, text: "Added" });
     setAddLineError("");
     setActionNotice(null);
   }
@@ -1235,11 +1271,10 @@ export default function OrdersClient({
               className="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:h-[calc(100vh-2.5rem)]"
             >
               <div className="shrink-0 border-b border-racing/10 px-4 py-3 sm:px-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <OrderTypePill quote={draft} />
-                      <StatusPill status={draft.status} />
                     </div>
                     <h2 id="invoice-editor-title" className="mt-1 truncate font-display text-2xl text-racing">
                       {draft.customer.name}
@@ -1252,21 +1287,21 @@ export default function OrdersClient({
                       {draft.customer.company && <span>{draft.customer.company}</span>}
                     </div>
                   </div>
-                  <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto sm:justify-end">
-                    <div className="w-full sm:w-56">
-                      <label className="label !mb-1" htmlFor="status">Status</label>
+                  <div className="w-full justify-self-end">
+                    <div>
+                      <label className="label !mb-1 text-[11px]" htmlFor="status">Status</label>
                       <select
                         id="status"
                         value={draft.status}
                         onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
-                        className="input min-h-[46px] py-2 text-base leading-normal"
+                        className="input min-h-0 py-2 text-sm leading-tight"
                       >
                         {STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
                     </div>
-                    <button type="button" onClick={closeInvoice} className="btn-secondary min-h-[46px] px-4 py-2 text-sm">
+                    <button type="button" onClick={closeInvoice} className="btn-secondary mt-2 w-full px-3 py-2 text-sm">
                       Close
                     </button>
                   </div>
@@ -1367,12 +1402,13 @@ export default function OrdersClient({
 
                       <div className="divide-y divide-racing/10">
                         {draft.items.map((item, index) => {
+                          const manualLine = isManualLine(item);
                           const ownerAdded = isOwnerAddedLine(item);
                           return (
                             <div key={item.key} className="grid gap-3 p-3 lg:grid-cols-[72px_minmax(0,1fr)_92px_132px] lg:items-start">
                               <div>
                                 <label className="label lg:hidden" htmlFor={`qty-${draft.id}-${index}`}>Qty</label>
-                                {ownerAdded ? (
+                                {manualLine ? (
                                   <input
                                     id={`qty-${draft.id}-${index}`}
                                     type="text"
@@ -1391,7 +1427,7 @@ export default function OrdersClient({
 
                               <div className="min-w-0">
                                 <label className="label lg:hidden" htmlFor={`description-${draft.id}-${index}`}>Item</label>
-                                {ownerAdded ? (
+                                {manualLine ? (
                                   <textarea
                                     id={`description-${draft.id}-${index}`}
                                     value={item.description}
@@ -1409,7 +1445,7 @@ export default function OrdersClient({
 
                               <div>
                                 <label className="label lg:hidden" htmlFor={`unit-${draft.id}-${index}`}>Unit</label>
-                                {ownerAdded ? (
+                                {manualLine ? (
                                   <input
                                     id={`unit-${draft.id}-${index}`}
                                     value={item.unit || ""}
@@ -1461,7 +1497,14 @@ export default function OrdersClient({
 
                     <section className="rounded-lg border border-racing/10 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-racing">Add new line</div>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="text-sm font-semibold text-racing">Add new line</div>
+                          {addLineNotice && (
+                            <span aria-live="polite" className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
+                              {addLineNotice.text === "Qty +1" ? "Quantity increased" : "Added"}
+                            </span>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => setAddLineOpen((open) => !open)}
@@ -1524,27 +1567,35 @@ export default function OrdersClient({
                             </div>
                             <div className="max-h-56 overflow-y-auto divide-y divide-racing/10">
                               {addLineResults.map((product) => (
-                                <button
-                                  type="button"
-                                  key={`${addLineCatalogue}-${product.id}`}
-                                  onClick={() => addCatalogueLine(product)}
-                                  className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
-                                >
-                                  <span className="min-w-0">
-                                    <span className="block truncate text-sm font-semibold text-racing">
-                                      {catalogueResultTitle(product, addLineCatalogue)}
-                                    </span>
-                                    <span className="block truncate text-xs text-ink-muted">
-                                      {catalogueResultSubtitle(product, addLineCatalogue)}
-                                    </span>
-                                  </span>
-                                  <span className="text-sm font-semibold text-racing sm:text-right">
-                                    {money(product.priceExVat)}
-                                  </span>
-                                  <span className="rounded-md bg-racing px-3 py-1 text-center text-xs font-semibold text-cream">
-                                    Add
-                                  </span>
-                                </button>
+                                (() => {
+                                  const activeNotice = addLineNotice?.catalogue === addLineCatalogue && addLineNotice.productId === product.id
+                                    ? addLineNotice.text
+                                    : "";
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={`${addLineCatalogue}-${product.id}`}
+                                      onClick={() => addCatalogueLine(product)}
+                                      className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
+                                      aria-label={`Add ${catalogueResultTitle(product, addLineCatalogue)} to invoice`}
+                                    >
+                                      <span className="min-w-0">
+                                        <span className="block truncate text-sm font-semibold text-racing">
+                                          {catalogueResultTitle(product, addLineCatalogue)}
+                                        </span>
+                                        <span className="block truncate text-xs text-ink-muted">
+                                          {catalogueResultSubtitle(product, addLineCatalogue)}
+                                        </span>
+                                      </span>
+                                      <span className="text-sm font-semibold text-racing sm:text-right">
+                                        {money(product.priceExVat)}
+                                      </span>
+                                      <span className={`rounded-md px-3 py-1 text-center text-xs font-semibold ${activeNotice ? "bg-green-50 text-green-800" : "bg-racing text-cream"}`}>
+                                        {activeNotice || "Add"}
+                                      </span>
+                                    </button>
+                                  );
+                                })()
                               ))}
                               {!addLineLoading && addLineResults.length === 0 && (
                                 <div className="px-3 py-4 text-sm text-ink-muted">
