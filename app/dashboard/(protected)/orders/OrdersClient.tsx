@@ -349,7 +349,7 @@ function StatusPill({ status }: { status: QuoteStatus }) {
 function OrderTypePill({ quote }: { quote: QuoteRequest }) {
   const kind = quoteKind(quote);
   return (
-    <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${KIND_STYLES[kind]}`}>
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${KIND_STYLES[kind]}`}>
       {KIND_LABELS[kind]}
     </span>
   );
@@ -453,7 +453,7 @@ function OrderCard({
 
   return (
     <article
-      className={`rounded-lg border p-4 transition ${
+      className={`flex h-full flex-col rounded-lg border p-3.5 transition ${
         selectedId === quote.id
           ? "border-gold bg-cream-dark shadow-sm"
           : "border-racing/10 bg-white hover:border-gold/60"
@@ -462,27 +462,27 @@ function OrderCard({
       <button
         type="button"
         onClick={() => onSelect(quote.id)}
-        className="block w-full text-left"
+        className="flex flex-1 flex-col text-left"
         aria-current={selectedId === quote.id ? "true" : undefined}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <OrderTypePill quote={quote} />
-            <div className="truncate font-semibold text-racing">{quote.id}</div>
-            <div className="mt-1 min-h-[5.25rem] space-y-0.5">
-              {customerLines.map((line, index) => (
-                <div key={`${index}-${line}`} className="break-words text-sm font-medium leading-5 text-ink [overflow-wrap:anywhere]">
-                  {line}
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <OrderTypePill quote={quote} />
           <StatusPill status={quote.status} />
         </div>
-        <div className="mt-3 text-xs text-ink-muted">
+        <div title={quote.id} className="mt-2 max-w-full truncate text-lg font-semibold leading-6 text-racing">
+          {quote.id}
+        </div>
+        <div className="mt-1 space-y-0.5">
+          {customerLines.map((line, index) => (
+            <div key={`${index}-${line}`} className="break-words text-sm font-medium leading-5 text-ink [overflow-wrap:anywhere]">
+              {line}
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 text-xs text-ink-muted">
           {dateLabel}: {formatDateTime(dateValue)}
         </div>
-        <div className="mt-4 flex items-end justify-between gap-3">
+        <div className="mt-3 flex items-end justify-between gap-3">
           <div className="text-xs text-ink-muted">
             {itemQuantity} {itemQuantity === 1 ? "item" : "items"}
           </div>
@@ -494,7 +494,7 @@ function OrderCard({
           </div>
         </div>
       </button>
-      <div className="mt-4 flex items-center justify-between gap-2 border-t border-racing/10 pt-3">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-racing/10 pt-2.5">
         <div className="min-w-0 text-xs text-ink-muted">
           {quote.paidAt
             ? `Paid ${formatDateTime(quote.paidAt)}`
