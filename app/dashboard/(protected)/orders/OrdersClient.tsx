@@ -579,6 +579,7 @@ export default function OrdersClient({
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const missingDeepLinkNoticeRef = useRef("");
   const closingQuoteIdRef = useRef("");
+  const activeQuoteIdRef = useRef("");
   const firstHistoryLoad = useRef(true);
   const requestedQuoteId = searchParams.get("quote") || searchParams.get("order") || "";
 
@@ -629,16 +630,17 @@ export default function OrdersClient({
   }, [monthStats, pageQuotes]);
 
   const replaceQuoteParam = useCallback((quoteId: string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
     params.delete("quote");
     params.delete("order");
     if (quoteId) params.set("quote", quoteId);
     const nextQuery = params.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+  }, [pathname, router]);
 
   const openInvoice = useCallback((quote: QuoteRequest, syncUrl = true) => {
     closingQuoteIdRef.current = "";
+    activeQuoteIdRef.current = quote.id;
     setSelectedId(quote.id);
     setDraft(cloneQuote(quote));
     setMessage("");
@@ -647,12 +649,13 @@ export default function OrdersClient({
   }, [replaceQuoteParam]);
 
   const closeInvoice = useCallback(() => {
-    closingQuoteIdRef.current = selectedId || draft?.id || "";
+    closingQuoteIdRef.current = activeQuoteIdRef.current;
+    activeQuoteIdRef.current = "";
     setSelectedId("");
     setDraft(null);
     setActionNotice(null);
     replaceQuoteParam(null);
-  }, [draft?.id, replaceQuoteParam, selectedId]);
+  }, [replaceQuoteParam]);
 
   useEffect(() => {
     if (firstHistoryLoad.current) {
@@ -828,12 +831,17 @@ export default function OrdersClient({
       ? document.activeElement
       : null;
     const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
 
     const focusableSelector =
       'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
-    window.setTimeout(() => focusable()[0]?.focus(), 0);
+    window.setTimeout(() => focusable()[0]?.focus({ preventScroll: true }), 0);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -860,7 +868,10 @@ export default function OrdersClient({
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
-      modalReturnFocusRef.current?.focus();
+      document.body.style.paddingRight = previousPaddingRight;
+      if (modalReturnFocusRef.current?.isConnected) {
+        modalReturnFocusRef.current.focus({ preventScroll: true });
+      }
     };
   }, [closeInvoice, draft?.id]);
 
