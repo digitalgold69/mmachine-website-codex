@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ key: string }> | { key: string } }
+  context: { params: Promise<{ key: string }> }
 ) {
   const params = await context.params;
   const key = decodeURIComponent(params.key || "");
