@@ -155,7 +155,13 @@ export default async function DashboardHomePage() {
       </section>
 
       <section className="grid xl:grid-cols-2 gap-5 mb-6">
-        <Panel title="Top sellers, past 90 days (Excl Custom Work)">
+        <Panel
+          title={
+            <>
+              Top sellers, past 90 days <span className="font-sans text-sm font-semibold text-ink-muted">(Excl Custom Work)</span>
+            </>
+          }
+        >
           {analytics.topItems.length === 0 ? (
             <EmptyState>No item history yet.</EmptyState>
           ) : (
@@ -456,14 +462,14 @@ function Panel({
   action,
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="bg-white rounded-xl border border-racing/10 p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-display text-xl text-racing">{title}</h2>
+        <h2 className="flex flex-wrap items-baseline gap-2 font-display text-xl text-racing">{title}</h2>
         {action}
       </div>
       {children}

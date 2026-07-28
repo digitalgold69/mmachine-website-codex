@@ -466,12 +466,12 @@ function OrderCard({
         aria-current={selectedId === quote.id ? "true" : undefined}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <OrderTypePill quote={quote} />
             <div className="truncate font-semibold text-racing">{quote.id}</div>
-            <div className="mt-1 space-y-0.5">
-              {customerLines.map((line) => (
-                <div key={line} className="truncate text-sm font-medium text-ink">
+            <div className="mt-1 min-h-[5.25rem] space-y-0.5">
+              {customerLines.map((line, index) => (
+                <div key={`${index}-${line}`} className="break-words text-sm font-medium leading-5 text-ink [overflow-wrap:anywhere]">
                   {line}
                 </div>
               ))}
