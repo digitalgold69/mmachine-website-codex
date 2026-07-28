@@ -258,7 +258,7 @@ type QuoteKind = "mini" | "metals" | "custom" | "featured" | "mixed";
 const KIND_STYLES: Record<QuoteKind, string> = {
   mini: "bg-racing/10 text-racing",
   metals: "bg-cream-dark text-racing",
-  custom: "bg-emerald-100 text-emerald-900",
+  custom: "bg-green-50 text-green-800",
   featured: "bg-sky-50 text-sky-800",
   mixed: "bg-stone-100 text-stone-700",
 };
