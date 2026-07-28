@@ -155,7 +155,7 @@ export default async function DashboardHomePage() {
       </section>
 
       <section className="grid xl:grid-cols-2 gap-5 mb-6">
-        <Panel title="Top sellers, past 90 days">
+        <Panel title="Top sellers, past 90 days (Excl Custom Work)">
           {analytics.topItems.length === 0 ? (
             <EmptyState>No item history yet.</EmptyState>
           ) : (
@@ -324,14 +324,14 @@ function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
   const map = new Map<string, RankedItem>();
   for (const quote of quotes) {
     for (const item of quote.items) {
+      if (item.catalogue === "custom") continue;
+
       const label = itemLabel(item);
       const current = map.get(label) || {
         label,
         detail:
-          item.catalogue === "custom"
-            ? "Custom fabrication"
-            : item.catalogue === "featured"
-              ? "Featured Work"
+          item.catalogue === "featured"
+            ? "Featured Work"
             : item.catalogue === "metals"
               ? "Metals"
               : item.code || "Mini panels",

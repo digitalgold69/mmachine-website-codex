@@ -242,17 +242,6 @@ function quoteItemFromCatalogueProduct(product: CatalogueSearchProduct, catalogu
   };
 }
 
-function orderCardSummary(quote: QuoteRequest) {
-  const firstItem = quote.items[0];
-  if (!firstItem) return "";
-
-  if (quoteKind(quote) === "custom") {
-    return firstItem.custom?.projectName || quote.customer.message || "Custom fabrication request";
-  }
-
-  return itemName(firstItem);
-}
-
 type QuoteKind = "mini" | "metals" | "custom" | "featured" | "mixed";
 
 const KIND_STYLES: Record<QuoteKind, string> = {
@@ -282,6 +271,10 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
 
 function customFiles(quote: QuoteRequest) {
   return quote.items.flatMap((item) => item.custom?.files || []);
+}
+
+function orderItemQuantity(quote: QuoteRequest) {
+  return quote.items.reduce((sum, item) => sum + item.qty, 0);
 }
 
 function fileHref(key: string) {
@@ -450,6 +443,13 @@ function OrderCard({
 }) {
   const quoteTotals = totals(quote);
   const cardSaving = savingAction.startsWith(`${quote.id}:`);
+  const itemQuantity = orderItemQuantity(quote);
+  const customerLines = [
+    quote.customer.name,
+    quote.customer.company,
+    quote.customer.email,
+    quote.customer.phone,
+  ].filter(Boolean);
 
   return (
     <article
@@ -469,21 +469,22 @@ function OrderCard({
           <div className="min-w-0">
             <OrderTypePill quote={quote} />
             <div className="truncate font-semibold text-racing">{quote.id}</div>
-            <div className="mt-1 truncate text-sm font-medium text-ink">{quote.customer.name}</div>
+            <div className="mt-1 space-y-0.5">
+              {customerLines.map((line) => (
+                <div key={line} className="truncate text-sm font-medium text-ink">
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
           <StatusPill status={quote.status} />
         </div>
         <div className="mt-3 text-xs text-ink-muted">
           {dateLabel}: {formatDateTime(dateValue)}
         </div>
-        {orderCardSummary(quote) && (
-          <div className="mt-3 max-h-10 overflow-hidden text-sm leading-5 text-ink">
-            {orderCardSummary(quote)}
-          </div>
-        )}
         <div className="mt-4 flex items-end justify-between gap-3">
           <div className="text-xs text-ink-muted">
-            {quote.items.length} {quote.items.length === 1 ? "item" : "items"}
+            {itemQuantity} {itemQuantity === 1 ? "item" : "items"}
           </div>
           <div className="text-right">
             <div className="font-semibold text-racing">
@@ -1820,7 +1821,7 @@ export default function OrdersClient({
             <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
               <h2 id="delete-order-title" className="font-display text-2xl text-racing">Delete this job?</h2>
               <p className="mt-3 text-sm leading-6 text-ink-muted">
-                {pendingDelete.id} for {pendingDelete.customer.name} will be removed from the active dashboard and kept as closed in the order records.
+                {pendingDelete.id} for {pendingDelete.customer.name} will be removed from the active dashboard.
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
