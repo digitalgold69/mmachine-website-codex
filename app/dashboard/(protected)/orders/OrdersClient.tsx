@@ -37,6 +37,9 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
 
+const invoiceMoney = (value: number | null | undefined) =>
+  typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "Add price";
+
 const lineExVat = (item: QuoteItem) =>
   typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : null;
 
@@ -59,18 +62,6 @@ const itemName = (item: QuoteItem) =>
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
 
-function itemDetails(item: QuoteItem) {
-  if (item.catalogue !== "custom") return itemName(item);
-  const custom = item.custom;
-  return [
-    custom?.material,
-    custom?.thickness,
-    custom?.services?.length ? custom.services.join(", ") : "",
-    custom?.finish,
-    custom?.files?.length ? `${custom.files.length} uploaded ${custom.files.length === 1 ? "file" : "files"}` : "",
-  ].filter(Boolean).join(" / ");
-}
-
 function firstCustomItem(quote: QuoteRequest) {
   return quote.items.find((item) => item.catalogue === "custom" && item.custom);
 }
@@ -80,19 +71,89 @@ function customJobRows(quote: QuoteRequest) {
   if (!custom) return [];
 
   return [
-    { label: "Project", value: custom.projectName },
     { label: "Material", value: custom.material },
     { label: "Thickness/spec", value: custom.thickness },
+    { label: "Services", value: custom.services?.length ? custom.services.join(", ") : "" },
     { label: "Quantity", value: [custom.quantity, custom.units].filter(Boolean).join(" ") },
     { label: "Finish", value: custom.finish },
     { label: "Tolerance", value: custom.tolerance },
     { label: "Needed by", value: custom.deadline },
     { label: "Budget", value: custom.budget },
-    {
-      label: "Drawing status",
-      value: custom.drawingStatus === "help" ? "Needs help from sketch/description" : "CAD/files route",
-    },
   ].filter((row) => row.value);
+}
+
+function compactText(value: string | null | undefined) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined) {
+  return compactText(a).toLowerCase() === compactText(b).toLowerCase();
+}
+
+function firstText(...values: Array<string | null | undefined>) {
+  return values.map(compactText).find(Boolean) || "";
+}
+
+function customBrief(quote: QuoteRequest) {
+  const item = firstCustomItem(quote);
+  return firstText(quote.customer.message, item?.custom?.projectName, item?.description);
+}
+
+function customBriefForContext(quote: QuoteRequest) {
+  const brief = customBrief(quote);
+  if (!brief) return "";
+  const duplicateLine = quote.items.some((item) =>
+    item.catalogue === "custom" && (sameText(item.description, brief) || sameText(item.custom?.projectName, brief))
+  );
+  return duplicateLine ? "" : brief;
+}
+
+function invoiceReferenceLabel(item: QuoteItem) {
+  if (item.catalogue === "custom") return "";
+  if (item.catalogue === "featured") return "Featured ref";
+  if (item.catalogue === "metals") return "Metal ref";
+  return "Part no.";
+}
+
+function invoiceReferencePlaceholder(item: QuoteItem) {
+  if (item.catalogue === "featured") return "Featured ref";
+  if (item.catalogue === "metals") return "Metal code";
+  return "Mini part no.";
+}
+
+function invoiceLineTypeLabel(item: QuoteItem) {
+  if (item.catalogue === "custom") return "Custom work";
+  if (item.catalogue === "featured") return "Featured work";
+  if (item.catalogue === "metals") return "Metal";
+  return "Mini panel";
+}
+
+function invoiceLineContext(item: QuoteItem) {
+  if (item.catalogue === "custom") {
+    const custom = item.custom;
+    const quantity = custom?.quantity || String(item.qty || "");
+    return [
+      custom?.material,
+      custom?.thickness,
+      custom?.services?.length ? custom.services.join(", ") : "",
+      custom?.finish,
+      quantity ? `Qty ${quantity}${custom?.units ? ` ${custom.units}` : ""}` : "",
+    ].filter(Boolean).join(" / ");
+  }
+
+  if (item.catalogue === "metals") {
+    return [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" / ");
+  }
+
+  if (item.catalogue === "featured") {
+    return "Featured Work order line";
+  }
+
+  return item.code ? `Mini panel ${item.code}` : "Mini panel order line";
+}
+
+function totalsReadyText(value: number | null | undefined, hasPoaItems: boolean) {
+  return hasPoaItems ? "Add prices" : money(value);
 }
 
 function orderCardSummary(quote: QuoteRequest) {
@@ -131,10 +192,6 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
   if (kinds.has("featured")) return "featured";
   if (kinds.has("metals")) return "metals";
   return "mini";
-}
-
-function customFiles(quote: QuoteRequest) {
-  return quote.items.flatMap((item) => item.custom?.files || []);
 }
 
 function fileHref(key: string) {
@@ -421,6 +478,7 @@ export default function OrdersClient({
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const missingDeepLinkNoticeRef = useRef("");
+  const closingQuoteIdRef = useRef("");
   const firstHistoryLoad = useRef(true);
   const requestedQuoteId = searchParams.get("quote") || searchParams.get("order") || "";
 
@@ -480,6 +538,7 @@ export default function OrdersClient({
   }, [pathname, router, searchParams]);
 
   const openInvoice = useCallback((quote: QuoteRequest, syncUrl = true) => {
+    closingQuoteIdRef.current = "";
     setSelectedId(quote.id);
     setDraft(cloneQuote(quote));
     setMessage("");
@@ -488,11 +547,12 @@ export default function OrdersClient({
   }, [replaceQuoteParam]);
 
   const closeInvoice = useCallback(() => {
+    closingQuoteIdRef.current = selectedId || draft?.id || "";
     setSelectedId("");
     setDraft(null);
     setActionNotice(null);
     replaceQuoteParam(null);
-  }, [replaceQuoteParam]);
+  }, [draft?.id, replaceQuoteParam, selectedId]);
 
   useEffect(() => {
     if (firstHistoryLoad.current) {
@@ -553,7 +613,11 @@ export default function OrdersClient({
   }, [page, pageCount]);
 
   useEffect(() => {
-    if (!requestedQuoteId) return;
+    if (!requestedQuoteId) {
+      closingQuoteIdRef.current = "";
+      return;
+    }
+    if (requestedQuoteId === closingQuoteIdRef.current) return;
 
     const existing = quotes.find((quote) => quote.id === requestedQuoteId);
     if (existing) {
@@ -811,11 +875,11 @@ export default function OrdersClient({
   }
 
   const draftTotals = draft ? totals(draft) : null;
+  const hasDraftPoaItems = Boolean(draftTotals?.hasPoaItems);
   const draftInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt || draft.invoiceSentAt) : false;
   const invoiceReady = draft
     ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
     : false;
-  const draftFiles = draft ? customFiles(draft) : [];
   const isSaving = Boolean(savingAction);
   const showingFrom = historyCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const showingTo = Math.min(currentPage * PAGE_SIZE, historyCount);
@@ -1011,21 +1075,21 @@ export default function OrdersClient({
                       <span>{draft.customer.email}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-end gap-2 sm:justify-end">
-                    <div className="w-44">
+                  <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto sm:justify-end">
+                    <div className="w-full sm:w-56">
                       <label className="label !mb-1" htmlFor="status">Status</label>
                       <select
                         id="status"
                         value={draft.status}
                         onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
-                        className="input h-9 py-1 text-sm"
+                        className="input min-h-[46px] py-2 text-base leading-normal"
                       >
                         {STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
                     </div>
-                    <button type="button" onClick={closeInvoice} className="btn-secondary px-3 py-2 text-sm">
+                    <button type="button" onClick={closeInvoice} className="btn-secondary min-h-[46px] px-4 py-2 text-sm">
                       Close
                     </button>
                   </div>
@@ -1059,21 +1123,20 @@ export default function OrdersClient({
                       </div>
                     </section>
 
-                    {quoteKind(draft) === "custom" && (
+                    {quoteKind(draft) === "custom" && (customBriefForContext(draft) || customJobRows(draft).length > 0) && (
                       <section className="rounded-lg border border-racing/10 p-3">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <div className="text-xs uppercase tracking-wider text-ink-muted">Custom job details</div>
-                            <h3 className="font-display text-xl text-racing">
-                              {firstCustomItem(draft)?.custom?.projectName || "Custom fabrication request"}
-                            </h3>
+                            <div className="text-xs uppercase tracking-wider text-ink-muted">Custom request</div>
+                            <h3 className="font-display text-xl text-racing">Job details</h3>
                           </div>
-                          {draftFiles.length > 0 && (
-                            <span className="rounded-full bg-cream-dark px-3 py-1 text-xs font-semibold text-racing">
-                              {draftFiles.length} {draftFiles.length === 1 ? "file" : "files"}
-                            </span>
-                          )}
                         </div>
+                        {customBriefForContext(draft) && (
+                          <div className="mb-3 rounded-md bg-cream-dark px-3 py-2 text-sm">
+                            <div className="label !mb-1">Job brief</div>
+                            <p className="whitespace-pre-wrap leading-6 text-ink">{customBriefForContext(draft)}</p>
+                          </div>
+                        )}
                         {customJobRows(draft).length > 0 && (
                           <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                             {customJobRows(draft).map((row) => (
@@ -1083,12 +1146,6 @@ export default function OrdersClient({
                               </div>
                             ))}
                           </dl>
-                        )}
-                        {draft.customer.message && (
-                          <div className="mt-3 rounded-md bg-cream-dark px-3 py-2 text-sm">
-                            <div className="label !mb-1">Job details from customer</div>
-                            <p className="whitespace-pre-wrap leading-6 text-ink">{draft.customer.message}</p>
-                          </div>
                         )}
                       </section>
                     )}
@@ -1100,116 +1157,138 @@ export default function OrdersClient({
                       </section>
                     )}
 
-                    {draftFiles.length > 0 && (
-                      <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
-                        <div className="label !mb-2">Uploaded design files</div>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {draftFiles.map((file) => (
-                            <a
-                              key={file.key}
-                              href={fileHref(file.key)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="min-w-0 rounded-md bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
-                            >
-                              <span className="block truncate">{file.name}</span>
-                              <span className="block text-xs font-normal text-ink-muted">
-                                {Math.ceil(file.size / 1024)} KB
-                              </span>
-                            </a>
-                          ))}
+                    <section className="rounded-lg border border-racing/10">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-racing/10 bg-cream-dark px-3 py-2">
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-ink-muted">Invoice lines</div>
+                          <div className="text-sm font-semibold text-racing">
+                            {quoteKind(draft) === "custom" ? "Customer-facing wording and price" : "Check quantities and pricing"}
+                          </div>
                         </div>
-                      </section>
-                    )}
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-racing">
+                          {draft.items.length} {draft.items.length === 1 ? "line" : "lines"}
+                        </span>
+                      </div>
 
-                    <section className="overflow-x-auto rounded-lg border border-racing/10">
-                      <table className="w-full min-w-[780px] table-fixed text-sm">
-                        <colgroup>
-                          <col className="w-[70px]" />
-                          <col className="w-[130px]" />
-                          <col />
-                          <col className="w-[100px]" />
-                          <col className="w-[120px]" />
-                          <col className="w-[110px]" />
-                        </colgroup>
-                        <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Qty</th>
-                            <th className="px-3 py-2 text-left">Part no.</th>
-                            <th className="px-3 py-2 text-left">Item</th>
-                            <th className="px-3 py-2 text-left">Unit</th>
-                            <th className="px-3 py-2 text-right">Each ex VAT</th>
-                            <th className="px-3 py-2 text-right">Line ex VAT</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {draft.items.map((item, index) => (
-                            <tr key={item.key} className="border-t border-racing/5">
-                              <td className="px-3 py-2 align-top">
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  value={item.qty}
-                                  onChange={(e) => {
-                                    const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
-                                    patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
-                                  }}
-                                  className="h-9 w-full rounded-md border border-racing/20 bg-white px-2 text-center font-semibold text-racing"
-                                />
-                              </td>
-                              <td className="px-3 py-2 align-top">
-                                <input
-                                  value={item.code || ""}
-                                  onChange={(e) => patchItem(index, { code: e.target.value })}
-                                  className="input h-9 font-mono text-xs"
-                                  placeholder={
-                                    item.catalogue === "custom"
-                                      ? "Custom ref"
-                                      : item.catalogue === "featured"
-                                        ? "Featured ref"
-                                        : item.catalogue === "mini"
-                                          ? "Mini part no."
-                                          : "Metal code"
-                                  }
-                                />
-                              </td>
-                              <td className="px-3 py-2 align-top">
-                                <input
-                                  value={item.description}
-                                  onChange={(e) => patchItem(index, { description: e.target.value })}
-                                  className="input h-9"
-                                />
-                                <div className="mt-1 text-xs text-ink-muted">{itemDetails(item)}</div>
-                              </td>
-                              <td className="px-3 py-2 align-top">
-                                <input
-                                  value={item.unit || ""}
-                                  onChange={(e) => patchItem(index, { unit: e.target.value })}
-                                  className="input h-9"
-                                />
-                              </td>
-                              <td className="px-3 py-2 align-top">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.unitPriceExVat ?? ""}
-                                  onChange={(e) =>
-                                    patchItem(index, {
-                                      unitPriceExVat: e.target.value === "" ? null : Number(e.target.value),
-                                      unitPriceIncVat: e.target.value === "" ? null : Number(e.target.value) * 1.2,
-                                    })
-                                  }
-                                  className="input h-9 text-right"
-                                />
-                              </td>
-                              <td className="px-3 py-2 text-right font-semibold text-racing align-top">
-                                {money(lineExVat(item))}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <div className="divide-y divide-racing/10">
+                        {draft.items.map((item, index) => {
+                          const referenceLabel = invoiceReferenceLabel(item);
+                          const files = item.custom?.files || [];
+                          return (
+                            <div key={item.key} className="p-3">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                                    {invoiceLineTypeLabel(item)}
+                                  </div>
+                                  {invoiceLineContext(item) && (
+                                    <div className="mt-0.5 truncate text-xs text-ink-muted">
+                                      {invoiceLineContext(item)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="rounded-full bg-cream-dark px-3 py-1 text-sm font-semibold text-racing">
+                                  {invoiceMoney(lineExVat(item))}
+                                </div>
+                              </div>
+
+                              <div className="grid gap-3 lg:grid-cols-[84px_minmax(0,1fr)_96px_140px]">
+                                <div>
+                                  <label className="label" htmlFor={`qty-${draft.id}-${index}`}>Qty</label>
+                                  <input
+                                    id={`qty-${draft.id}-${index}`}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={item.qty}
+                                    onChange={(e) => {
+                                      const qty = Number(e.target.value.replace(/\D/g, "")) || 1;
+                                      patchItem(index, { qty: Math.max(1, Math.min(999, qty)) });
+                                    }}
+                                    className="input text-center font-semibold text-racing"
+                                  />
+                                </div>
+
+                                <div className="min-w-0">
+                                  <label className="label" htmlFor={`description-${draft.id}-${index}`}>
+                                    {item.catalogue === "custom" ? "Invoice wording" : "Item"}
+                                  </label>
+                                  <textarea
+                                    id={`description-${draft.id}-${index}`}
+                                    value={item.description}
+                                    onChange={(e) => patchItem(index, { description: e.target.value })}
+                                    rows={2}
+                                    className="input min-h-[74px] resize-y text-sm leading-5"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="label" htmlFor={`unit-${draft.id}-${index}`}>Unit</label>
+                                  <input
+                                    id={`unit-${draft.id}-${index}`}
+                                    value={item.unit || ""}
+                                    onChange={(e) => patchItem(index, { unit: e.target.value })}
+                                    className="input"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="label" htmlFor={`price-${draft.id}-${index}`}>Price ex VAT</label>
+                                  <input
+                                    id={`price-${draft.id}-${index}`}
+                                    type="number"
+                                    step="0.01"
+                                    value={item.unitPriceExVat ?? ""}
+                                    onChange={(e) =>
+                                      patchItem(index, {
+                                        unitPriceExVat: e.target.value === "" ? null : Number(e.target.value),
+                                        unitPriceIncVat: e.target.value === "" ? null : Number(e.target.value) * 1.2,
+                                      })
+                                    }
+                                    className="input text-right"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                              </div>
+
+                              {referenceLabel && (
+                                <div className="mt-3 max-w-sm">
+                                  <label className="label" htmlFor={`code-${draft.id}-${index}`}>{referenceLabel}</label>
+                                  <input
+                                    id={`code-${draft.id}-${index}`}
+                                    value={item.code || ""}
+                                    onChange={(e) => patchItem(index, { code: e.target.value })}
+                                    className="input font-mono text-sm"
+                                    placeholder={invoiceReferencePlaceholder(item)}
+                                  />
+                                </div>
+                              )}
+
+                              {files.length > 0 && (
+                                <div className="mt-3 rounded-md bg-cream-dark p-3 text-sm">
+                                  <div className="label !mb-2">Uploaded design files</div>
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    {files.map((file) => (
+                                      <a
+                                        key={file.key}
+                                        href={fileHref(file.key)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="min-w-0 rounded-md bg-white px-3 py-2 font-semibold text-racing hover:text-gold"
+                                      >
+                                        <span className="block truncate">{file.name}</span>
+                                        <span className="block text-xs font-normal text-ink-muted">
+                                          {Math.ceil(file.size / 1024)} KB
+                                        </span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </section>
                   </div>
 
@@ -1236,7 +1315,7 @@ export default function OrdersClient({
                     </section>
 
                     <section className="rounded-lg border border-racing/10 p-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="label" htmlFor="carriage">Carriage ex VAT</label>
                           <input
@@ -1245,7 +1324,7 @@ export default function OrdersClient({
                             step="0.01"
                             value={draft.carriageExVat ?? ""}
                             onChange={(e) => patchDraft({ carriageExVat: e.target.value === "" ? null : Number(e.target.value) })}
-                            className="input h-9"
+                            className="input"
                           />
                         </div>
                         <div>
@@ -1256,15 +1335,20 @@ export default function OrdersClient({
                             step="0.01"
                             value={draft.extraChargesExVat ?? ""}
                             onChange={(e) => patchDraft({ extraChargesExVat: e.target.value === "" ? null : Number(e.target.value) })}
-                            className="input h-9"
+                            className="input"
                           />
                         </div>
                       </div>
                       <div className="mt-3 space-y-1 rounded-md bg-cream-dark p-3 text-sm">
-                        <div className="flex justify-between gap-3"><span>Goods ex VAT</span><strong>{money(draftTotals?.goods)}</strong></div>
-                        <div className="flex justify-between gap-3"><span>VAT</span><strong>{money(draftTotals?.vat)}</strong></div>
-                        <div className="flex justify-between gap-3"><span>Total ex VAT</span><strong>{money(draftTotals?.totalEx)}</strong></div>
-                        <div className="flex justify-between gap-3 text-racing"><span>Total inc VAT</span><strong>{money(draftTotals?.totalInc)}</strong></div>
+                        {hasDraftPoaItems && (
+                          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            Totals calculate after every invoice line has an ex VAT price.
+                          </div>
+                        )}
+                        <div className="flex justify-between gap-3"><span>Goods ex VAT</span><strong>{totalsReadyText(draftTotals?.goods, hasDraftPoaItems)}</strong></div>
+                        <div className="flex justify-between gap-3"><span>VAT</span><strong>{totalsReadyText(draftTotals?.vat, hasDraftPoaItems)}</strong></div>
+                        <div className="flex justify-between gap-3"><span>Total ex VAT</span><strong>{totalsReadyText(draftTotals?.totalEx, hasDraftPoaItems)}</strong></div>
+                        <div className="flex justify-between gap-3 text-racing"><span>Total inc VAT</span><strong>{totalsReadyText(draftTotals?.totalInc, hasDraftPoaItems)}</strong></div>
                       </div>
                     </section>
 
@@ -1306,7 +1390,7 @@ export default function OrdersClient({
 
                     {!invoiceReady && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        Add an ex VAT price to every invoice line before emailing it to the customer.
+                        Add an ex VAT price to every invoice line before emailing it to the customer. VAT is added automatically.
                       </div>
                     )}
                   </aside>
