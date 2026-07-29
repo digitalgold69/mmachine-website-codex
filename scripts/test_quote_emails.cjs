@@ -161,7 +161,7 @@ assert.deepEqual(ownerQuoteRecipients({
     { ...quote.items[0], catalogue: "metals" },
     { ...quote.items[0], catalogue: "featured" },
   ],
-}), ["mini@example.test", "metals@example.test", "metals-backup@example.test", "featured@example.test"]);
+}), ["mini@example.test"]);
 assert.deepEqual(ownerEnquiryRecipients(), ["enquiries@example.test"]);
 
 const sesInput = buildSesEmailInput({
@@ -208,7 +208,7 @@ assert.equal(
     ...quote,
     items: [miniQuote.items[0], metalsQuote.items[0]],
   }),
-  "New M Machine Order"
+  "New Mixed Order"
 );
 
 const setup = buildEmailSetupStatus();

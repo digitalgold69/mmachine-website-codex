@@ -100,7 +100,7 @@ function orderType(quote: QuoteRequest) {
 
 export function ownerNotificationFromName(quote: QuoteRequest) {
   const kinds = new Set(quote.items.map((item) => item.catalogue));
-  if (kinds.size !== 1) return "New M Machine Order";
+  if (kinds.size !== 1) return "New Mixed Order";
   if (kinds.has("metals")) return "New Metals Order";
   if (kinds.has("mini")) return "New Mini Panel Order";
   if (kinds.has("custom")) return "New Custom Work Order";
@@ -457,6 +457,12 @@ function ownerRecipientsForCatalogue(catalogue: QuoteCatalogue, env: EmailEnv = 
 }
 
 export function ownerQuoteRecipients(quote: QuoteRequest, env: EmailEnv = process.env) {
+  const kinds = new Set(quote.items.map((item) => item.catalogue));
+  if (kinds.size > 1) {
+    const miniRecipients = ownerRecipientsForCatalogue("mini", env);
+    return miniRecipients.length > 0 ? miniRecipients : ownerFallbackRecipients(env);
+  }
+
   const recipients = quote.items.flatMap((item) => ownerRecipientsForCatalogue(item.catalogue, env));
   const unique = uniqueRecipients(recipients);
   return unique.length > 0 ? unique : ownerFallbackRecipients(env);
