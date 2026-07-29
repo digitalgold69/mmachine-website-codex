@@ -14,6 +14,24 @@ import { guideUrl, guides } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
 
+const heroAvifSrcSet = [
+  "/home/mmachine-services-hero-640.avif 640w",
+  "/home/mmachine-services-hero-960.avif 960w",
+  "/home/mmachine-services-hero-1280.avif 1280w",
+].join(", ");
+const heroWebpSrcSet = [
+  "/home/mmachine-services-hero-640.webp 640w",
+  "/home/mmachine-services-hero-960-v2.webp 960w",
+  "/home/mmachine-services-hero-1280.webp 1280w",
+].join(", ");
+const heroJpegSrcSet = [
+  "/home/mmachine-services-hero-640.jpg 640w",
+  "/home/mmachine-services-hero-960.jpg 960w",
+  "/home/mmachine-services-hero-1280.jpg 1280w",
+].join(", ");
+const transparentPixel =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
 export default async function HomePage() {
   let featuredWork = fallbackFeaturedWork;
   try {
@@ -33,49 +51,76 @@ export default async function HomePage() {
       {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cream via-cream-dark to-cream" />
-        <Image
-          src="/home/mmachine-hero.png"
-          alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
-          fill
-          priority
-          sizes="100vw"
-          className="pointer-events-none object-cover object-center opacity-[0.08] lg:hidden"
-        />
+        <picture className="pointer-events-none absolute inset-0 lg:hidden" aria-hidden="true">
+          <source media="(max-width: 1023px)" type="image/avif" srcSet={heroAvifSrcSet} sizes="100vw" />
+          <source media="(max-width: 1023px)" type="image/webp" srcSet={heroWebpSrcSet} sizes="100vw" />
+          <source media="(max-width: 1023px)" type="image/jpeg" srcSet={heroJpegSrcSet} sizes="100vw" />
+          <img
+            src={transparentPixel}
+            alt=""
+            width={1280}
+            height={853}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover object-center opacity-[0.08]"
+          />
+        </picture>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] xl:gap-14">
             <div className="max-w-2xl">
-            <p className="text-xs tracking-[3px] font-semibold text-gold mb-4">
+              <p className="text-xs tracking-[3px] font-semibold text-gold mb-4">
               CLASSIC MINI SPECIALISTS · EST. 1980
-            </p>
-            <h1 className="home-hero-title font-display font-semibold text-racing leading-[1.1] mb-6">
-              Mini Panels, Custom Engineering,<br />{" "}
-              <span className="text-gold">Huge Material Range.</span>
-            </h1>
-            <p className="text-lg text-ink-muted leading-relaxed mb-8 max-w-xl">
-              Four decades supplying restorers, workshops and fabricators from our Darlington workshop.
-              Browse our current catalogues, then send an order request for availability, carriage and payment details.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/catalogue/mini" className="btn-primary">
-                Browse {miniCount} Mini panels
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
-              </Link>
-              <Link href="/catalogue/metals" className="btn-secondary">
-                View metals
-              </Link>
-            </div>
+              </p>
+              <h1 className="home-hero-title font-display font-semibold text-racing leading-[1.1] mb-6">
+                Mini Panels, Custom Engineering,<br />{" "}
+                <span className="text-gold">Huge Material Range.</span>
+              </h1>
+              <p className="text-lg text-ink-muted leading-relaxed mb-8 max-w-xl">
+                Four decades supplying restorers, workshops and fabricators from our Darlington workshop.
+                Browse our current catalogues, then send an order request for availability, carriage and payment details.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/catalogue/mini" className="btn-primary">
+                  Browse {miniCount} Mini panels
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+                </Link>
+                <Link href="/catalogue/metals" className="btn-secondary">
+                  View metals
+                </Link>
+              </div>
             </div>
 
-            <div className="relative hidden aspect-[3/2] w-full overflow-hidden lg:block">
-              <Image
-                src="/home/mmachine-hero.png"
-                alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
-                fill
-                priority
+            <picture className="relative hidden aspect-[3/2] w-full overflow-hidden lg:block">
+              <source
+                media="(min-width: 1024px)"
+                type="image/avif"
+                srcSet={heroAvifSrcSet}
                 sizes="(min-width: 1280px) 590px, 48vw"
-                className="object-cover object-center"
               />
-            </div>
+              <source
+                media="(min-width: 1024px)"
+                type="image/webp"
+                srcSet={heroWebpSrcSet}
+                sizes="(min-width: 1280px) 590px, 48vw"
+              />
+              <source
+                media="(min-width: 1024px)"
+                type="image/jpeg"
+                srcSet={heroJpegSrcSet}
+                sizes="(min-width: 1280px) 590px, 48vw"
+              />
+              <img
+                src={transparentPixel}
+                alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
+                width={1280}
+                height={853}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="h-full w-full object-cover object-center"
+              />
+            </picture>
           </div>
         </div>
       </section>
