@@ -45,6 +45,8 @@ type ZoneDef = {
   normalTol?: number;
 };
 
+const MAX_HIGHLIGHT_ZONES = 8;
+
 const EXTERIOR_ZONES: ZoneDef[] = [
   // Grille face — faces forward (±X)
   { code: "170", label: "Front panel",       box: [ 1.33, 0.24, -0.62,  1.52, 0.82,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
@@ -52,15 +54,19 @@ const EXTERIOR_ZONES: ZoneDef[] = [
   { code: "160", label: "Bonnet",            box: [ 0.58, 0.72, -0.56,  1.31, 1.02,  0.56], normal: [ 0, 1, 0], normalTol: 0.28 },
   // Traveller roof — faces up
   { code: "160", label: "Roof",              box: [-1.28, 1.10, -0.54,  0.60, 1.40,  0.54], normal: [ 0, 1, 0], normalTol: 0.34 },
-  // Front wing L/R
-  { code: "130", label: "Front wing (L)",    box: [ 0.56, 0.24, -0.76,  1.27, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.50 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.56, 0.24,  0.45,  1.27, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.50 },
+  // Front wing L/R — split into shaped slabs around the arch and scuttle.
+  { code: "130", label: "Front wing (L)",    box: [ 0.64, 0.42, -0.76,  1.33, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.44 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.86, 0.28, -0.76,  1.34, 0.62, -0.45], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.64, 0.24, -0.76,  0.86, 0.52, -0.45], normal: [ 0, 0, 1], normalTol: 0.46 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.64, 0.42,  0.45,  1.33, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.44 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.86, 0.28,  0.45,  1.34, 0.62,  0.76], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.64, 0.24,  0.45,  0.86, 0.52,  0.76], normal: [ 0, 0, 1], normalTol: 0.46 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.38, 0.25, -0.76,  0.43, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.52 },
-  { code: "150", label: "Door (R)",          box: [-0.38, 0.25,  0.45,  0.43, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.52 },
+  { code: "150", label: "Door (L)",          box: [-0.31, 0.25, -0.76,  0.53, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.54 },
+  { code: "150", label: "Door (R)",          box: [-0.31, 0.25,  0.45,  0.53, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.54 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.25, -0.76, -0.53, 0.79, -0.45], normal: [ 0, 0, 1], normalTol: 0.52 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.25,  0.45, -0.53, 0.79,  0.76], normal: [ 0, 0, 1], normalTol: 0.52 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.25, -0.76, -0.40, 0.80, -0.45], normal: [ 0, 0, 1], normalTol: 0.54 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.25,  0.45, -0.40, 0.80,  0.76], normal: [ 0, 0, 1], normalTol: 0.54 },
   // Rear panel — faces backward
   { code: "120", label: "Rear panel",        box: [-1.53, 0.24, -0.62, -1.31, 0.88,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
 ];
@@ -191,14 +197,10 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       ([wx, wy, wz, wr]) => new THREE.Vector4(wx, wy, wz, wr)
     );
     const highlightUniforms = {
-      uZoneMin0: { value: new THREE.Vector3(0, 0, 0) },
-      uZoneMax0: { value: new THREE.Vector3(0, 0, 0) },
-      uZoneMin1: { value: new THREE.Vector3(0, 0, 0) },
-      uZoneMax1: { value: new THREE.Vector3(0, 0, 0) },
-      uZoneNormal0: { value: new THREE.Vector3(0, 1, 0) },
-      uZoneNormal1: { value: new THREE.Vector3(0, 1, 0) },
-      uZoneTol0: { value: 0.45 },
-      uZoneTol1: { value: 0.45 },
+      uZoneMins: { value: Array.from({ length: MAX_HIGHLIGHT_ZONES }, () => new THREE.Vector3(0, 0, 0)) },
+      uZoneMaxs: { value: Array.from({ length: MAX_HIGHLIGHT_ZONES }, () => new THREE.Vector3(0, 0, 0)) },
+      uZoneNormals: { value: Array.from({ length: MAX_HIGHLIGHT_ZONES }, () => new THREE.Vector3(0, 1, 0)) },
+      uZoneTols: { value: Array.from({ length: MAX_HIGHLIGHT_ZONES }, () => 0.45) },
       uZoneCount: { value: 0 },
       uWheelArches: { value: wheelVec4s },
       uWheelZTol: { value: 0.28 },
@@ -208,14 +210,10 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       const std = mat as THREE.MeshStandardMaterial;
       if (!("onBeforeCompile" in std)) return;
       std.onBeforeCompile = (shader) => {
-        shader.uniforms.uZoneMin0 = highlightUniforms.uZoneMin0;
-        shader.uniforms.uZoneMax0 = highlightUniforms.uZoneMax0;
-        shader.uniforms.uZoneMin1 = highlightUniforms.uZoneMin1;
-        shader.uniforms.uZoneMax1 = highlightUniforms.uZoneMax1;
-        shader.uniforms.uZoneNormal0 = highlightUniforms.uZoneNormal0;
-        shader.uniforms.uZoneNormal1 = highlightUniforms.uZoneNormal1;
-        shader.uniforms.uZoneTol0 = highlightUniforms.uZoneTol0;
-        shader.uniforms.uZoneTol1 = highlightUniforms.uZoneTol1;
+        shader.uniforms.uZoneMins = highlightUniforms.uZoneMins;
+        shader.uniforms.uZoneMaxs = highlightUniforms.uZoneMaxs;
+        shader.uniforms.uZoneNormals = highlightUniforms.uZoneNormals;
+        shader.uniforms.uZoneTols = highlightUniforms.uZoneTols;
         shader.uniforms.uZoneCount = highlightUniforms.uZoneCount;
         shader.uniforms.uWheelArches = highlightUniforms.uWheelArches;
         shader.uniforms.uWheelZTol = highlightUniforms.uWheelZTol;
@@ -238,14 +236,10 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           .replace(
             "#include <common>",
             `#include <common>
-             uniform vec3 uZoneMin0;
-             uniform vec3 uZoneMax0;
-             uniform vec3 uZoneMin1;
-             uniform vec3 uZoneMax1;
-             uniform vec3 uZoneNormal0;
-             uniform vec3 uZoneNormal1;
-             uniform float uZoneTol0;
-             uniform float uZoneTol1;
+             uniform vec3 uZoneMins[${MAX_HIGHLIGHT_ZONES}];
+             uniform vec3 uZoneMaxs[${MAX_HIGHLIGHT_ZONES}];
+             uniform vec3 uZoneNormals[${MAX_HIGHLIGHT_ZONES}];
+             uniform float uZoneTols[${MAX_HIGHLIGHT_ZONES}];
              uniform float uZoneCount;
              uniform vec4 uWheelArches[4];
              uniform float uWheelZTol;
@@ -273,11 +267,11 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
                vec3 fdx = dFdx(vCarPos);
                vec3 fdy = dFdy(vCarPos);
                vec3 n = normalize(cross(fdx, fdy));
-               if (insideBox(vCarPos, uZoneMin0, uZoneMax0) > 0.5
-                   && abs(dot(n, uZoneNormal0)) > uZoneTol0) inZone = 1.0;
-               if (uZoneCount > 1.5
-                   && insideBox(vCarPos, uZoneMin1, uZoneMax1) > 0.5
-                   && abs(dot(n, uZoneNormal1)) > uZoneTol1) inZone = 1.0;
+               for (int i = 0; i < ${MAX_HIGHLIGHT_ZONES}; i++) {
+                 if (float(i) >= uZoneCount) break;
+                 if (insideBox(vCarPos, uZoneMins[i], uZoneMaxs[i]) > 0.5
+                     && abs(dot(n, uZoneNormals[i])) > uZoneTols[i]) inZone = 1.0;
+               }
                if (inZone > 0.5 && inAnyArch(vCarPos) > 0.5) inZone = 0.0;
                if (inZone > 0.5) {
                  vec3 accent = vec3(0.87, 0.09, 0.09);
@@ -566,21 +560,26 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
     // --- Body highlight uniforms control -----------------------------------
     const highlightZones = (zones: ZoneDef[]) => {
-      const take = zones.slice(0, 2);
+      const take = zones.slice(0, MAX_HIGHLIGHT_ZONES);
       highlightUniforms.uZoneCount.value = take.length;
-      if (take[0]) {
-        highlightUniforms.uZoneMin0.value.set(take[0].box[0], take[0].box[1], take[0].box[2]);
-        highlightUniforms.uZoneMax0.value.set(take[0].box[3], take[0].box[4], take[0].box[5]);
-        const n0 = new THREE.Vector3(take[0].normal[0], take[0].normal[1], take[0].normal[2]).normalize();
-        highlightUniforms.uZoneNormal0.value.copy(n0);
-        highlightUniforms.uZoneTol0.value = take[0].normalTol ?? 0.45;
-      }
-      if (take[1]) {
-        highlightUniforms.uZoneMin1.value.set(take[1].box[0], take[1].box[1], take[1].box[2]);
-        highlightUniforms.uZoneMax1.value.set(take[1].box[3], take[1].box[4], take[1].box[5]);
-        const n1 = new THREE.Vector3(take[1].normal[0], take[1].normal[1], take[1].normal[2]).normalize();
-        highlightUniforms.uZoneNormal1.value.copy(n1);
-        highlightUniforms.uZoneTol1.value = take[1].normalTol ?? 0.45;
+
+      for (let i = 0; i < MAX_HIGHLIGHT_ZONES; i += 1) {
+        const z = take[i];
+        const min = highlightUniforms.uZoneMins.value[i];
+        const max = highlightUniforms.uZoneMaxs.value[i];
+        const normal = highlightUniforms.uZoneNormals.value[i];
+
+        if (z) {
+          min.set(z.box[0], z.box[1], z.box[2]);
+          max.set(z.box[3], z.box[4], z.box[5]);
+          normal.set(z.normal[0], z.normal[1], z.normal[2]).normalize();
+          highlightUniforms.uZoneTols.value[i] = z.normalTol ?? 0.45;
+        } else {
+          min.set(0, 0, 0);
+          max.set(0, 0, 0);
+          normal.set(0, 1, 0);
+          highlightUniforms.uZoneTols.value[i] = 0.45;
+        }
       }
     };
     const clearHighlight = () => {
