@@ -53,14 +53,14 @@ const EXTERIOR_ZONES: ZoneDef[] = [
   // Traveller roof — faces up
   { code: "160", label: "Roof",              box: [-1.28, 1.10, -0.54,  0.60, 1.40,  0.54], normal: [ 0, 1, 0], normalTol: 0.34 },
   // Front wing L/R
-  { code: "130", label: "Front wing (L)",    box: [ 0.42, 0.18, -0.78,  1.29, 0.86, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.42, 0.18,  0.42,  1.29, 0.86,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.56, 0.24, -0.76,  1.27, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.50 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.56, 0.24,  0.45,  1.27, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.50 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.45, 0.18, -0.78,  0.45, 0.93, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
-  { code: "150", label: "Door (R)",          box: [-0.45, 0.18,  0.42,  0.45, 0.93,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "150", label: "Door (L)",          box: [-0.38, 0.25, -0.76,  0.43, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.52 },
+  { code: "150", label: "Door (R)",          box: [-0.38, 0.25,  0.45,  0.43, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.52 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.32, 0.18, -0.78, -0.45, 0.92, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.32, 0.18,  0.42, -0.45, 0.92,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.25, -0.76, -0.53, 0.79, -0.45], normal: [ 0, 0, 1], normalTol: 0.52 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.25,  0.45, -0.53, 0.79,  0.76], normal: [ 0, 0, 1], normalTol: 0.52 },
   // Rear panel — faces backward
   { code: "120", label: "Rear panel",        box: [-1.53, 0.24, -0.62, -1.31, 0.88,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
 ];
@@ -320,20 +320,27 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     interiorGroup.visible = false;
     carGroup.add(interiorGroup);
 
-    const chassisMat  = new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.55, metalness: 0.25 });
-    const floorMat    = new THREE.MeshStandardMaterial({ color: 0x8a7a65, roughness: 0.8,  metalness: 0.1 });
-    const subframeMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.35, metalness: 0.55 });
-    const bulkheadMat = new THREE.MeshStandardMaterial({ color: 0x6f5e48, roughness: 0.65, metalness: 0.2 });
-    const interiorHighlightMat = new THREE.MeshStandardMaterial({
+    const keepInteriorOverlayStable = (mat: THREE.MeshStandardMaterial) => {
+      mat.depthTest = false;
+      mat.depthWrite = false;
+      return mat;
+    };
+
+    const chassisMat  = keepInteriorOverlayStable(new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.55, metalness: 0.25 }));
+    const floorMat    = keepInteriorOverlayStable(new THREE.MeshStandardMaterial({ color: 0x8a7a65, roughness: 0.8,  metalness: 0.1 }));
+    const subframeMat = keepInteriorOverlayStable(new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.35, metalness: 0.55 }));
+    const bulkheadMat = keepInteriorOverlayStable(new THREE.MeshStandardMaterial({ color: 0x6f5e48, roughness: 0.65, metalness: 0.2 }));
+    const interiorHighlightMat = keepInteriorOverlayStable(new THREE.MeshStandardMaterial({
       color: 0xB8860B, roughness: 0.3, metalness: 0.6,
       emissive: 0xB8860B, emissiveIntensity: 0.55,
-    });
+    }));
 
     const interiorMeshes: THREE.Mesh[] = [];
     const addInterior = (code: string, label: string, mesh: THREE.Mesh, mat: THREE.Material) => {
       mesh.material = mat;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
+      mesh.renderOrder = 20;
       mesh.userData = { sectionCode: code, label, kind: "interior", originalMat: mat };
       interiorGroup.add(mesh);
       interiorMeshes.push(mesh);
