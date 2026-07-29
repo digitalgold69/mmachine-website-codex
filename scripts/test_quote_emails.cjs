@@ -262,6 +262,8 @@ assert.match(enquiryHtml, /https:\/\/example\.test\/products\/mini-rear-panel/);
 const customerHtml = buildCustomerInvoiceEmail(quote);
 assert.match(customerHtml, /Hello Alice Buyer/);
 assert.match(customerHtml, /Order invoice/);
+assert.match(customerHtml, /See your order summary below\./);
+assert.doesNotMatch(customerHtml, /We have reviewed it and added any carriage or extra charges below/);
 assert.match(customerHtml, /Items/);
 assert.match(customerHtml, /Q-CF-TEST/);
 assert.match(customerHtml, /Custom Job/);

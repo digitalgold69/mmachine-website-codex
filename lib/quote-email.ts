@@ -338,7 +338,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
             ${
               isUpdatedInvoice
                 ? "We have updated your invoice details below. Payment is arranged manually with M-Machine."
-                : "Thank you for your order request. We have reviewed it and added any carriage or extra charges below. Payment is arranged manually with M-Machine."
+                : "See your order summary below."
             }
           </p>
           ${
