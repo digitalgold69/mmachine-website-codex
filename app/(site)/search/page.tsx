@@ -14,7 +14,7 @@ type PageProps = {
 
 export const metadata: Metadata = {
   title: "Search M-Machine parts",
-  description: "Search M-Machine Classic Mini parts and engineering metals.",
+  description: "Search M-Machine Classic Mini panels and engineering metals.",
   robots: {
     index: false,
     follow: true,

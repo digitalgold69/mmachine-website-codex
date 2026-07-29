@@ -279,7 +279,7 @@ export default async function HomePage() {
           </div>
           <div>
             <div className="font-display text-4xl text-gold mb-2">{miniCount}</div>
-            <div className="text-sm text-ink-muted">Mini parts in catalogue</div>
+            <div className="text-sm text-ink-muted">Mini panels in catalogue</div>
           </div>
           <div>
             <div className="font-display text-4xl text-gold mb-2">{metalsCount.toLocaleString("en-GB")}</div>

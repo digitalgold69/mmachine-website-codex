@@ -4,6 +4,8 @@ import { getQuoteFilesBucket } from "@/lib/cloudflare";
 import {
   buildCustomerInvoiceEmailForRuntime,
   buildOwnerQuoteEmailForRuntime,
+  CUSTOMER_INVOICE_FROM_NAME,
+  ownerNotificationFromName,
   ownerQuoteRecipientsForRuntime,
   sendQuoteEmail,
 } from "@/lib/quote-email";
@@ -258,6 +260,7 @@ async function persistCustomQuote(
     subject: `New M-Machine custom fabrication request ${quote.id}`,
     html: await buildOwnerQuoteEmailForRuntime(quote),
     replyTo: quote.customer.email,
+    fromName: ownerNotificationFromName(quote),
   });
   if (email.ok) {
     saved = await saveQuoteRequest({
@@ -608,6 +611,7 @@ export async function POST(req: Request) {
         : `New M-Machine quote request ${quote.id}`,
       html: await buildOwnerQuoteEmailForRuntime(quote),
       replyTo: quote.customer.email,
+      fromName: ownerNotificationFromName(quote),
     });
     if (email.ok) {
       saved = await saveQuoteRequest({
@@ -714,6 +718,7 @@ export async function PATCH(req: Request) {
         subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${savedDraft.id}`,
         html: await buildCustomerInvoiceEmailForRuntime(savedDraft),
         replyTo,
+        fromName: CUSTOMER_INVOICE_FROM_NAME,
       });
       if (!email.ok) {
         console.error("customer_invoice_email_failed", {

@@ -253,7 +253,7 @@ const KIND_STYLES: Record<QuoteKind, string> = {
 };
 
 const KIND_LABELS: Record<QuoteKind, string> = {
-  mini: "Mini parts",
+  mini: "Mini panels",
   metals: "Metals",
   custom: "Custom fab",
   featured: "Featured Work",

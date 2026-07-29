@@ -26,7 +26,7 @@ Cloudflare dashboard path:
 | `AWS_SES_ACCESS_KEY_ID` | IAM access key with `ses:SendEmail` |
 | `AWS_SES_SECRET_ACCESS_KEY` | IAM secret key with `ses:SendEmail` |
 | `AWS_SES_FROM_EMAIL` | `orders@orders.m-machine.co.uk` |
-| `AWS_SES_FROM_NAME` | `orders@m-machine.co.uk` |
+| `AWS_SES_FROM_NAME` | `New M Machine Order` |
 | `QUOTE_OWNER_EMAIL` | Fallback/general owner notification address |
 | `QUOTE_CUSTOM_OWNER_EMAIL` | Custom-work request notification address |
 | `QUOTE_MINI_OWNER_EMAIL` | Mini panel order notification address |
@@ -34,12 +34,11 @@ Cloudflare dashboard path:
 | `QUOTE_FEATURED_OWNER_EMAIL` | Featured-work order notification address |
 | `QUOTE_ENQUIRY_OWNER_EMAIL` | Optional website contact/enquiry notification address |
 
-Email is sent through Amazon SES API v2. Sender defaults to
-`"orders@m-machine.co.uk" <orders@orders.m-machine.co.uk>`. SES authenticates
-the address inside the angle brackets, so `AWS_SES_FROM_EMAIL` must be an
-address under the verified `orders.m-machine.co.uk` identity. Most inboxes show
-the display name from `AWS_SES_FROM_NAME`, while expanded message details still
-show the real authenticated sender address.
+Email is sent through Amazon SES API v2. Staff order notifications set a
+message-specific display name such as `New Mini Panel Order`; customer invoice
+emails use `Your M Machine Order`. SES authenticates the address inside the
+angle brackets, so `AWS_SES_FROM_EMAIL` must be an address under a verified SES
+identity in the configured region.
 
 Manage the SES settings and recipient-routing addresses in Cloudflare Workers
 Settings -> Variables and Secrets. Do not put the `QUOTE_*_EMAIL` recipient

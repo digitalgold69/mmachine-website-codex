@@ -13,7 +13,7 @@ process.env.AWS_SES_REGION = "eu-west-2";
 process.env.AWS_SES_ACCESS_KEY_ID = "AKIATEST";
 process.env.AWS_SES_SECRET_ACCESS_KEY = "test-secret";
 process.env.AWS_SES_FROM_EMAIL = "orders@orders.m-machine.co.uk";
-process.env.AWS_SES_FROM_NAME = "orders@m-machine.co.uk";
+process.env.AWS_SES_FROM_NAME = "New M Machine Order";
 
 const jiti = require("jiti")(__filename, {
   alias: {
@@ -26,8 +26,10 @@ const {
   buildSesEmailInput,
   buildEmailSetupStatus,
   buildCustomerInvoiceEmail,
+  CUSTOMER_INVOICE_FROM_NAME,
   buildOwnerEnquiryEmail,
   buildOwnerQuoteEmail,
+  ownerNotificationFromName,
   ownerEnquiryRecipients,
   ownerQuoteRecipients,
 } = jiti("../lib/quote-email.ts");
@@ -93,6 +95,64 @@ const quote = {
   ownerEmailSentAt: null,
 };
 
+const miniQuote = {
+  ...quote,
+  id: "Q-MINI-TEST",
+  items: [
+    {
+      key: "mini-floor-panel",
+      catalogue: "mini",
+      productId: "floor-panel",
+      code: "14A1234",
+      description: "Front floor panel",
+      qty: 3,
+      unit: "each",
+      unitPriceExVat: 25,
+      unitPriceIncVat: 30,
+    },
+  ],
+};
+
+const metalsQuote = {
+  ...quote,
+  id: "Q-METALS-TEST",
+  items: [
+    {
+      key: "metals-sheet",
+      catalogue: "metals",
+      productId: "sheet",
+      code: "MS-SHEET",
+      description: "Mild steel sheet",
+      shape: "Sheet",
+      metal: "Mild steel",
+      spec: "CR4",
+      size: "1.2 mm",
+      qty: 1,
+      unit: "sheet",
+      unitPriceExVat: 12,
+      unitPriceIncVat: 14.4,
+    },
+  ],
+};
+
+const featuredQuote = {
+  ...quote,
+  id: "Q-FW-TEST",
+  items: [
+    {
+      key: "featured-shell",
+      catalogue: "featured",
+      productId: "shell",
+      code: "FW-SHELL",
+      description: "Restored Mini shell",
+      qty: 1,
+      unit: "each",
+      unitPriceExVat: 5000,
+      unitPriceIncVat: 6000,
+    },
+  ],
+};
+
 assert.deepEqual(ownerQuoteRecipients(quote), ["custom@example.test"]);
 assert.deepEqual(ownerQuoteRecipients({
   ...quote,
@@ -109,12 +169,47 @@ const sesInput = buildSesEmailInput({
   subject: "M-Machine test",
   html: "<p>Hello &amp; welcome</p>",
   replyTo: ownerQuoteRecipients(quote)[0],
+  fromName: ownerNotificationFromName(quote),
 });
-assert.equal(sesInput.FromEmailAddress, "\"orders@m-machine.co.uk\" <orders@orders.m-machine.co.uk>");
+assert.equal(sesInput.FromEmailAddress, "\"New Custom Work Order\" <orders@orders.m-machine.co.uk>");
 assert.deepEqual(sesInput.Destination?.ToAddresses, ["custom@example.test"]);
 assert.deepEqual(sesInput.ReplyToAddresses, ["custom@example.test"]);
 assert.equal(sesInput.Content?.Simple?.Subject?.Charset, "UTF-8");
 assert.match(sesInput.Content?.Simple?.Body?.Text?.Data || "", /Hello & welcome/);
+
+const customerSesInput = buildSesEmailInput({
+  to: quote.customer.email,
+  subject: "M-Machine invoice",
+  html: "<p>Invoice</p>",
+  fromName: CUSTOMER_INVOICE_FROM_NAME,
+});
+assert.equal(customerSesInput.FromEmailAddress, "\"Your M Machine Order\" <orders@orders.m-machine.co.uk>");
+
+const configuredFullFromInput = buildSesEmailInput(
+  {
+    to: quote.customer.email,
+    subject: "M-Machine test",
+    html: "<p>Hello</p>",
+    fromName: "New Metals Order",
+  },
+  {
+    AWS_SES_FROM_EMAIL: "\"Legacy Name\" <orders@orders.m-machine.co.uk>",
+    AWS_SES_FROM_NAME: "Legacy Name",
+  }
+);
+assert.equal(configuredFullFromInput.FromEmailAddress, "\"New Metals Order\" <orders@orders.m-machine.co.uk>");
+
+assert.equal(ownerNotificationFromName(quote), "New Custom Work Order");
+assert.equal(ownerNotificationFromName(miniQuote), "New Mini Panel Order");
+assert.equal(ownerNotificationFromName(metalsQuote), "New Metals Order");
+assert.equal(ownerNotificationFromName(featuredQuote), "New Featured Order");
+assert.equal(
+  ownerNotificationFromName({
+    ...quote,
+    items: [miniQuote.items[0], metalsQuote.items[0]],
+  }),
+  "New M Machine Order"
+);
 
 const setup = buildEmailSetupStatus();
 assert.equal(setup.configured, true);
@@ -130,13 +225,22 @@ const ownerHtml = buildOwnerQuoteEmail(quote);
 assert.match(ownerHtml, /Alice Buyer/);
 assert.match(ownerHtml, /alice@example\.test/);
 assert.match(ownerHtml, /01325 000000/);
-assert.match(ownerHtml, /Mild steel/);
-assert.match(ownerHtml, /Laser cutting, Folding/);
-assert.match(ownerHtml, /Included details/);
+assert.match(ownerHtml, /Uploaded files/);
+assert.doesNotMatch(ownerHtml, /Included details/);
+assert.doesNotMatch(ownerHtml, /Qty 2\s*\/\s*Ref Custom\s*\/\s*Unit job/);
+assert.doesNotMatch(ownerHtml, /Uploaded files:/);
 assert.match(ownerHtml, /Open this order in dashboard/);
 assert.match(ownerHtml, /https:\/\/example\.test\/dashboard\/orders\?quote=Q-CF-TEST/);
 assert.match(ownerHtml, /https:\/\/example\.test\/api\/quote-files\/quote-uploads\/session-1\/drawing%201\.dxf/);
 assert.doesNotMatch(ownerHtml, /Each ex VAT/);
+
+const miniOwnerHtml = buildOwnerQuoteEmail(miniQuote);
+assert.match(miniOwnerHtml, /Mini panels/);
+assert.match(miniOwnerHtml, /Items Requested/);
+assert.match(miniOwnerHtml, /Front floor panel/);
+assert.match(miniOwnerHtml, /\u00a375\.00/);
+assert.doesNotMatch(miniOwnerHtml, /Unit each/);
+assert.doesNotMatch(miniOwnerHtml, /Mini parts/);
 
 const enquiryHtml = buildOwnerEnquiryEmail({
   name: "Bob Enquirer",

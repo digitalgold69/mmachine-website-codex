@@ -25,12 +25,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (machineTypeSlug !== "classic-mini") return {};
 
   return {
-    title: "Classic Mini Parts, Panels & Repair Sections",
+    title: "Classic Mini Panels & Repair Sections",
     description:
       "Browse Classic Mini repair panels and restoration parts from M-Machine, organised by Mini catalogue section with part-number pages.",
     alternates: { canonical: absoluteUrl("/machines/classic-mini") },
     openGraph: {
-      title: "Classic Mini Parts, Panels & Repair Sections | M-Machine",
+      title: "Classic Mini Panels & Repair Sections | M-Machine",
       description:
         "Classic Mini pressed steel panels and repair sections from M-Machine in Darlington.",
       url: absoluteUrl("/machines/classic-mini"),
@@ -53,7 +53,7 @@ export default async function MachinePage({ params }: PageProps) {
   const collection = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Classic Mini parts",
+    name: "Classic Mini panels",
     description: "Classic Mini pressed steel panels and repair sections from M-Machine.",
     url: absoluteUrl("/machines/classic-mini"),
   };
@@ -70,7 +70,7 @@ export default async function MachinePage({ params }: PageProps) {
       </nav>
 
       <header className="mb-10 max-w-3xl">
-        <h1 className="font-display text-4xl text-racing mb-3">Classic Mini parts and panels</h1>
+        <h1 className="font-display text-4xl text-racing mb-3">Classic Mini panels and repair sections</h1>
         <p className="text-ink-muted leading-relaxed">
           M-Machine supplies Classic Mini pressed steel panels, restoration repair sections and related parts for Mk1 through later Mini models.
           Use this machine page to reach the right section, part number or enquiry route.
@@ -116,7 +116,7 @@ export default async function MachinePage({ params }: PageProps) {
           Send the part number, model details or a photo and M-Machine will help match the correct repair panel.
         </p>
         <Link href="/contact?category=Classic%20Mini%20panels" className="text-sm font-semibold text-racing hover:text-gold">
-          Ask about Classic Mini parts
+          Ask about Classic Mini panels
         </Link>
       </section>
     </div>

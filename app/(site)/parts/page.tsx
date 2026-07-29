@@ -9,12 +9,12 @@ import {
 } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Classic Mini Parts & Engineering Metals Catalogue",
+  title: "Classic Mini Panels & Engineering Metals Catalogue",
   description:
     "Browse M-Machine Classic Mini pressed panels and engineering metals with crawlable category pages, product pages and quote enquiry links.",
   alternates: { canonical: absoluteUrl("/parts") },
   openGraph: {
-    title: "Classic Mini Parts & Engineering Metals Catalogue | M-Machine",
+    title: "Classic Mini Panels & Engineering Metals Catalogue | M-Machine",
     description:
       "Classic Mini panels, repair sections and engineering metals from M-Machine in Darlington.",
     url: absoluteUrl("/parts"),
@@ -54,7 +54,7 @@ export default function PartsIndexPage() {
 
       <header className="mb-10 max-w-3xl">
         <h1 className="font-display text-4xl text-racing mb-3">
-          Classic Mini parts and engineering metals
+          Classic Mini panels and engineering metals
         </h1>
         <p className="text-ink-muted leading-relaxed">
           Use these indexable catalogue pages to browse Classic Mini restoration panels and engineering metal stock.

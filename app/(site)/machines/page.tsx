@@ -33,7 +33,7 @@ export default function MachinesPage() {
           <p className="mt-2 text-sm leading-6 text-ink-muted">
             Pressed steel panels and restoration parts for Mini saloons, Clubman, Traveller, Van and Pick-Up.
           </p>
-          <span className="mt-4 inline-block text-sm font-semibold text-racing">Browse Classic Mini parts &rarr;</span>
+          <span className="mt-4 inline-block text-sm font-semibold text-racing">Browse Classic Mini panels &rarr;</span>
         </Link>
       </div>
     </div>

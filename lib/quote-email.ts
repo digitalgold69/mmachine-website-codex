@@ -7,7 +7,8 @@ const GBP = "\u00a3";
 const DEFAULT_SITE_URL = "https://m-machine-metals.co.uk";
 const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
 const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
-const DEFAULT_FROM_NAME = "orders@m-machine.co.uk";
+const DEFAULT_FROM_NAME = "New M Machine Order";
+export const CUSTOMER_INVOICE_FROM_NAME = "Your M Machine Order";
 
 type EmailEnv = Record<string, unknown>;
 type SesConfigValues = {
@@ -94,7 +95,17 @@ function orderType(quote: QuoteRequest) {
   if (kinds.has("featured")) return "Featured Work";
   if (kinds.has("custom")) return "Custom fabrication";
   if (kinds.has("metals")) return "Metals";
-  return "Mini parts";
+  return "Mini panels";
+}
+
+export function ownerNotificationFromName(quote: QuoteRequest) {
+  const kinds = new Set(quote.items.map((item) => item.catalogue));
+  if (kinds.size !== 1) return "New M Machine Order";
+  if (kinds.has("metals")) return "New Metals Order";
+  if (kinds.has("mini")) return "New Mini Panel Order";
+  if (kinds.has("custom")) return "New Custom Work Order";
+  if (kinds.has("featured")) return "New Featured Order";
+  return "New M Machine Order";
 }
 
 const lineExVat = (item: QuoteItem) =>
@@ -141,6 +152,10 @@ function customSummary(item: QuoteItem, includeFileLinks = false, env: EmailEnv 
   `;
 }
 
+function isCustomOnly(items: QuoteItem[]) {
+  return items.length > 0 && items.every((item) => item.catalogue === "custom");
+}
+
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = numericTotal(quote.items);
   const carriageExVat = quote.carriageExVat ?? 0;
@@ -151,7 +166,37 @@ export function quoteTotals(quote: QuoteRequest) {
   return { goodsExVat, carriageExVat, extraChargesExVat, totalExVat, vat, totalIncVat };
 }
 
-function ownerItemList(items: QuoteItem[], env: EmailEnv = process.env) {
+function ownerLineMeta(item: QuoteItem) {
+  const parts = [`Qty ${escapeHtml(item.qty)}`];
+  const reference = itemReference(item);
+  if (reference) parts.push(`Ref ${escapeHtml(reference)}`);
+  if (item.catalogue === "mini") {
+    parts.push(escapeHtml(money(lineExVat(item))));
+  } else if (item.unit) {
+    parts.push(`Unit ${escapeHtml(item.unit)}`);
+  }
+  return parts.join(" / ");
+}
+
+function ownerCustomFileBlock(items: QuoteItem[], env: EmailEnv = process.env) {
+  const files = items.flatMap((item) => item.custom?.files || []);
+  return `
+    <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff;font-size:14px;line-height:1.55;color:#4d3f31">
+      ${
+        files.length
+          ? files
+              .map(
+                (file) =>
+                  `<div><a href="${escapeHtml(fileDownloadUrl(file.key, env))}" style="color:#0f3d2e;font-weight:700">${escapeHtml(file.name)}</a> (${Math.ceil(file.size / 1024)} KB)</div>`
+              )
+              .join("")
+          : `<div>No files uploaded.</div>`
+      }
+    </div>
+  `;
+}
+
+function ownerItemList(items: QuoteItem[]) {
   return items
     .map((item) => {
       const name = itemName(item);
@@ -161,15 +206,20 @@ function ownerItemList(items: QuoteItem[], env: EmailEnv = process.env) {
           <strong style="display:block;color:#0f3d2e;font-size:15px">${escapeHtml(item.description || name)}</strong>
           ${detail ? `<div style="margin-top:3px;color:#6b5a46;font-size:13px">${escapeHtml(detail)}</div>` : ""}
           <div style="margin-top:8px;color:#4d3f31;font-size:13px">
-            Qty ${escapeHtml(item.qty)}
-            ${itemReference(item) ? ` / Ref ${escapeHtml(itemReference(item))}` : ""}
-            ${item.unit ? ` / Unit ${escapeHtml(item.unit)}` : ""}
+            ${ownerLineMeta(item)}
           </div>
-          ${item.catalogue === "custom" ? customSummary(item, true, env) : ""}
         </li>
       `;
     })
     .join("");
+}
+
+function ownerDetailsContent(items: QuoteItem[], env: EmailEnv = process.env) {
+  return isCustomOnly(items) ? ownerCustomFileBlock(items, env) : `<ul style="margin:0;padding:0">${ownerItemList(items)}</ul>`;
+}
+
+function ownerDetailsHeading(items: QuoteItem[]) {
+  return isCustomOnly(items) ? "Uploaded files" : "Items Requested";
 }
 
 export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
@@ -207,8 +257,8 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = proces
         }
 
         <div style="margin:0 0 18px">
-          <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Included details</strong>
-          <ul style="margin:0;padding:0">${ownerItemList(quote.items, env)}</ul>
+          <strong style="display:block;margin-bottom:8px;color:#0f3d2e">${ownerDetailsHeading(quote.items)}</strong>
+          ${ownerDetailsContent(quote.items, env)}
         </div>
 
         <p style="margin:22px 0">
@@ -450,11 +500,11 @@ function quoteDisplayName(value: string) {
   return `"${value.replace(/["\\]/g, "\\$&")}"`;
 }
 
-function sesFromEmailAddress(env: EmailEnv = process.env) {
+function sesFromEmailAddress(env: EmailEnv = process.env, fromName?: string) {
   const configured = envValue(env, "AWS_SES_FROM_EMAIL");
-  if (configured?.includes("<")) return configured;
+  if (configured?.includes("<") && !fromName) return configured;
   const email = cleanEmailAddress(configured || DEFAULT_FROM_EMAIL);
-  const name = envValue(env, "AWS_SES_FROM_NAME") || DEFAULT_FROM_NAME;
+  const name = fromName || envValue(env, "AWS_SES_FROM_NAME") || DEFAULT_FROM_NAME;
   return `${quoteDisplayName(name)} <${email}>`;
 }
 
@@ -498,10 +548,11 @@ export function buildSesEmailInput(opts: {
   subject: string;
   html: string;
   replyTo?: string;
+  fromName?: string;
 }, env: EmailEnv = process.env): SendEmailCommandInput {
   const to = uniqueRecipients(Array.isArray(opts.to) ? opts.to : splitEmailList(opts.to));
   return {
-    FromEmailAddress: sesFromEmailAddress(env),
+    FromEmailAddress: sesFromEmailAddress(env, opts.fromName),
     Destination: { ToAddresses: to },
     ReplyToAddresses: opts.replyTo ? [cleanEmailAddress(opts.replyTo)] : undefined,
     Content: {
@@ -572,6 +623,7 @@ export async function sendQuoteEmail(opts: {
   subject: string;
   html: string;
   replyTo?: string;
+  fromName?: string;
 }): Promise<EmailDeliveryResult> {
   const env = await emailRuntimeEnv();
   const config = sesConfig(env);
