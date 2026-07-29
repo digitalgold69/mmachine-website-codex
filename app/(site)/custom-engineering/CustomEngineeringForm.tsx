@@ -245,6 +245,7 @@ export default function CustomEngineeringForm() {
             company: form.get("company"),
             address: deliveryRequired ? form.get("address") : "",
             arrangeOwnDelivery: !deliveryRequired,
+            deliveryMode: deliveryRequired ? "delivery" : "collection",
             message: form.get("message"),
           },
           custom: {

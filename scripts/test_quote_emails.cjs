@@ -129,6 +129,16 @@ const singleMiniQuote = {
   ],
 };
 
+const addressWithCollectionFlagQuote = {
+  ...quote,
+  id: "Q-DELIVERY-SAFETY",
+  customer: {
+    ...quote.customer,
+    address: "65 Stanhope Road North\nDarlington\nDL3 7AP",
+    arrangeOwnDelivery: true,
+  },
+};
+
 const metalsQuote = {
   ...quote,
   id: "Q-METALS-TEST",
@@ -250,6 +260,10 @@ assert.match(ownerHtml, /https:\/\/example\.test\/dashboard\/orders\?quote=Q-CF-
 assert.match(ownerHtml, /https:\/\/example\.test\/api\/quote-files\/quote-uploads\/session-1\/drawing%201\.dxf/);
 assert.doesNotMatch(ownerHtml, /Each ex VAT/);
 
+const safeOwnerDeliveryHtml = buildOwnerQuoteEmail(addressWithCollectionFlagQuote);
+assert.match(safeOwnerDeliveryHtml, /65 Stanhope Road North/);
+assert.doesNotMatch(safeOwnerDeliveryHtml, /Customer will arrange delivery or collection/);
+
 const miniOwnerHtml = buildOwnerQuoteEmail(miniQuote);
 assert.match(miniOwnerHtml, /Mini panels/);
 assert.match(miniOwnerHtml, /Items Requested/);
@@ -305,6 +319,11 @@ assert.doesNotMatch(singleMiniCustomerHtml, /14A1234\s*\/\s*each/);
 assert.match(singleMiniCustomerHtml, /Price ex VAT/);
 assert.doesNotMatch(singleMiniCustomerHtml, /Price each ex VAT/);
 assert.doesNotMatch(singleMiniCustomerHtml, /Line ex VAT/);
+
+const safeCustomerDeliveryHtml = buildCustomerInvoiceEmail(addressWithCollectionFlagQuote);
+assert.match(safeCustomerDeliveryHtml, /Your Delivery Address/);
+assert.match(safeCustomerDeliveryHtml, /65 Stanhope Road North<br>Darlington<br>DL3 7AP/);
+assert.doesNotMatch(safeCustomerDeliveryHtml, /You selected collection/);
 
 const updatedCustomerHtml = buildCustomerInvoiceEmail({
   ...quote,

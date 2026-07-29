@@ -1,6 +1,7 @@
 import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-sdk/client-sesv2";
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 import { getCloudflareEnv } from "./cloudflare";
+import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 
 const GBP = "\u00a3";
@@ -222,6 +223,17 @@ function ownerDetailsHeading(items: QuoteItem[]) {
   return isCustomOnly(items) ? "Uploaded files" : "Items Requested";
 }
 
+function ownerDeliveryContent(quote: QuoteRequest) {
+  const address = quoteDeliveryAddress(quote.customer);
+  if (address) {
+    return `<span style="white-space:pre-line">${escapeHtml(address)}</span>`;
+  }
+  if (quoteCustomerWillArrangeDelivery(quote.customer)) {
+    return "Customer will arrange delivery or collection.";
+  }
+  return `<span style="color:#8a3a10">Delivery address was not supplied. Contact the customer before arranging carriage.</span>`;
+}
+
 export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
   const dashboardLink = dashboardUrl(env, quote.id);
   return `
@@ -240,11 +252,7 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = proces
 
         <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
           <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Delivery</strong>
-          ${
-            quote.customer.arrangeOwnDelivery
-              ? "Customer will arrange delivery or collection."
-              : `<span style="white-space:pre-line">${escapeHtml(quote.customer.address || "Delivery quote required")}</span>`
-          }
+          ${ownerDeliveryContent(quote)}
         </div>
 
         ${
@@ -324,10 +332,14 @@ function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
 }
 
 function customerDeliveryBlock(quote: QuoteRequest) {
-  const body = quote.customer.arrangeOwnDelivery
+  const address = quoteDeliveryAddress(quote.customer);
+  const collection = quoteCustomerWillArrangeDelivery(quote.customer);
+  const body = collection
     ? "You selected collection. Please contact us if you'd prefer us to arrange delivery"
-    : escapeHtml(quote.customer.address || "Delivery address to be confirmed.").replace(/\n/g, "<br>");
-  const heading = quote.customer.arrangeOwnDelivery ? "Collection" : "Your Delivery Address";
+    : address
+      ? escapeHtml(address).replace(/\n/g, "<br>")
+      : "Delivery address was not supplied. Please contact M-Machine before arranging delivery.";
+  const heading = collection ? "Collection" : "Your Delivery Address";
   return `
     <div style="margin:0 0 18px;padding:14px 16px;border:1px solid #eadfca;border-radius:10px;background:#fbf8f1">
       <strong style="display:block;margin-bottom:8px;color:#0f3d2e;font-size:15px">${heading}</strong>

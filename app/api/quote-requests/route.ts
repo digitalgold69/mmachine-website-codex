@@ -15,6 +15,7 @@ import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { checkRateLimit } from "@/lib/request-limits";
 import { readCompletedFileToken } from "@/lib/quote-upload-token";
+import { normaliseQuoteDelivery } from "@/lib/quote-delivery";
 import type { QuoteCustomer } from "@/lib/quote-types";
 import { ukHistoryBounds, ukMonthBounds } from "@/lib/uk-time";
 import { listFeaturedWork, type FeaturedWork } from "@/lib/featured";
@@ -37,10 +38,6 @@ function asNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function asBoolean(value: unknown) {
-  return value === true || value === "true" || value === "on" || value === "1";
 }
 
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
@@ -293,18 +290,21 @@ async function persistCustomQuote(
 }
 
 async function createCustomQuoteJson(body: {
-  customer?: Partial<QuoteCustomer>;
+    customer?: Partial<QuoteCustomer>;
   custom?: Partial<CustomQuoteDetails>;
   uploadedFiles?: { token?: string }[];
   website?: string;
 }) {
   const customer: QuoteCustomer = {
+    ...normaliseQuoteDelivery({
+      address: body.customer?.address,
+      arrangeOwnDelivery: body.customer?.arrangeOwnDelivery,
+      deliveryMode: (body.customer as { deliveryMode?: unknown } | undefined)?.deliveryMode,
+    }),
     name: asString(body.customer?.name, 160),
     email: asString(body.customer?.email, 220),
     phone: asString(body.customer?.phone, 80),
     company: asString(body.customer?.company, 180),
-    address: asString(body.customer?.address, 1200),
-    arrangeOwnDelivery: body.customer?.arrangeOwnDelivery === true,
     message: asString(body.customer?.message, 2400),
   };
 
@@ -383,12 +383,15 @@ async function createCustomQuote(req: Request) {
   validateCustomFiles(files);
 
   const customer = {
+    ...normaliseQuoteDelivery({
+      address: form.get("address"),
+      arrangeOwnDelivery: form.get("arrangeOwnDelivery"),
+      deliveryMode: form.get("deliveryMode"),
+    }),
     name: asString(form.get("name"), 160),
     email: asString(form.get("email"), 220),
     phone: asString(form.get("phone"), 80),
     company: asString(form.get("company"), 180),
-    address: asString(form.get("address"), 1200),
-    arrangeOwnDelivery: asBoolean(form.get("arrangeOwnDelivery")),
     message: asString(form.get("message"), 2400),
   };
 
@@ -515,6 +518,7 @@ export async function POST(req: Request) {
       company?: string;
       address?: string;
       arrangeOwnDelivery?: boolean;
+      deliveryMode?: string;
       message?: string;
     };
     items?: Partial<QuoteItem>[];
@@ -530,12 +534,15 @@ export async function POST(req: Request) {
   }
 
   const customer = {
+    ...normaliseQuoteDelivery({
+      address: body.customer?.address,
+      arrangeOwnDelivery: body.customer?.arrangeOwnDelivery,
+      deliveryMode: body.customer?.deliveryMode,
+    }),
     name: asString(body.customer?.name, 160),
     email: asString(body.customer?.email, 220),
     phone: asString(body.customer?.phone, 80),
     company: asString(body.customer?.company, 180),
-    address: asString(body.customer?.address, 1200),
-    arrangeOwnDelivery: body.customer?.arrangeOwnDelivery === true,
     message: asString(body.customer?.message, 2000),
   };
 

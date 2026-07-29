@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 const GBP = "\u00a3";
@@ -1331,11 +1332,20 @@ export default function OrdersClient({
                   <div className="min-w-0 space-y-4">
                     <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
                       <div className="label !mb-1">Delivery</div>
-                      {draft.customer.arrangeOwnDelivery ? (
-                        <p>Customer will arrange delivery / collection.</p>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{draft.customer.address || "No delivery address supplied"}</p>
-                      )}
+                      {(() => {
+                        const deliveryAddress = quoteDeliveryAddress(draft.customer);
+                        if (deliveryAddress) {
+                          return <p className="whitespace-pre-wrap">{deliveryAddress}</p>;
+                        }
+                        if (quoteCustomerWillArrangeDelivery(draft.customer)) {
+                          return <p>Customer will arrange delivery / collection.</p>;
+                        }
+                        return (
+                          <p className="font-semibold text-amber-800">
+                            Delivery address was not supplied. Contact the customer before arranging carriage.
+                          </p>
+                        );
+                      })()}
                     </section>
 
                     {quoteKind(draft) === "custom" && (

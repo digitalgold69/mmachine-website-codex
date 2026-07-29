@@ -195,9 +195,13 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
     setMessage("");
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const address = String(form.get("address") ?? "").trim();
+    const ownDeliveryInput = formEl.elements.namedItem("arrangeOwnDelivery");
+    const ownDeliverySelected = ownDeliveryInput instanceof HTMLInputElement
+      ? ownDeliveryInput.checked
+      : arrangeOwnDelivery;
+    const address = ownDeliverySelected ? "" : String(form.get("address") ?? "").trim();
 
-    if (!arrangeOwnDelivery && !address) {
+    if (!ownDeliverySelected && !address) {
       setMessage("Please enter a delivery address, or tick the collection / own delivery option.");
       setSubmitting(false);
       return;
@@ -214,7 +218,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             phone: form.get("phone"),
             company: form.get("company"),
             address,
-            arrangeOwnDelivery,
+            arrangeOwnDelivery: ownDeliverySelected,
+            deliveryMode: ownDeliverySelected ? "collection" : "delivery",
             message: form.get("message"),
           },
           items,
@@ -443,6 +448,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                   )}
                   <label className="mt-3 flex items-start gap-3 rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm text-racing">
                     <input
+                      name="arrangeOwnDelivery"
+                      value="true"
                       type="checkbox"
                       checked={arrangeOwnDelivery}
                       onChange={(e) => setArrangeOwnDelivery(e.target.checked)}
