@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { getSection, sections } from "@/lib/mini-data";
 
 type Props = {
@@ -46,22 +47,22 @@ type ZoneDef = {
 
 const EXTERIOR_ZONES: ZoneDef[] = [
   // Grille face — faces forward (±X)
-  { code: "170", label: "Front panel",       box: [ 1.32, 0.30, -0.58,  1.52, 0.82,  0.58], normal: [ 1, 0, 0], normalTol: 0.20 },
+  { code: "170", label: "Front panel",       box: [ 1.33, 0.24, -0.62,  1.52, 0.82,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
   // Bonnet top — faces up
-  { code: "160", label: "Bonnet",            box: [ 0.58, 0.78, -0.52,  1.32, 0.96,  0.52], normal: [ 0, 1, 0], normalTol: 0.30 },
-  // Roof — faces up
-  { code: "160", label: "Roof",              box: [-0.85, 1.18, -0.52,  0.55, 1.42,  0.52], normal: [ 0, 1, 0], normalTol: 0.40 },
+  { code: "160", label: "Bonnet",            box: [ 0.58, 0.72, -0.56,  1.31, 1.02,  0.56], normal: [ 0, 1, 0], normalTol: 0.28 },
+  // Traveller roof — faces up
+  { code: "160", label: "Roof",              box: [-1.28, 1.10, -0.54,  0.60, 1.40,  0.54], normal: [ 0, 1, 0], normalTol: 0.34 },
   // Front wing L/R
-  { code: "130", label: "Front wing (L)",    box: [ 0.48, 0.20, -0.82,  1.28, 0.84, -0.46], normal: [ 0, 0, 1], normalTol: 0.42 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.48, 0.20,  0.46,  1.28, 0.84,  0.82], normal: [ 0, 0, 1], normalTol: 0.42 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.42, 0.18, -0.78,  1.29, 0.86, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.42, 0.18,  0.42,  1.29, 0.86,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.43, 0.22, -0.82,  0.39, 0.82, -0.46], normal: [ 0, 0, 1], normalTol: 0.45 },
-  { code: "150", label: "Door (R)",          box: [-0.43, 0.22,  0.46,  0.39, 0.82,  0.82], normal: [ 0, 0, 1], normalTol: 0.45 },
+  { code: "150", label: "Door (L)",          box: [-0.45, 0.18, -0.78,  0.45, 0.93, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "150", label: "Door (R)",          box: [-0.45, 0.18,  0.42,  0.45, 0.93,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.26, 0.24, -0.82, -0.48, 0.82, -0.46], normal: [ 0, 0, 1], normalTol: 0.45 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.26, 0.24,  0.46, -0.48, 0.82,  0.82], normal: [ 0, 0, 1], normalTol: 0.45 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.32, 0.18, -0.78, -0.45, 0.92, -0.42], normal: [ 0, 0, 1], normalTol: 0.40 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.32, 0.18,  0.42, -0.45, 0.92,  0.78], normal: [ 0, 0, 1], normalTol: 0.40 },
   // Rear panel — faces backward
-  { code: "120", label: "Rear panel",        box: [-1.52, 0.30, -0.58, -1.30, 0.85,  0.58], normal: [ 1, 0, 0], normalTol: 0.20 },
+  { code: "120", label: "Rear panel",        box: [-1.53, 0.24, -0.62, -1.31, 0.88,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
 ];
 
 const INTERIOR_CODES = new Set([
@@ -72,10 +73,10 @@ const INTERIOR_CODES = new Set([
 // Wheel-arch cutouts (carve circular holes from the highlight).
 // Format: [x, y, z, radius].
 const WHEEL_ARCHES: [number, number, number, number][] = [
-  [ 0.95, 0.30, -0.60, 0.34],
-  [ 0.95, 0.30,  0.60, 0.34],
-  [-0.95, 0.30, -0.60, 0.34],
-  [-0.95, 0.30,  0.60, 0.34],
+  [ 0.92, 0.30, -0.59, 0.31],
+  [ 0.92, 0.30,  0.59, 0.31],
+  [-1.02, 0.30, -0.59, 0.31],
+  [-1.02, 0.30,  0.59, 0.31],
 ];
 
 // ---------------------------------------------------------------------------
@@ -466,6 +467,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
     // --- Loader -------------------------------------------------------------
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
 
     const loadFromUrl = (url: string) => {
       setModelStatus("loading");
