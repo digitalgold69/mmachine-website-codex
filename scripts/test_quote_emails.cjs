@@ -113,6 +113,22 @@ const miniQuote = {
   ],
 };
 
+const singleMiniQuote = {
+  ...miniQuote,
+  id: "Q-MINI-SINGLE",
+  customer: {
+    ...miniQuote.customer,
+    address: "",
+    arrangeOwnDelivery: true,
+  },
+  items: [
+    {
+      ...miniQuote.items[0],
+      qty: 1,
+    },
+  ],
+};
+
 const metalsQuote = {
   ...quote,
   id: "Q-METALS-TEST",
@@ -264,13 +280,31 @@ assert.match(customerHtml, /Hello Alice Buyer/);
 assert.match(customerHtml, /Order invoice/);
 assert.match(customerHtml, /See your order summary below\./);
 assert.doesNotMatch(customerHtml, /We have reviewed it and added any carriage or extra charges below/);
+assert.match(customerHtml, /Your Delivery Address/);
+assert.match(customerHtml, /1 Test Street<br>Darlington/);
 assert.match(customerHtml, /Items/);
 assert.match(customerHtml, /Q-CF-TEST/);
 assert.match(customerHtml, /Custom Job/);
+assert.match(customerHtml, /Price each ex VAT/);
+assert.match(customerHtml, /Price ex VAT/);
+assert.doesNotMatch(customerHtml, />Each ex VAT</);
+assert.doesNotMatch(customerHtml, /Line ex VAT/);
 assert.doesNotMatch(customerHtml, /Drawing status/);
 assert.match(customerHtml, /Please approve before fabrication/);
 assert.match(customerHtml, /Total inc VAT/);
 assert.match(customerHtml, /GB123456789/);
+
+const singleMiniCustomerHtml = buildCustomerInvoiceEmail(singleMiniQuote);
+assert.match(singleMiniCustomerHtml, /Collection/);
+assert.match(
+  singleMiniCustomerHtml,
+  /You selected collection\. Please contact us if you&#039;d prefer us to arrange delivery|You selected collection\. Please contact us if you'd prefer us to arrange delivery/
+);
+assert.match(singleMiniCustomerHtml, /14A1234/);
+assert.doesNotMatch(singleMiniCustomerHtml, /14A1234\s*\/\s*each/);
+assert.match(singleMiniCustomerHtml, /Price ex VAT/);
+assert.doesNotMatch(singleMiniCustomerHtml, /Price each ex VAT/);
+assert.doesNotMatch(singleMiniCustomerHtml, /Line ex VAT/);
 
 const updatedCustomerHtml = buildCustomerInvoiceEmail({
   ...quote,

@@ -286,14 +286,27 @@ function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
   return items
     .map((item) => {
       const line = lineExVat(item);
+      const subtitle = [itemReference(item), item.catalogue === "mini" ? "" : item.unit].filter(Boolean).join(" / ");
+      const priceRows = item.qty > 1
+        ? `
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price each ex VAT</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700">${escapeHtml(money(item.unitPriceExVat))}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price ex VAT</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
+              </tr>`
+        : `
+              <tr>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price ex VAT</td>
+                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
+              </tr>`;
       return `
         <div style="margin:0 0 12px;border:1px solid #eadfca;border-radius:10px;background:#ffffff;overflow:hidden">
           <div style="padding:13px 14px;background:#fbf8f1">
             <strong style="display:block;color:#0f3d2e;font-size:15px;line-height:1.35">${escapeHtml(invoiceItemName(item))}</strong>
-            <div style="margin-top:4px;color:#6b5a46;font-size:12px;line-height:1.4">
-              ${escapeHtml(itemReference(item))}
-              ${item.unit ? ` / ${escapeHtml(item.unit)}` : ""}
-            </div>
+            ${subtitle ? `<div style="margin-top:4px;color:#6b5a46;font-size:12px;line-height:1.4">${escapeHtml(subtitle)}</div>` : ""}
             ${item.catalogue === "custom" ? customSummary(item, false, env) : ""}
           </div>
           <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;font-size:14px">
@@ -302,19 +315,25 @@ function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
                 <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Qty</td>
                 <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(item.qty)}</td>
               </tr>
-              <tr>
-                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Each ex VAT</td>
-                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700">${escapeHtml(money(item.unitPriceExVat))}</td>
-              </tr>
-              <tr>
-                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Line ex VAT</td>
-                <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
-              </tr>
+              ${priceRows}
             </tbody>
           </table>
         </div>`;
     })
     .join("");
+}
+
+function customerDeliveryBlock(quote: QuoteRequest) {
+  const body = quote.customer.arrangeOwnDelivery
+    ? "You selected collection. Please contact us if you'd prefer us to arrange delivery"
+    : escapeHtml(quote.customer.address || "Delivery address to be confirmed.").replace(/\n/g, "<br>");
+  const heading = quote.customer.arrangeOwnDelivery ? "Collection" : "Your Delivery Address";
+  return `
+    <div style="margin:0 0 18px;padding:14px 16px;border:1px solid #eadfca;border-radius:10px;background:#fbf8f1">
+      <strong style="display:block;margin-bottom:8px;color:#0f3d2e;font-size:15px">${heading}</strong>
+      <div style="line-height:1.55;color:#4d3f31">${body}</div>
+    </div>
+  `;
 }
 
 export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
@@ -363,6 +382,8 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
               </tr>
             </tbody>
           </table>
+
+          ${customerDeliveryBlock(quote)}
 
           <h2 style="margin:0 0 10px;color:#0f3d2e;font-size:18px">Items</h2>
           ${invoiceLineCards(quote.items, env)}
