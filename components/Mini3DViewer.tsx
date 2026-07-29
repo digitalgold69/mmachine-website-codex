@@ -54,19 +54,17 @@ const EXTERIOR_ZONES: ZoneDef[] = [
   { code: "160", label: "Bonnet",            box: [ 0.58, 0.72, -0.56,  1.31, 1.02,  0.56], normal: [ 0, 1, 0], normalTol: 0.28 },
   // Traveller roof — faces up
   { code: "160", label: "Roof",              box: [-1.28, 1.10, -0.54,  0.60, 1.40,  0.54], normal: [ 0, 1, 0], normalTol: 0.34 },
-  // Front wing L/R — split into shaped slabs around the arch and scuttle.
-  { code: "130", label: "Front wing (L)",    box: [ 0.64, 0.42, -0.76,  1.33, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.44 },
-  { code: "130", label: "Front wing (L)",    box: [ 0.86, 0.28, -0.76,  1.34, 0.62, -0.45], normal: [ 0, 0, 1], normalTol: 0.40 },
-  { code: "130", label: "Front wing (L)",    box: [ 0.64, 0.24, -0.76,  0.86, 0.52, -0.45], normal: [ 0, 0, 1], normalTol: 0.46 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.64, 0.42,  0.45,  1.33, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.44 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.86, 0.28,  0.45,  1.34, 0.62,  0.76], normal: [ 0, 0, 1], normalTol: 0.40 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.64, 0.24,  0.45,  0.86, 0.52,  0.76], normal: [ 0, 0, 1], normalTol: 0.46 },
+  // Front wing L/R — two upper/front slabs, with the wheel disk cut out by shader.
+  { code: "130", label: "Front wing (L)",    box: [ 0.73, 0.46, -0.76,  1.38, 0.80, -0.45], normal: [ 0, 0, 1], normalTol: 0.46 },
+  { code: "130", label: "Front wing (L)",    box: [ 1.05, 0.30, -0.76,  1.40, 0.63, -0.45], normal: [ 0, 0, 1], normalTol: 0.42 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.73, 0.46,  0.45,  1.38, 0.80,  0.76], normal: [ 0, 0, 1], normalTol: 0.46 },
+  { code: "130", label: "Front wing (R)",    box: [ 1.05, 0.30,  0.45,  1.40, 0.63,  0.76], normal: [ 0, 0, 1], normalTol: 0.42 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.31, 0.25, -0.76,  0.53, 0.78, -0.45], normal: [ 0, 0, 1], normalTol: 0.54 },
-  { code: "150", label: "Door (R)",          box: [-0.31, 0.25,  0.45,  0.53, 0.78,  0.76], normal: [ 0, 0, 1], normalTol: 0.54 },
+  { code: "150", label: "Door (L)",          box: [-0.24, 0.25, -0.76,  0.61, 0.79, -0.45], normal: [ 0, 0, 1], normalTol: 0.56 },
+  { code: "150", label: "Door (R)",          box: [-0.24, 0.25,  0.45,  0.61, 0.79,  0.76], normal: [ 0, 0, 1], normalTol: 0.56 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.25, -0.76, -0.40, 0.80, -0.45], normal: [ 0, 0, 1], normalTol: 0.54 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.25,  0.45, -0.40, 0.80,  0.76], normal: [ 0, 0, 1], normalTol: 0.54 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.30, 0.25, -0.76, -0.30, 0.80, -0.45], normal: [ 0, 0, 1], normalTol: 0.56 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.30, 0.25,  0.45, -0.30, 0.80,  0.76], normal: [ 0, 0, 1], normalTol: 0.56 },
   // Rear panel — faces backward
   { code: "120", label: "Rear panel",        box: [-1.53, 0.24, -0.62, -1.31, 0.88,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
 ];
@@ -79,10 +77,10 @@ const INTERIOR_CODES = new Set([
 // Wheel-arch cutouts (carve circular holes from the highlight).
 // Format: [x, y, z, radius].
 const WHEEL_ARCHES: [number, number, number, number][] = [
-  [ 0.92, 0.30, -0.59, 0.31],
-  [ 0.92, 0.30,  0.59, 0.31],
-  [-1.02, 0.30, -0.59, 0.31],
-  [-1.02, 0.30,  0.59, 0.31],
+  [ 0.95, 0.30, -0.59, 0.40],
+  [ 0.95, 0.30,  0.59, 0.40],
+  [-1.02, 0.30, -0.59, 0.38],
+  [-1.02, 0.30,  0.59, 0.38],
 ];
 
 // ---------------------------------------------------------------------------
@@ -93,16 +91,25 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
   const modeRef = useRef<Mode>("exterior");
   const applyModeRef = useRef<((mode: Mode) => void) | null>(null);
+  const highlightCodeRef = useRef<((code: string) => void) | null>(null);
+  const clearHighlightRef = useRef<(() => void) | null>(null);
 
   const [mode, setMode] = useState<Mode>("exterior");
   const [modelStatus, setModelStatus] = useState<"loading" | "placeholder" | "loaded">("loading");
   const [hovered, setHovered] = useState<{ code: string; label: string; x: number; y: number } | null>(null);
 
-  // Section chip → mode switch
+  // Section chip / model click → mode and highlight sync.
   useEffect(() => {
-    if (selectedSection === "all") return;
-    if (INTERIOR_CODES.has(selectedSection)) setMode("interior");
-    else setMode("exterior");
+    if (selectedSection === "all") {
+      clearHighlightRef.current?.();
+      return;
+    }
+
+    const nextMode = INTERIOR_CODES.has(selectedSection) ? "interior" : "exterior";
+    modeRef.current = nextMode;
+    setMode(nextMode);
+    applyModeRef.current?.(nextMode);
+    highlightCodeRef.current?.(selectedSection);
   }, [selectedSection]);
 
   useEffect(() => {
@@ -203,7 +210,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       uZoneTols: { value: Array.from({ length: MAX_HIGHLIGHT_ZONES }, () => 0.45) },
       uZoneCount: { value: 0 },
       uWheelArches: { value: wheelVec4s },
-      uWheelZTol: { value: 0.28 },
+      uWheelZTol: { value: 0.46 },
     };
 
     const injectHighlightShader = (mat: THREE.Material) => {
@@ -614,6 +621,15 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       }
       requestRender();
     };
+    highlightCodeRef.current = highlightForCode;
+    clearHighlightRef.current = clearHighlight;
+
+    if (selectedSection !== "all") {
+      const nextMode = INTERIOR_CODES.has(selectedSection) ? "interior" : "exterior";
+      modeRef.current = nextMode;
+      applyMode(nextMode);
+      highlightForCode(selectedSection);
+    }
 
     // Shared raycast: clientX/clientY -> section code+label or null
     const raycastAt = (clientX: number, clientY: number) => {
@@ -730,6 +746,8 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       observer?.disconnect();
       controls.dispose();
       renderer.dispose();
+      highlightCodeRef.current = null;
+      clearHighlightRef.current = null;
       if (renderer.domElement.parentNode === mount) {
         mount.removeChild(renderer.domElement);
       }
