@@ -26,6 +26,7 @@ type Draft = Entry & {
 
 const PAGE_SIZE = 20;
 const GBP = "\u00a3";
+const categoryTextClass = "text-xs tracking-wider text-gold font-semibold";
 
 function categoryLabel(entry: Entry) {
   return entry.category?.trim() || "Featured Work";
@@ -290,7 +291,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
               )}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="chip !bg-gold !text-cream !text-[10px]">{categoryLabel(job).toUpperCase()}</span>
+              <span className={categoryTextClass}>{categoryLabel(job).toUpperCase()}</span>
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
@@ -348,7 +349,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-racing/10 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="chip !bg-gold !text-cream">{categoryLabel(preview).toUpperCase()}</span>
+                  <span className={categoryTextClass}>{categoryLabel(preview).toUpperCase()}</span>
                 </div>
                 <h2 id="featured-preview-title" className="font-display text-2xl leading-tight text-racing sm:text-3xl">
                   {preview.title}
@@ -499,23 +500,20 @@ function EditForm({
           </div>
           <div className="sm:col-span-1">
             <label className="label" htmlFor="featured-price">Price ex VAT (optional)</label>
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-muted">{GBP}</span>
-              <input
-                id="featured-price"
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                className="input pl-10"
-                value={form.priceExVat ?? ""}
-                onChange={(e) => setForm({
-                  ...form,
-                  priceExVat: e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
-                })}
-                placeholder="Leave blank for POA"
-              />
-            </div>
+            <input
+              id="featured-price"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              className="input"
+              value={form.priceExVat ?? ""}
+              onChange={(e) => setForm({
+                ...form,
+                priceExVat: e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
+              })}
+              placeholder="Leave blank for POA"
+            />
           </div>
           <div className="sm:col-span-2">
             <label className="label">Short description *</label>
