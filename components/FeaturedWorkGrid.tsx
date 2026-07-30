@@ -139,7 +139,7 @@ export default function FeaturedWorkGrid({
               >
                 <div>
                   <div className="font-semibold text-racing">{price(job.priceExVat)}</div>
-                  <div className="text-xs text-ink-muted">ex VAT</div>
+                  {!job.hideExVat && <div className="text-xs text-ink-muted">ex VAT</div>}
                 </div>
                 <OrderButton item={featuredOrderItem(job)} />
               </div>
@@ -205,6 +205,17 @@ export default function FeaturedWorkGrid({
                       {selected.fullStory}
                     </div>
                   )}
+                  {typeof selected.priceExVat === "number" && (
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-racing/10 p-4">
+                      <div>
+                        <div className="text-xs uppercase tracking-wider text-ink-muted">
+                          {selected.hideExVat ? "Price" : "Price ex VAT"}
+                        </div>
+                        <div className="font-display text-2xl text-racing">{price(selected.priceExVat)}</div>
+                      </div>
+                      <OrderButton item={featuredOrderItem(selected)} />
+                    </div>
+                  )}
                   <div className="grid gap-2 border-t border-racing/10 pt-4 sm:grid-cols-3 lg:grid-cols-1">
                     <Link href="/catalogue/mini" className="inline-flex items-center justify-center rounded-lg border border-racing/20 px-4 py-3 text-sm font-semibold text-racing hover:bg-cream-dark">
                       Mini Panels Catalogue
@@ -216,15 +227,6 @@ export default function FeaturedWorkGrid({
                       Get Something Custom Made
                     </Link>
                   </div>
-                  {typeof selected.priceExVat === "number" && (
-                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-racing/10 p-4">
-                      <div>
-                        <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
-                        <div className="font-display text-2xl text-racing">{price(selected.priceExVat)}</div>
-                      </div>
-                      <OrderButton item={featuredOrderItem(selected)} />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

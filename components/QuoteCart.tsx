@@ -271,7 +271,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       )}
 
       {showCartUi && pending && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-racing-dark/55 px-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-racing-dark/55 px-4">
           <div
             ref={pendingDialogRef}
             role="dialog"

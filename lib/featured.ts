@@ -10,6 +10,7 @@ export type FeaturedWork = {
   fullStory: string;
   imagePath: string | null;
   priceExVat: number | null;
+  hideExVat: boolean;
 };
 
 export type FeaturedEntry = {
@@ -22,6 +23,7 @@ export type FeaturedEntry = {
   fullStory: string;
   image: string;
   priceExVat: number | null;
+  hideExVat: boolean;
 };
 
 type FeaturedRow = {
@@ -36,6 +38,7 @@ type FeaturedRow = {
   image_path: string | null;
   created_at: string;
   price_ex_vat: number | null;
+  hide_ex_vat: number | null;
 };
 
 let pricingSchemaReady: Promise<void> | null = null;
@@ -48,10 +51,23 @@ async function ensureFeaturedPricingSchema() {
         create table if not exists featured_work_prices (
           featured_id text primary key,
           price_ex_vat real check (price_ex_vat is null or price_ex_vat >= 0),
+          hide_ex_vat integer not null default 0 check (hide_ex_vat in (0, 1)),
           updated_at text not null
         )
       `).run();
       if (table.error) throw new Error(`D1 featured pricing setup failed: ${table.error}`);
+
+      const columns = await db.prepare("pragma table_info(featured_work_prices)").all<{ name: string }>();
+      if (columns.error) throw new Error(`D1 featured pricing schema check failed: ${columns.error}`);
+      const hasHideExVat = (columns.results || []).some((column) => column.name === "hide_ex_vat");
+      if (!hasHideExVat) {
+        const alter = await db
+          .prepare("alter table featured_work_prices add column hide_ex_vat integer not null default 0")
+          .run();
+        if (alter.error && !String(alter.error).toLowerCase().includes("duplicate column")) {
+          throw new Error(`D1 featured pricing migration failed: ${alter.error}`);
+        }
+      }
     })();
   }
 
@@ -78,6 +94,7 @@ function rowToWork(row: FeaturedRow): FeaturedWork {
     fullStory: row.full_story || "",
     imagePath: row.image_url || imageUrlFromPath(row.image_path),
     priceExVat: typeof row.price_ex_vat === "number" ? row.price_ex_vat : null,
+    hideExVat: row.hide_ex_vat === 1,
   };
 }
 
@@ -92,6 +109,7 @@ function workToEntry(work: FeaturedWork): FeaturedEntry {
     fullStory: work.fullStory,
     image: work.imagePath || "",
     priceExVat: work.priceExVat,
+    hideExVat: work.hideExVat,
   };
 }
 
@@ -101,7 +119,8 @@ async function getFeaturedRow(id: string): Promise<FeaturedRow | null> {
   return db
     .prepare(
       `select fw.id,fw.title,fw.description,fw.tag,fw.year,fw.category,fw.full_story,
-        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat
+        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat,
+        coalesce(fwp.hide_ex_vat, 0) as hide_ex_vat
        from featured_work fw
        left join featured_work_prices fwp on fwp.featured_id = fw.id
        where fw.id = ?`
@@ -116,7 +135,8 @@ export async function listFeaturedWork(): Promise<FeaturedWork[]> {
   const result = await db
     .prepare(
       `select fw.id,fw.title,fw.description,fw.tag,fw.year,fw.category,fw.full_story,
-        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat
+        fw.image_url,fw.image_path,fw.created_at,fwp.price_ex_vat,
+        coalesce(fwp.hide_ex_vat, 0) as hide_ex_vat
        from featured_work fw
        left join featured_work_prices fwp on fwp.featured_id = fw.id
        order by fw.created_at desc`
@@ -202,6 +222,7 @@ export async function saveFeaturedEntry(input: {
   if (priceExVat !== null && (!Number.isFinite(priceExVat) || priceExVat < 0)) {
     throw new Error("Price must be a valid amount, or left blank.");
   }
+  const hideExVat = entry.hideExVat === true;
   const result = await db
     .prepare(
       `
@@ -259,15 +280,14 @@ export async function saveFeaturedEntry(input: {
     throw new Error(`D1 featured_work save failed: ${result.error}`);
   }
 
-  const priceResult = priceExVat === null
-    ? await db.prepare("delete from featured_work_prices where featured_id = ?").bind(id).run()
-    : await db.prepare(`
-        insert into featured_work_prices (featured_id, price_ex_vat, updated_at)
-        values (?, ?, ?)
+  const priceResult = await db.prepare(`
+        insert into featured_work_prices (featured_id, price_ex_vat, hide_ex_vat, updated_at)
+        values (?, ?, ?, ?)
         on conflict(featured_id) do update set
           price_ex_vat = excluded.price_ex_vat,
+          hide_ex_vat = excluded.hide_ex_vat,
           updated_at = excluded.updated_at
-      `).bind(id, priceExVat, now).run();
+      `).bind(id, priceExVat, hideExVat ? 1 : 0, now).run();
   if (priceResult.error) {
     throw new Error(`D1 featured price save failed: ${priceResult.error}`);
   }

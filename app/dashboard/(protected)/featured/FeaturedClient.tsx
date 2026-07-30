@@ -15,6 +15,7 @@ type Entry = {
   fullStory: string;
   image: string;
   priceExVat: number | null;
+  hideExVat: boolean;
 };
 
 // What the EditForm operates on. `imageFile` is what the user picked from
@@ -114,6 +115,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
       fullStory: "",
       image: "",
       priceExVat: null,
+      hideExVat: false,
     });
   }
 
@@ -149,6 +151,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             fullStory: draft.fullStory,
             image: draft.image,
             priceExVat: draft.priceExVat,
+            hideExVat: draft.hideExVat,
           },
           imageDataUrl: draft.imageDataUrl,
         }),
@@ -297,7 +300,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
             {typeof job.priceExVat === "number" && (
               <p className="mb-4 text-sm font-semibold text-racing">
-                {GBP}{job.priceExVat.toFixed(2)} ex VAT
+                {GBP}{job.priceExVat.toFixed(2)}{job.hideExVat ? "" : " ex VAT"}
               </p>
             )}
             <div className="mt-auto flex gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
@@ -392,7 +395,9 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
                   )}
                   {typeof preview.priceExVat === "number" && (
                     <div className="rounded-lg border border-racing/10 p-4">
-                      <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
+                      <div className="text-xs uppercase tracking-wider text-ink-muted">
+                        {preview.hideExVat ? "Price" : "Price ex VAT"}
+                      </div>
                       <div className="font-display text-2xl text-racing">
                         {GBP}{preview.priceExVat.toFixed(2)}
                       </div>
@@ -499,7 +504,20 @@ function EditForm({
             />
           </div>
           <div className="sm:col-span-1">
-            <label className="label" htmlFor="featured-price">Price ex VAT (optional)</label>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <label className="text-[13px] font-semibold tracking-[0.3px] text-ink-muted" htmlFor="featured-price">
+                Price ex VAT (optional)
+              </label>
+              <label className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={form.hideExVat}
+                  onChange={(e) => setForm({ ...form, hideExVat: e.target.checked })}
+                  className="h-3.5 w-3.5 accent-racing"
+                />
+                hide ex VAT
+              </label>
+            </div>
             <input
               id="featured-price"
               type="number"
