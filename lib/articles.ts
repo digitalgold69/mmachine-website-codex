@@ -16,6 +16,17 @@ export type Article = Omit<Guide, "id" | "href"> & {
 
 export const articles: Article[] = [
   {
+    slug: "reverse-engineering-worn-parts",
+    title: "Reverse Engineering Worn Parts: From Sample to Finished Component",
+    shortTitle: "Reverse engineering worn parts",
+    description:
+      "How a worn, obsolete or damaged component can be measured, interpreted and remade as a useful machined replacement.",
+    category: "Custom Engineering",
+    image: "/articles/reverse-engineering-worn-parts/hero.jpg",
+    imageAlt: "Thread cutting a replacement component on a lathe",
+    readingTime: "9 min read",
+  },
+  {
     slug: "metal-grades-and-uses",
     title: "Metal Grades and Uses: A Machining Guide",
     shortTitle: "Metal grades and uses",

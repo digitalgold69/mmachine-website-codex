@@ -380,7 +380,166 @@ function DividingHeadArticle() {
   );
 }
 
+function ReverseEngineeringWornPartsArticle() {
+  return (
+    <>
+      <p className={paragraphClass}>
+        Reverse engineering is the workshop process of turning an existing part, broken sample or worn-out original into
+        a new component that can be made again. It is especially useful when a drawing no longer exists, the original
+        supplier has disappeared, or the part has been modified over years of service.
+      </p>
+      <p className={paragraphClass}>
+        The important point is that a worn part should not be copied blindly. A good replacement is based on what the
+        component is meant to do, which surfaces locate it, which dimensions are critical, and which features have been
+        damaged or worn away.
+      </p>
+
+      <Note>
+        If a part is safety critical, carries a high load, or is used on public-road or lifting equipment, the design
+        requirement must be confirmed properly. Reverse engineering can recreate geometry, but it does not replace the
+        need for a suitable material specification and engineering judgement.
+      </Note>
+
+      <h2 className={headingClass}>Start With Function, Not Shape</h2>
+      <p className={paragraphClass}>
+        A sample tells us a lot, but not everything. Before measuring it, we want to understand what the part actually
+        does. Is it a spacer, shaft, link, gear, stop, bracket, guide, bush or handle? Does it rotate, clamp, slide, carry
+        shock load, locate against another component, or simply hold something in place?
+      </p>
+      <p className={paragraphClass}>
+        That functional context decides which features matter most. A decorative outside profile may only need to look
+        right, while a bearing bore, shoulder, thread, keyway or bolt pattern may need to be held much more closely.
+      </p>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/old-and-new-threaded-parts.jpg"
+        alt="A worn threaded sample next to a newly machined replacement"
+        caption="A worn original can provide the basic form, but the replacement should be based on the intended fit and function."
+      />
+
+      <h2 className={headingClass}>What To Send For A Quote</h2>
+      <p className={paragraphClass}>
+        The best reverse engineering jobs start with clear information. You do not need a perfect drawing, but the more
+        context you send, the less time is lost guessing what matters.
+      </p>
+      <ul className={listClass}>
+        <li><strong>The original part if possible:</strong> even a damaged sample is often better than photos alone.</li>
+        <li><strong>Clear photos:</strong> show every side, any wear, any mating parts and a ruler or known object for scale.</li>
+        <li><strong>Critical dimensions:</strong> bores, shaft diameters, thread sizes, hole centres, thicknesses and overall length.</li>
+        <li><strong>Quantity:</strong> one-off repair work and repeat batches are planned differently.</li>
+        <li><strong>Material or use:</strong> tell us if it needs to be stainless, aluminium, mild steel, tool steel or a specific grade.</li>
+        <li><strong>Finish:</strong> bare machined, polished, painted, plated, heat treated or supplied ready for your own finishing.</li>
+      </ul>
+
+      <h2 className={headingClass}>Measuring A Worn Part</h2>
+      <p className={paragraphClass}>
+        Wear is the awkward part. A shaft may be undersize where it runs in a bush. A hole may have opened out. A thread
+        may be bruised, stretched or packed with dirt. A slot may look wide because it has been hammered by years of use.
+      </p>
+      <p className={paragraphClass}>
+        Instead of treating every visible surface as correct, we look for reference features that are least likely to
+        have moved. Shoulders, unworn ends, bolt-hole patterns, register diameters and mating components are often more
+        useful than the most damaged area of the sample.
+      </p>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/large-worn-sprocket.jpg"
+        alt="A large worn steel component being assessed on a workshop bench"
+        caption="Large or heavily worn parts need interpretation, not just direct measurement."
+      />
+
+      <h2 className={headingClass}>Choosing Datums And Tolerances</h2>
+      <p className={paragraphClass}>
+        Once the useful dimensions are known, the job needs sensible datums. A datum is the feature everything else is
+        measured from. On a turned part this might be a bore or shoulder. On a plate or bracket it might be one face and
+        two hole centres. On a link it may be the relationship between bores.
+      </p>
+      <p className={paragraphClass}>
+        This matters because tolerances cost time. Holding every edge to a close tolerance is rarely useful. Holding the
+        correct locating face, bore or hole pattern accurately is often the difference between a part that looks right and
+        a part that actually fits.
+      </p>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/machined-link-in-fixture.jpg"
+        alt="A machined aluminium link clamped in a CNC fixture"
+        caption="Good workholding keeps the important features stable while the part is machined."
+      />
+
+      <h2 className={headingClass}>Threads, Bores And Repeatable Features</h2>
+      <p className={paragraphClass}>
+        Threads are a common reason for remaking obsolete parts. Before cutting a new thread, the original needs to be
+        identified correctly: diameter, pitch, thread form, length, handedness and whether the thread is meant to locate,
+        clamp or adjust.
+      </p>
+      <p className={paragraphClass}>
+        Bores and running fits need the same care. If the matching shaft or pin is available, measure that too. Where a
+        fit has worn loose, the new part may need to return to the original intended size rather than copying the worn
+        hole exactly.
+      </p>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/thread-cutting-on-lathe.jpg"
+        alt="A long threaded component being screwcut on a lathe"
+        caption="For threaded parts, pitch, form and fit matter as much as the visible outside diameter."
+      />
+
+      <h2 className={headingClass}>Selecting The Material</h2>
+      <p className={paragraphClass}>
+        If the original material is known, include it with the enquiry. If it is not known, the application usually gives
+        the best clues. A light cover, a bearing carrier, a puller screw, a pivot pin and a fabrication bracket all have
+        different requirements.
+      </p>
+      <ul className={listClass}>
+        <li><strong>Aluminium:</strong> useful for light, corrosion-resistant brackets, covers, plates and housings.</li>
+        <li><strong>Mild or medium-carbon steel:</strong> common for shafts, spacers, links and general mechanical parts.</li>
+        <li><strong>Alloy steels:</strong> suited to higher-strength shafts, pins, studs and stressed components.</li>
+        <li><strong>Stainless steel:</strong> helpful where corrosion resistance is more important than easy machining.</li>
+        <li><strong>Tool steel:</strong> used when hardness, wear resistance or heat treatment is part of the design.</li>
+      </ul>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/finished-turned-component.jpg"
+        alt="A finished machined circular component on an inspection bench"
+        caption="The right material and process depend on the load, environment, finish and quantity required."
+      />
+
+      <h2 className={headingClass}>When To Improve The Original</h2>
+      <p className={paragraphClass}>
+        Reverse engineering does not always mean making an exact clone. Sometimes a small change improves the part while
+        keeping it compatible with the machine or assembly. A radius can reduce a stress raiser, a better material can
+        reduce wear, or a feature can be adjusted to make future assembly easier.
+      </p>
+      <p className={paragraphClass}>
+        Those changes should be deliberate. If a part must match a restoration, an exact visual copy may be the priority.
+        If it is hidden inside a working machine, reliability and fit may matter more than faithfully reproducing a weak
+        detail from the original.
+      </p>
+      <Figure
+        src="/articles/reverse-engineering-worn-parts/machined-plate-fixture.jpg"
+        alt="A machined aluminium plate located in a fixture"
+        caption="A remade component can preserve the critical fit while improving details that caused problems in service."
+      />
+
+      <h2 className={headingClass}>A Practical Checklist</h2>
+      <p className={paragraphClass}>
+        Before asking for a quote, use this quick checklist. It helps turn a vague request into something that can be
+        priced and made with confidence.
+      </p>
+      <ul className={listClass}>
+        <li>What does the part do?</li>
+        <li>Which surfaces or holes does it locate from?</li>
+        <li>Which dimensions are critical, and which are only cosmetic?</li>
+        <li>Is the sample worn, bent, cracked, stretched or repaired?</li>
+        <li>Do you have the mating part it fits against?</li>
+        <li>Do you know the material, finish or heat treatment?</li>
+        <li>How many do you need now, and might you need more later?</li>
+      </ul>
+      <Note>
+        If you are unsure, send the photos and explain what the part is from. We can usually tell you what else we need
+        before any machining starts.
+      </Note>
+    </>
+  );
+}
+
 export default function ArticleContent({ slug }: ArticleContentProps) {
+  if (slug === "reverse-engineering-worn-parts") return <ReverseEngineeringWornPartsArticle />;
   if (slug === "metal-grades-and-uses") return <MetalGradesArticle />;
   if (slug === "what-en-and-bs970-mean") return <EnBs970Article />;
   if (slug === "heat-treating-tool-steel") return <HeatTreatmentArticle />;
