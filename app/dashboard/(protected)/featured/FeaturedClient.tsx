@@ -294,9 +294,11 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
-            <p className="mb-4 text-sm font-semibold text-racing">
-              {typeof job.priceExVat === "number" ? `${GBP}${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
-            </p>
+            {typeof job.priceExVat === "number" && (
+              <p className="mb-4 text-sm font-semibold text-racing">
+                {GBP}{job.priceExVat.toFixed(2)} ex VAT
+              </p>
+            )}
             <div className="mt-auto flex gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
               <button type="button" onClick={() => setPendingDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
@@ -387,12 +389,14 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
                       {preview.fullStory}
                     </div>
                   )}
-                  <div className="rounded-lg border border-racing/10 p-4">
-                    <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
-                    <div className="font-display text-2xl text-racing">
-                      {typeof preview.priceExVat === "number" ? `${GBP}${preview.priceExVat.toFixed(2)}` : "POA"}
+                  {typeof preview.priceExVat === "number" && (
+                    <div className="rounded-lg border border-racing/10 p-4">
+                      <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
+                      <div className="font-display text-2xl text-racing">
+                        {GBP}{preview.priceExVat.toFixed(2)}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-4">
                     <button type="button" onClick={() => { setPreview(null); startEdit(preview); }} disabled={busy} className="btn-secondary">
                       Edit
@@ -496,14 +500,14 @@ function EditForm({
           <div className="sm:col-span-1">
             <label className="label" htmlFor="featured-price">Price ex VAT (optional)</label>
             <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-muted">{GBP}</span>
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-muted">{GBP}</span>
               <input
                 id="featured-price"
                 type="number"
                 min="0"
                 step="0.01"
                 inputMode="decimal"
-                className="input pl-8"
+                className="input pl-10"
                 value={form.priceExVat ?? ""}
                 onChange={(e) => setForm({
                   ...form,
@@ -513,9 +517,6 @@ function EditForm({
               />
             </div>
           </div>
-          <p className="sm:col-span-2 -mt-2 text-xs text-ink-muted">
-            The category is shown as the red pill on Featured Work cards. Leave price blank for POA.
-          </p>
           <div className="sm:col-span-2">
             <label className="label">Short description *</label>
             <textarea

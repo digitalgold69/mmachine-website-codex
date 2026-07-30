@@ -50,11 +50,6 @@ export default function DashboardProductsPage() {
         </p>
       </div>
 
-      <div className="mb-5 rounded-xl border-l-4 border-gold bg-cream-dark p-4 text-sm leading-6 text-racing">
-        To change a price or product, edit the usual master spreadsheet on the M-Machine computer and run the
-        M-Machine sync. This page is for checking the result; it does not change the master files.
-      </div>
-
       <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-racing/10 bg-white p-1">
         <button type="button" onClick={() => switchCatalogue("mini")} aria-pressed={catalogue === "mini"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "mini" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
           Mini panels ({products.length.toLocaleString("en-GB")})

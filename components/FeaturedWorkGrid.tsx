@@ -131,9 +131,6 @@ export default function FeaturedWorkGrid({
             {!showDescription && (
               <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>
             )}
-            {job.fullStory?.trim() && showDescription && (
-              <span className="mb-3 text-sm font-medium text-racing">Open details</span>
-            )}
             {typeof job.priceExVat === "number" && (
               <div
                 className="mt-auto flex items-center justify-between gap-4 border-t border-racing/10 pt-4"
