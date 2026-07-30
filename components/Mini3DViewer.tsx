@@ -47,6 +47,8 @@ type ZoneDef = {
 };
 
 const MAX_HIGHLIGHT_ZONES = 8;
+// Keep the model URL versioned because /models/* is intentionally cached long-term.
+const MINI_MODEL_URL = "/models/mini.glb?v=c656145df084";
 
 const EXTERIOR_ZONES: ZoneDef[] = [
   // Grille face — faces forward (±X)
@@ -588,7 +590,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       );
     };
 
-    loadFromUrl("/models/mini.glb");
+    loadFromUrl(MINI_MODEL_URL);
 
     // --- Mode change: animate body opacity + toggle overlay ----------------
     const applyMode = (m: Mode) => {
