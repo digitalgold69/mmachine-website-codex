@@ -56,14 +56,14 @@ const EXTERIOR_ZONES: ZoneDef[] = [
   // Traveller roof — faces up
   { code: "160", label: "Roof",              box: [-1.28, 1.10, -0.54,  0.60, 1.40,  0.54], normal: [ 0, 1, 0], normalTol: 0.34 },
   // Side panels use shader-side shaped masks, not plain box paint.
-  { code: "130", label: "Front wing (L)",    box: [ 0.58, 0.27, -0.76,  1.42, 0.82, -0.45], normal: [ 0, 0, 1], normalTol: 0.56, shape: 1 },
-  { code: "130", label: "Front wing (R)",    box: [ 0.58, 0.27,  0.45,  1.42, 0.82,  0.76], normal: [ 0, 0, 1], normalTol: 0.56, shape: 1 },
+  { code: "130", label: "Front wing (L)",    box: [ 0.72, 0.25, -0.76,  1.50, 0.88, -0.45], normal: [ 0, 0, 1], normalTol: 0.48, shape: 1 },
+  { code: "130", label: "Front wing (R)",    box: [ 0.72, 0.25,  0.45,  1.50, 0.88,  0.76], normal: [ 0, 0, 1], normalTol: 0.48, shape: 1 },
   // Door L/R
-  { code: "150", label: "Door (L)",          box: [-0.28, 0.24, -0.76,  0.64, 0.80, -0.45], normal: [ 0, 0, 1], normalTol: 0.58, shape: 2 },
-  { code: "150", label: "Door (R)",          box: [-0.28, 0.24,  0.45,  0.64, 0.80,  0.76], normal: [ 0, 0, 1], normalTol: 0.58, shape: 2 },
+  { code: "150", label: "Door (L)",          box: [-0.08, 0.22, -0.76,  1.04, 0.81, -0.45], normal: [ 0, 0, 1], normalTol: 0.58, shape: 2 },
+  { code: "150", label: "Door (R)",          box: [-0.08, 0.22,  0.45,  1.04, 0.81,  0.76], normal: [ 0, 0, 1], normalTol: 0.58, shape: 2 },
   // Quarter panel L/R
-  { code: "140", label: "Quarter panel (L)", box: [-1.40, 0.24, -0.76, -0.30, 0.82, -0.45], normal: [ 0, 0, 1], normalTol: 0.58, shape: 3 },
-  { code: "140", label: "Quarter panel (R)", box: [-1.40, 0.24,  0.45, -0.30, 0.82,  0.76], normal: [ 0, 0, 1], normalTol: 0.58, shape: 3 },
+  { code: "140", label: "Quarter panel (L)", box: [-1.48, 0.22, -0.76, -0.15, 0.82, -0.45], normal: [ 0, 0, 1], normalTol: 0.58, shape: 3 },
+  { code: "140", label: "Quarter panel (R)", box: [-1.48, 0.22,  0.45, -0.15, 0.82,  0.76], normal: [ 0, 0, 1], normalTol: 0.58, shape: 3 },
   // Rear panel — faces backward
   { code: "120", label: "Rear panel",        box: [-1.53, 0.24, -0.62, -1.31, 0.88,  0.62], normal: [ 1, 0, 0], normalTol: 0.18 },
 ];
@@ -76,10 +76,10 @@ const INTERIOR_CODES = new Set([
 // Wheel-arch cutouts (carve circular holes from the highlight).
 // Format: [x, y, z, radius].
 const WHEEL_ARCHES: [number, number, number, number][] = [
-  [ 0.95, 0.30, -0.59, 0.40],
-  [ 0.95, 0.30,  0.59, 0.40],
-  [-1.02, 0.30, -0.59, 0.38],
-  [-1.02, 0.30,  0.59, 0.38],
+  [ 1.02, 0.27, -0.59, 0.33],
+  [ 1.02, 0.27,  0.59, 0.33],
+  [-0.90, 0.27, -0.59, 0.33],
+  [-0.90, 0.27,  0.59, 0.33],
 ];
 
 // ---------------------------------------------------------------------------
@@ -287,30 +287,31 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
 
                if (shape < 1.5) {
                  float mask = 1.0;
-                 mask *= aboveLine(xy, vec2(0.68, 0.78), vec2(0.86, 0.38));  // rear/A-post edge
-                 mask *= belowLine(xy, vec2(0.70, 0.80), vec2(1.38, 0.72));  // wing crown
-                 mask *= aboveLine(xy, vec2(0.94, 0.35), vec2(1.40, 0.31));  // lower valance cut
-                 mask *= outsideEllipse(xy, vec2(0.96, 0.31), vec2(0.34, 0.34));
-                 mask *= 1.0 - (step(1.25, p.x) * step(0.0, 0.47 - p.y));   // headlamp/bumper face
+                 mask *= aboveLine(xy, vec2(0.76, 0.80), vec2(1.00, 0.31));  // A-post edge
+                 mask *= belowLine(xy, vec2(0.76, 0.88), vec2(1.44, 0.77));  // bonnet/wing crown
+                 mask *= aboveLine(xy, vec2(1.10, 0.32), vec2(1.47, 0.36));  // lower wing return
+                 mask *= belowLine(xy, vec2(1.42, 0.73), vec2(1.49, 0.42));  // nose/front edge
+                 mask *= outsideEllipse(xy, vec2(1.02, 0.27), vec2(0.30, 0.33));
+                 mask *= 1.0 - (step(1.28, p.x) * step(0.0, 0.46 - p.y));   // lamp/bumper face
                  return mask;
                }
 
                if (shape < 2.5) {
                  float mask = 1.0;
-                 mask *= aboveLine(xy, vec2(-0.26, 0.25), vec2(0.61, 0.26)); // sill
-                 mask *= belowLine(xy, vec2(-0.27, 0.78), vec2(0.53, 0.74)); // belt line
-                 mask *= belowLine(xy, vec2(-0.27, 0.24), vec2(-0.24, 0.80)); // rear seam
-                 mask *= aboveLine(xy, vec2(0.62, 0.25), vec2(0.53, 0.79));  // front seam
-                 mask *= outsideEllipse(xy, vec2(0.95, 0.31), vec2(0.37, 0.36));
+                 mask *= aboveLine(xy, vec2(-0.08, 0.24), vec2(0.88, 0.24)); // sill
+                 mask *= belowLine(xy, vec2(-0.16, 0.79), vec2(0.78, 0.78)); // window/belt line
+                 mask *= belowLine(xy, vec2(-0.08, 0.24), vec2(-0.06, 0.80)); // rear door seam
+                 mask *= belowLine(xy, vec2(0.78, 0.80), vec2(1.03, 0.33));  // A-post/front seam
+                 mask *= outsideEllipse(xy, vec2(1.02, 0.27), vec2(0.32, 0.34));
                  return mask;
                }
 
                float mask = 1.0;
-               mask *= aboveLine(xy, vec2(-1.36, 0.27), vec2(-0.34, 0.26));  // lower sill
-               mask *= belowLine(xy, vec2(-1.36, 0.74), vec2(-0.34, 0.77));  // below rear window
-               mask *= belowLine(xy, vec2(-1.37, 0.26), vec2(-1.22, 0.73));  // tail/rear seam
-               mask *= aboveLine(xy, vec2(-0.32, 0.25), vec2(-0.30, 0.80));  // door seam
-               mask *= outsideEllipse(xy, vec2(-1.01, 0.31), vec2(0.35, 0.36));
+               mask *= aboveLine(xy, vec2(-1.46, 0.23), vec2(-0.17, 0.23));  // lower sill
+               mask *= belowLine(xy, vec2(-1.38, 0.79), vec2(-0.17, 0.78));  // below rear window
+               mask *= belowLine(xy, vec2(-1.47, 0.24), vec2(-1.32, 0.79));  // tail/rear seam
+               mask *= aboveLine(xy, vec2(-0.18, 0.23), vec2(-0.16, 0.79));  // door seam
+               mask *= outsideEllipse(xy, vec2(-0.90, 0.27), vec2(0.31, 0.34));
                return mask;
              }`
           )
