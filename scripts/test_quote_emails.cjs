@@ -98,6 +98,11 @@ const quote = {
 const miniQuote = {
   ...quote,
   id: "Q-MINI-TEST",
+  customer: {
+    ...quote.customer,
+    vehicleYear: "1967",
+    vehicleModel: "Traveller",
+  },
   items: [
     {
       key: "mini-floor-panel",
@@ -266,6 +271,9 @@ assert.doesNotMatch(safeOwnerDeliveryHtml, /Customer will arrange delivery or co
 
 const miniOwnerHtml = buildOwnerQuoteEmail(miniQuote);
 assert.match(miniOwnerHtml, /Mini panels/);
+assert.match(miniOwnerHtml, /Vehicle details/);
+assert.match(miniOwnerHtml, /Vehicle year:<\/strong> 1967/);
+assert.match(miniOwnerHtml, /Model:<\/strong> Traveller/);
 assert.match(miniOwnerHtml, /Items Requested/);
 assert.match(miniOwnerHtml, /Front floor panel/);
 assert.match(miniOwnerHtml, /\u00a375\.00/);

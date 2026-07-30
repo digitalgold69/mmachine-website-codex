@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 
 // Server-side type — kept in sync with /api/featured/route.ts
@@ -41,7 +42,10 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [preview, setPreview] = useState<Entry | null>(null);
   const [page, setPage] = useState(1);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -52,6 +56,39 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
+
+  useEffect(() => {
+    if (!preview) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    window.setTimeout(() => {
+      previewRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    }, 0);
+
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setPreview(null);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      returnFocusRef.current?.focus({ preventScroll: true });
+    };
+  }, [preview]);
 
   // Show a banner that fades after a few seconds
   useEffect(() => {
@@ -76,6 +113,12 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
 
   function startEdit(it: Entry) {
     setEditing({ ...it });
+  }
+
+  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>, job: Entry) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    setPreview(job);
   }
 
   async function handleSignOut() {
@@ -221,7 +264,15 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {visibleItems.map((job) => (
-          <div key={job.id} className="card bg-white flex min-h-full flex-col">
+          <article
+            key={job.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setPreview(job)}
+            onKeyDown={(event) => handleCardKeyDown(event, job)}
+            aria-label={`Preview ${job.title}`}
+            className="card flex min-h-full cursor-pointer flex-col bg-white transition hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2"
+          >
             <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center p-2">
               {job.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -242,11 +293,11 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             <p className="mb-4 text-sm font-semibold text-racing">
               {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
             </p>
-            <div className="mt-auto flex gap-2">
+            <div className="mt-auto flex gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
               <button type="button" onClick={() => setPendingDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
             </div>
-          </div>
+          </article>
         ))}
       </div>
 
@@ -269,6 +320,86 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
               <button type="button" onClick={handleDelete} disabled={busy} className="rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
                 {busy ? "Deleting..." : "Delete job"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-racing-dark/65 px-3 py-5 backdrop-blur-sm sm:px-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPreview(null);
+          }}
+        >
+          <div
+            ref={previewRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="featured-preview-title"
+            className="flex max-h-[calc(100vh-2.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-racing/10 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span className="chip !bg-racing !text-cream">{preview.tag.toUpperCase()}</span>
+                  <span className="text-xs text-ink-muted">{preview.category}</span>
+                </div>
+                <h2 id="featured-preview-title" className="font-display text-2xl leading-tight text-racing sm:text-3xl">
+                  {preview.title}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="shrink-0 rounded-lg border border-racing/20 px-3 py-2 text-sm font-semibold text-racing hover:bg-cream-dark"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+                <div className="flex min-h-[280px] items-center justify-center rounded-lg bg-cream-dark p-3 sm:min-h-[460px]">
+                  {preview.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageSrc(preview.image) || ""}
+                      alt={preview.title}
+                      className="max-h-[68vh] max-w-full object-contain"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  ) : (
+                    <svg width="96" height="96" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5" aria-hidden="true">
+                      <path d="M10 40 L30 15 L50 40 Z" />
+                      <circle cx="30" cy="32" r="3" />
+                    </svg>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm leading-7 text-ink-muted">{preview.description}</p>
+                  {preview.fullStory?.trim() && (
+                    <div className="rounded-lg bg-cream-dark p-4 text-sm leading-7 text-ink">
+                      {preview.fullStory}
+                    </div>
+                  )}
+                  <div className="rounded-lg border border-racing/10 p-4">
+                    <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
+                    <div className="font-display text-2xl text-racing">
+                      {typeof preview.priceExVat === "number" ? `\u00a3${preview.priceExVat.toFixed(2)}` : "POA"}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-4">
+                    <button type="button" onClick={() => { setPreview(null); startEdit(preview); }} disabled={busy} className="btn-secondary">
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => { setPreview(null); setPendingDelete(preview); }} disabled={busy} className="rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

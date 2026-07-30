@@ -8,8 +8,7 @@ import { products, sections } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
-import { featuredOrderItem } from "@/lib/featured-order";
-import { OrderButton } from "@/components/QuoteCart";
+import FeaturedWorkGrid from "@/components/FeaturedWorkGrid";
 import { guideUrl, guides } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
@@ -268,50 +267,14 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {latestFeatured.length === 0 && (
-              <div className="md:col-span-3 rounded-xl border border-racing/10 bg-white p-6 text-sm text-ink-muted">
-                New Featured Work will appear here as it is added by M-Machine.
-              </div>
-            )}
-            {latestFeatured.map((job) => (
-              <article key={job.id} className="card bg-white flex flex-col">
-                <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center p-2">
-                  {job.imagePath ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={job.imagePath}
-                      alt={job.title}
-                      width={1200}
-                      height={900}
-                      loading="lazy"
-                      decoding="async"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
-                      <path d="M10 40 L30 15 L50 40 Z" />
-                      <circle cx="30" cy="32" r="3" />
-                    </svg>
-                  )}
-                </div>
-                <p className="text-xs tracking-wider text-gold font-semibold mb-1">
-                  {job.tag.toUpperCase()}
-                </p>
-                <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
-                <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>
-                {typeof job.priceExVat === "number" && (
-                  <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                    <div>
-                      <div className="font-semibold text-racing">£{job.priceExVat.toFixed(2)}</div>
-                      <div className="text-xs text-ink-muted">ex VAT</div>
-                    </div>
-                    <OrderButton item={featuredOrderItem(job)} />
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
+          <FeaturedWorkGrid
+            items={latestFeatured}
+            emptyText="New Featured Work will appear here as it is added by M-Machine."
+            gridClassName="grid md:grid-cols-3 gap-6"
+            cardImageClassName="aspect-[4/3]"
+            showCategory={false}
+            showDescription={false}
+          />
         </div>
       </section>
 

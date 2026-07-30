@@ -46,6 +46,8 @@ export type QuoteCustomer = {
   email: string;
   phone: string;
   company?: string;
+  vehicleYear?: string;
+  vehicleModel?: string;
   address?: string;
   arrangeOwnDelivery?: boolean;
   message?: string;

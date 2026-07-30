@@ -26,6 +26,7 @@ export const dynamic = "force-dynamic";
 const MAX_CUSTOM_FILES = 10;
 const MAX_ORDER_LINES = 100;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MINI_VEHICLE_MODELS = ["Saloon", "Van", "Traveller", "Pickup"];
 
 const miniById = new Map(products.map((product) => [product.id, product]));
 const metalsById = new Map(metals.map((product) => [product.id, product]));
@@ -38,6 +39,11 @@ function asNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function normaliseMiniVehicleModel(value: unknown) {
+  const raw = asString(value, 40).replace(/^pick-up$/i, "Pickup");
+  return MINI_VEHICLE_MODELS.find((model) => model.toLowerCase() === raw.toLowerCase()) || "";
 }
 
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
@@ -516,6 +522,8 @@ export async function POST(req: Request) {
       email?: string;
       phone?: string;
       company?: string;
+      vehicleYear?: string;
+      vehicleModel?: string;
       address?: string;
       arrangeOwnDelivery?: boolean;
       deliveryMode?: string;
@@ -543,6 +551,8 @@ export async function POST(req: Request) {
     email: asString(body.customer?.email, 220),
     phone: asString(body.customer?.phone, 80),
     company: asString(body.customer?.company, 180),
+    vehicleYear: asString(body.customer?.vehicleYear, 40),
+    vehicleModel: normaliseMiniVehicleModel(body.customer?.vehicleModel),
     message: asString(body.customer?.message, 2000),
   };
 
@@ -589,6 +599,12 @@ export async function POST(req: Request) {
       ? new Map((await listFeaturedWork()).map((item) => [item.id, item]))
       : new Map<string, FeaturedWork>();
     const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById));
+    if (items.some((item) => item.catalogue === "mini") && (!customer.vehicleYear || !customer.vehicleModel)) {
+      return NextResponse.json(
+        { error: "Vehicle year and model are required for Mini panel orders." },
+        { status: 400 }
+      );
+    }
     const now = new Date().toISOString();
     const featuredOnly = items.every((item) => item.catalogue === "featured");
     const quote: QuoteRequest = {

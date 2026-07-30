@@ -24,6 +24,7 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "mmachine-quote-cart";
+const MINI_VEHICLE_MODELS = ["Saloon", "Van", "Traveller", "Pickup"];
 
 const money = (value: number | null) =>
   value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
@@ -91,6 +92,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const count = items.reduce((sum, item) => sum + item.qty, 0);
   const showCartUi = !pathname?.startsWith("/dashboard");
   const hasPoaItems = items.some((item) => typeof item.unitPriceExVat !== "number");
+  const needsVehicleDetails = items.some((item) => item.catalogue === "mini");
 
   const subtotal = useMemo(
     () =>
@@ -200,6 +202,14 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       ? ownDeliveryInput.checked
       : arrangeOwnDelivery;
     const address = ownDeliverySelected ? "" : String(form.get("address") ?? "").trim();
+    const vehicleYear = String(form.get("vehicleYear") ?? "").trim();
+    const vehicleModel = String(form.get("vehicleModel") ?? "").trim();
+
+    if (needsVehicleDetails && (!vehicleYear || !vehicleModel)) {
+      setMessage("Please enter the vehicle year and model for Mini panel orders.");
+      setSubmitting(false);
+      return;
+    }
 
     if (!ownDeliverySelected && !address) {
       setMessage("Please enter a delivery address, or tick the collection / own delivery option.");
@@ -217,6 +227,8 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             email: form.get("email"),
             phone: form.get("phone"),
             company: form.get("company"),
+            vehicleYear: needsVehicleDetails ? vehicleYear : "",
+            vehicleModel: needsVehicleDetails ? vehicleModel : "",
             address,
             arrangeOwnDelivery: ownDeliverySelected,
             deliveryMode: ownDeliverySelected ? "collection" : "delivery",
@@ -413,6 +425,38 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                   <label htmlFor="order-website">Website</label>
                   <input id="order-website" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
                 </div>
+                {needsVehicleDetails && (
+                  <section className="rounded-lg border border-racing/10 bg-cream-dark p-3">
+                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-[2px] text-racing">
+                      Vehicle Details
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="label" htmlFor="order-vehicle-year">Vehicle Year *</label>
+                        <input
+                          id="order-vehicle-year"
+                          name="vehicleYear"
+                          required
+                          className="input bg-white"
+                          inputMode="numeric"
+                          placeholder="e.g. 1967"
+                        />
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="order-vehicle-model">Model *</label>
+                        <select id="order-vehicle-model" name="vehicleModel" required defaultValue="" className="input bg-white">
+                          <option value="" disabled>Select model</option>
+                          {MINI_VEHICLE_MODELS.map((model) => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </section>
+                )}
+                <h3 className="pt-1 text-xs font-semibold uppercase tracking-[2px] text-racing">
+                  Your Details
+                </h3>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className="label" htmlFor="order-name">Name *</label>

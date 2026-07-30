@@ -101,6 +101,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB" className={`${inter.variable} ${playfair.variable}`}>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if("scrollRestoration"in history)history.scrollRestoration="manual";if(!location.hash)scrollTo(0,0)}catch(e){}`,
+          }}
+        />
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(organization)} />
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(website)} />
       </head>

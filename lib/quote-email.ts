@@ -157,6 +157,23 @@ function isCustomOnly(items: QuoteItem[]) {
   return items.length > 0 && items.every((item) => item.catalogue === "custom");
 }
 
+function hasMiniItems(items: QuoteItem[]) {
+  return items.some((item) => item.catalogue === "mini");
+}
+
+function ownerVehicleDetailsBlock(quote: QuoteRequest) {
+  if (!hasMiniItems(quote.items)) return "";
+  const year = quote.customer.vehicleYear || "Not supplied";
+  const model = quote.customer.vehicleModel || "Not supplied";
+  return `
+    <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
+      <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Vehicle details</strong>
+      <div><strong>Vehicle year:</strong> ${escapeHtml(year)}</div>
+      <div><strong>Model:</strong> ${escapeHtml(model)}</div>
+    </div>
+  `;
+}
+
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = numericTotal(quote.items);
   const carriageExVat = quote.carriageExVat ?? 0;
@@ -249,6 +266,8 @@ export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = proces
           <div>${escapeHtml(quote.customer.phone)}</div>
           ${quote.customer.company ? `<div>${escapeHtml(quote.customer.company)}</div>` : ""}
         </div>
+
+        ${ownerVehicleDetailsBlock(quote)}
 
         <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
           <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Delivery</strong>

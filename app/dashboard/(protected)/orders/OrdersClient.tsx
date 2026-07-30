@@ -278,6 +278,17 @@ function orderItemQuantity(quote: QuoteRequest) {
   return quote.items.reduce((sum, item) => sum + item.qty, 0);
 }
 
+function hasMiniItems(quote: QuoteRequest) {
+  return quote.items.some((item) => item.catalogue === "mini");
+}
+
+function vehicleDetailRows(quote: QuoteRequest) {
+  return [
+    { label: "Vehicle year", value: compactText(quote.customer.vehicleYear) },
+    { label: "Model", value: compactText(quote.customer.vehicleModel) },
+  ];
+}
+
 function fileHref(key: string) {
   return `/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
@@ -1330,6 +1341,22 @@ export default function OrdersClient({
               <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="min-w-0 space-y-4">
+                    {hasMiniItems(draft) && (
+                      <section className="rounded-lg border border-racing/10 p-3 text-sm">
+                        <div className="label !mb-2">Vehicle details</div>
+                        <dl className="grid gap-2 sm:grid-cols-2">
+                          {vehicleDetailRows(draft).map((row) => (
+                            <div key={row.label} className="rounded-md bg-cream-dark px-3 py-2">
+                              <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
+                              <dd className={`mt-0.5 text-sm font-semibold ${row.value ? "text-racing" : "text-amber-800"}`}>
+                                {row.value || "Not supplied"}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    )}
+
                     <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
                       <div className="label !mb-1">Delivery</div>
                       {(() => {

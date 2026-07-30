@@ -49,6 +49,8 @@ type ZoneDef = {
 const MAX_HIGHLIGHT_ZONES = 8;
 // Keep the model URL versioned because /models/* is intentionally cached long-term.
 const MINI_MODEL_URL = "/models/mini.glb?v=c656145df084";
+const MODEL_LOAD_ATTEMPTS = 3;
+const MODEL_LOAD_TIMEOUT_MS = 12000;
 
 const EXTERIOR_ZONES: ZoneDef[] = [
   // Grille face — faces forward (±X)
@@ -125,10 +127,12 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     // --- Scene --------------------------------------------------------------
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#F5EFE0");
+    const initialWidth = Math.max(1, mount.clientWidth);
+    const initialHeight = Math.max(1, mount.clientHeight || 360);
 
     const camera = new THREE.PerspectiveCamera(
       42,
-      mount.clientWidth / mount.clientHeight,
+      initialWidth / initialHeight,
       0.1,
       100
     );
@@ -140,7 +144,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       powerPreference: "high-performance",
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.setSize(initialWidth, initialHeight);
     renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
@@ -495,6 +499,10 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     let rafId = 0;
     let isVisible = true;
     let activeUntil = 0;
+    let disposed = false;
+    let loadRequestId = 0;
+    let loadTimeoutId = 0;
+    const retryTimers: number[] = [];
 
     function requestRender() {
       if (!isVisible || rafId) return;
@@ -528,11 +536,25 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
 
-    const loadFromUrl = (url: string) => {
+    const retryUrl = (url: string, attempt: number) =>
+      attempt === 1 ? url : `${url}&retry=${attempt}&t=${Date.now()}`;
+
+    const loadFromUrl = (url: string, attempt = 1) => {
+      retryTimers.splice(0).forEach((timer) => window.clearTimeout(timer));
+      const requestId = ++loadRequestId;
       setModelStatus("loading");
+      window.clearTimeout(loadTimeoutId);
+      loadTimeoutId = window.setTimeout(() => {
+        handleLoadFailure(new Error("Timed out while loading the Mini model."), attempt, requestId);
+      }, MODEL_LOAD_TIMEOUT_MS);
+
       loader.load(
-        url,
+        retryUrl(url, attempt),
         (gltf) => {
+          window.clearTimeout(loadTimeoutId);
+          if (disposed || requestId !== loadRequestId) return;
+          retryTimers.splice(0).forEach((timer) => window.clearTimeout(timer));
+
           if (loadedModel) {
             carGroup.remove(loadedModel);
             loadedModel.traverse((o) => disposeObject(o));
@@ -579,16 +601,32 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           carGroup.add(model);
           applyModeRef.current?.(modeRef.current);
           setModelStatus("loaded");
-          requestRender();
+          wakeRender(1000);
         },
         undefined,
         (err) => {
-          console.warn("GLB load failed:", err);
-          setModelStatus("placeholder");
-          requestRender();
+          window.clearTimeout(loadTimeoutId);
+          handleLoadFailure(err, attempt, requestId);
         }
       );
     };
+
+    function handleLoadFailure(error: unknown, attempt: number, requestId: number) {
+      if (disposed || requestId !== loadRequestId) return;
+      if (attempt < MODEL_LOAD_ATTEMPTS) {
+        if (retryTimers.length > 0) return;
+        const timer = window.setTimeout(() => {
+          loadFromUrl(MINI_MODEL_URL, attempt + 1);
+        }, attempt * 650);
+        retryTimers.push(timer);
+        wakeRender(900);
+        return;
+      }
+
+      console.warn("GLB load failed:", error);
+      setModelStatus("placeholder");
+      wakeRender(900);
+    }
 
     loadFromUrl(MINI_MODEL_URL);
 
@@ -781,17 +819,29 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
     // --- Resize -------------------------------------------------------------
     const onResize = () => {
       if (!mount) return;
-      camera.aspect = mount.clientWidth / mount.clientHeight;
+      const width = Math.max(1, mount.clientWidth);
+      const height = Math.max(1, mount.clientHeight || 360);
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(mount.clientWidth, mount.clientHeight);
-      requestRender();
+      renderer.setSize(width, height);
+      wakeRender(500);
     };
     window.addEventListener("resize", onResize);
+    const resizeObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(onResize)
+      : null;
+    resizeObserver?.observe(mount);
+    const resizeKickTimer = window.setTimeout(onResize, 0);
 
     // --- Cleanup ------------------------------------------------------------
     return () => {
+      disposed = true;
+      window.clearTimeout(loadTimeoutId);
+      window.clearTimeout(resizeKickTimer);
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
