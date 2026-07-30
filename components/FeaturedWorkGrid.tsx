@@ -5,6 +5,7 @@ import type { KeyboardEvent } from "react";
 import type { FeaturedWork } from "@/lib/featured";
 import { featuredOrderItem } from "@/lib/featured-order";
 import { OrderButton } from "@/components/QuoteCart";
+import Link from "next/link";
 
 type FeaturedWorkGridProps = {
   items: FeaturedWork[];
@@ -16,6 +17,7 @@ type FeaturedWorkGridProps = {
 };
 
 const GBP = "\u00a3";
+const categoryLabel = (job: FeaturedWork) => job.category?.trim() || "Featured Work";
 
 function price(value: number | null) {
   return typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
@@ -117,10 +119,9 @@ export default function FeaturedWorkGrid({
             </div>
 
             <div className={showCategory ? "mb-2 flex items-center gap-2" : "mb-1"}>
-              <span className={showCategory ? "chip !bg-racing !text-cream" : "text-xs tracking-wider text-gold font-semibold"}>
-                {job.tag.toUpperCase()}
+              <span className={showCategory ? "chip !bg-gold !text-cream" : "text-xs tracking-wider text-gold font-semibold"}>
+                {categoryLabel(job).toUpperCase()}
               </span>
-              {showCategory && <span className="min-w-0 truncate text-xs text-ink-muted">{job.category}</span>}
             </div>
             <h2 className="font-display text-xl text-racing mb-2">{job.title}</h2>
             {showDescription && (
@@ -166,8 +167,7 @@ export default function FeaturedWorkGrid({
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-racing/10 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="chip !bg-racing !text-cream">{selected.tag.toUpperCase()}</span>
-                  <span className="text-xs text-ink-muted">{selected.category}</span>
+                  <span className="chip !bg-gold !text-cream">{categoryLabel(selected).toUpperCase()}</span>
                 </div>
                 <h2 id="featured-work-modal-title" className="font-display text-2xl leading-tight text-racing sm:text-3xl">
                   {selected.title}
@@ -207,6 +207,17 @@ export default function FeaturedWorkGrid({
                       {selected.fullStory}
                     </div>
                   )}
+                  <div className="grid gap-2 border-t border-racing/10 pt-4 sm:grid-cols-3 lg:grid-cols-1">
+                    <Link href="/catalogue/mini" className="inline-flex items-center justify-center rounded-lg border border-racing/20 px-4 py-3 text-sm font-semibold text-racing hover:bg-cream-dark">
+                      Mini Panels Catalogue
+                    </Link>
+                    <Link href="/catalogue/metals" className="inline-flex items-center justify-center rounded-lg border border-racing/20 px-4 py-3 text-sm font-semibold text-racing hover:bg-cream-dark">
+                      Metals Catalogue
+                    </Link>
+                    <Link href="/custom-engineering" className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-3 text-sm font-semibold text-cream hover:bg-gold-light">
+                      Get Something Custom Made
+                    </Link>
+                  </div>
                   {typeof selected.priceExVat === "number" && (
                     <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-racing/10 p-4">
                       <div>

@@ -25,6 +25,11 @@ type Draft = Entry & {
 };
 
 const PAGE_SIZE = 20;
+const GBP = "\u00a3";
+
+function categoryLabel(entry: Entry) {
+  return entry.category?.trim() || "Featured Work";
+}
 
 function imageSrc(image: string): string | null {
   if (!image) return null;
@@ -138,7 +143,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             id: draft.id,
             title: draft.title,
             description: draft.description,
-            tag: draft.tag,
+            tag: draft.category || draft.tag,
             category: draft.category,
             fullStory: draft.fullStory,
             image: draft.image,
@@ -285,13 +290,12 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
               )}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="chip !bg-racing !text-cream !text-[10px]">{job.tag.toUpperCase()}</span>
-              <span className="min-w-0 truncate text-xs text-ink-muted">{job.category}</span>
+              <span className="chip !bg-gold !text-cream !text-[10px]">{categoryLabel(job).toUpperCase()}</span>
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
             <p className="mb-4 text-sm font-semibold text-racing">
-              {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
+              {typeof job.priceExVat === "number" ? `${GBP}${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
             </p>
             <div className="mt-auto flex gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
@@ -342,8 +346,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-racing/10 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="chip !bg-racing !text-cream">{preview.tag.toUpperCase()}</span>
-                  <span className="text-xs text-ink-muted">{preview.category}</span>
+                  <span className="chip !bg-gold !text-cream">{categoryLabel(preview).toUpperCase()}</span>
                 </div>
                 <h2 id="featured-preview-title" className="font-display text-2xl leading-tight text-racing sm:text-3xl">
                   {preview.title}
@@ -387,7 +390,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
                   <div className="rounded-lg border border-racing/10 p-4">
                     <div className="text-xs uppercase tracking-wider text-ink-muted">Price ex VAT</div>
                     <div className="font-display text-2xl text-racing">
-                      {typeof preview.priceExVat === "number" ? `\u00a3${preview.priceExVat.toFixed(2)}` : "POA"}
+                      {typeof preview.priceExVat === "number" ? `${GBP}${preview.priceExVat.toFixed(2)}` : "POA"}
                     </div>
                   </div>
                   <div className="flex flex-wrap justify-end gap-3 border-t border-racing/10 pt-4">
@@ -482,20 +485,6 @@ function EditForm({
             />
           </div>
           <div className="sm:col-span-1">
-            <label className="label">Tag</label>
-            <select
-              className="input"
-              value={form.tag}
-              onChange={(e) => setForm({ ...form, tag: e.target.value })}
-            >
-              <option>Bespoke</option>
-              <option>Fabrication</option>
-              <option>Restoration</option>
-              <option>One-off</option>
-              <option>Racing</option>
-            </select>
-          </div>
-          <div className="sm:col-span-1">
             <label className="label">Category</label>
             <input
               className="input"
@@ -504,10 +493,10 @@ function EditForm({
               placeholder="e.g. Fabrication, Engineering, Welding"
             />
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-1">
             <label className="label" htmlFor="featured-price">Price ex VAT (optional)</label>
-            <div className="relative max-w-xs">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-muted">£</span>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-muted">{GBP}</span>
               <input
                 id="featured-price"
                 type="number"
@@ -523,10 +512,10 @@ function EditForm({
                 placeholder="Leave blank for POA"
               />
             </div>
-            <p className="mt-2 text-xs text-ink-muted">
-              Leave this blank when the item needs to be quoted individually.
-            </p>
           </div>
+          <p className="sm:col-span-2 -mt-2 text-xs text-ink-muted">
+            The category is shown as the red pill on Featured Work cards. Leave price blank for POA.
+          </p>
           <div className="sm:col-span-2">
             <label className="label">Short description *</label>
             <textarea
