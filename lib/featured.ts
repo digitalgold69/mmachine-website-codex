@@ -235,7 +235,9 @@ export async function saveFeaturedEntry(input: {
       String(entry.title).trim(),
       String(entry.description || "").trim(),
       String(entry.tag || "Bespoke").trim(),
-      Number.isFinite(entry.year as number) ? Number(entry.year) : new Date().getFullYear(),
+      Number.isFinite(entry.year as number)
+        ? Number(entry.year)
+        : current?.year || new Date().getFullYear(),
       String(entry.category || "Fabrication").trim(),
       String(entry.fullStory || "").trim(),
       imageUrl,

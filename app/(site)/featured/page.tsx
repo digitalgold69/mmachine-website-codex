@@ -64,7 +64,7 @@ export default async function FeaturedPage() {
         )}
         {featuredWork.map((job, index) => (
           <article key={job.id} className="card bg-white">
-            <div className="aspect-[16/10] bg-cream-dark rounded-lg mb-5 overflow-hidden flex items-center justify-center">
+            <div className="aspect-[16/10] bg-cream-dark rounded-lg mb-5 overflow-hidden flex items-center justify-center p-2">
               {job.imagePath ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -75,7 +75,7 @@ export default async function FeaturedPage() {
                   loading={index === 0 ? "eager" : "lazy"}
                   fetchPriority={index === 0 ? "high" : "auto"}
                   decoding="async"
-                  className="w-full h-full object-cover"
+                  className="max-h-full max-w-full object-contain"
                 />
               ) : (
                 <svg width="80" height="80" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
@@ -86,8 +86,6 @@ export default async function FeaturedPage() {
             </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="chip !bg-racing !text-cream">{job.tag.toUpperCase()}</span>
-              <span className="text-xs text-ink-muted">{job.year}</span>
-              <span className="text-xs text-ink-muted">·</span>
               <span className="text-xs text-ink-muted">{job.category}</span>
             </div>
             <h2 className="font-display text-xl text-racing mb-2">{job.title}</h2>

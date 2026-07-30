@@ -276,7 +276,7 @@ export default async function HomePage() {
             )}
             {latestFeatured.map((job) => (
               <article key={job.id} className="card bg-white flex flex-col">
-                <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
+                <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center p-2">
                   {job.imagePath ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -286,7 +286,7 @@ export default async function HomePage() {
                       height={900}
                       loading="lazy"
                       decoding="async"
-                      className="w-full h-full object-cover"
+                      className="max-h-full max-w-full object-contain"
                     />
                   ) : (
                     <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
@@ -296,7 +296,7 @@ export default async function HomePage() {
                   )}
                 </div>
                 <p className="text-xs tracking-wider text-gold font-semibold mb-1">
-                  {job.tag.toUpperCase()} · {job.year}
+                  {job.tag.toUpperCase()}
                 </p>
                 <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
                 <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>

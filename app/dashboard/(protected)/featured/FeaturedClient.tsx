@@ -23,6 +23,8 @@ type Draft = Entry & {
   imageDataUrl?: string;
 };
 
+const PAGE_SIZE = 20;
+
 function imageSrc(image: string): string | null {
   if (!image) return null;
   if (image.startsWith("http://") || image.startsWith("https://") || image.startsWith("/")) {
@@ -39,6 +41,17 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const visibleItems = items.slice(pageStart, pageStart + PAGE_SIZE);
+  const showingFrom = items.length === 0 ? 0 : pageStart + 1;
+  const showingTo = Math.min(items.length, pageStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
 
   // Show a banner that fades after a few seconds
   useEffect(() => {
@@ -83,7 +96,6 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             title: draft.title,
             description: draft.description,
             tag: draft.tag,
-            year: draft.year,
             category: draft.category,
             fullStory: draft.fullStory,
             image: draft.image,
@@ -106,6 +118,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
         }
         return [saved, ...prev];
       });
+      setPage(1);
       setEditing(null);
       setFlash(`Saved "${saved.title}". The public site updates within a minute.`);
     } catch (e) {
@@ -175,13 +188,44 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {items.map((job) => (
-          <div key={job.id} className="card bg-white">
-            <div className="aspect-video bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center">
+      {items.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
+          <span>
+            Showing {showingFrom}-{showingTo} of {items.length}
+          </span>
+          {pageCount > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-racing/20 px-3 py-2 font-medium text-racing disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="min-w-16 text-center text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                {currentPage} / {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+                className="rounded-lg border border-racing/20 px-3 py-2 font-medium text-racing disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {visibleItems.map((job) => (
+          <div key={job.id} className="card bg-white flex min-h-full flex-col">
+            <div className="aspect-[4/3] bg-cream-dark rounded-lg mb-4 overflow-hidden flex items-center justify-center p-2">
               {job.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageSrc(job.image) || ""} alt={job.title} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                <img src={imageSrc(job.image) || ""} alt={job.title} className="max-h-full max-w-full object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               ) : (
                 <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#DF1718" strokeWidth="1.5">
                   <path d="M10 40 L30 15 L50 40 Z" />
@@ -191,14 +235,14 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="chip !bg-racing !text-cream !text-[10px]">{job.tag.toUpperCase()}</span>
-              <span className="text-xs text-ink-muted">{job.year}</span>
+              <span className="min-w-0 truncate text-xs text-ink-muted">{job.category}</span>
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
             <p className="mb-4 text-sm font-semibold text-racing">
               {typeof job.priceExVat === "number" ? `£${job.priceExVat.toFixed(2)} ex VAT` : "POA"}
             </p>
-            <div className="flex gap-2">
+            <div className="mt-auto flex gap-2">
               <button onClick={() => startEdit(job)} className="btn-secondary text-xs py-1 px-3" disabled={busy}>Edit</button>
               <button type="button" onClick={() => setPendingDelete(job)} className="text-xs text-red-700 hover:underline ml-auto" disabled={busy}>Delete</button>
             </div>
@@ -306,7 +350,7 @@ function EditForm({
               placeholder="e.g. Aluminium bonnet scoop"
             />
           </div>
-          <div>
+          <div className="sm:col-span-1">
             <label className="label">Tag</label>
             <select
               className="input"
@@ -320,16 +364,7 @@ function EditForm({
               <option>Racing</option>
             </select>
           </div>
-          <div>
-            <label className="label">Year</label>
-            <input
-              type="number"
-              className="input"
-              value={form.year}
-              onChange={(e) => setForm({ ...form, year: parseInt(e.target.value) || new Date().getFullYear() })}
-            />
-          </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-1">
             <label className="label">Category</label>
             <input
               className="input"
@@ -385,10 +420,10 @@ function EditForm({
           <div className="sm:col-span-2">
             <label className="label">Photo</label>
             <div className="flex items-start gap-3 flex-wrap">
-              <div className="w-32 h-24 bg-cream-dark rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-32 h-24 bg-cream-dark rounded-lg flex items-center justify-center overflow-hidden p-1">
                 {imagePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imagePreview} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <img src={imagePreview} alt="" className="max-h-full max-w-full object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 ) : (
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DF1718" strokeWidth="1.5">
                     <rect x="3" y="5" width="18" height="14" rx="1" />
