@@ -20,8 +20,7 @@ type CompletedFile = QuoteFile & {
 function secret() {
   const value =
     process.env.QUOTE_UPLOAD_SECRET?.trim() ||
-    process.env.AUTH_SECRET?.trim() ||
-    process.env.OWNER_PASSWORD?.trim();
+    process.env.AUTH_SECRET?.trim();
   if (!value || value.length < 12) throw new Error("Quote upload signing secret is unavailable.");
   return value;
 }

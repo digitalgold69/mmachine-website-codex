@@ -2,7 +2,7 @@
 
 This site is a full Next.js app, not a static-only site. It uses API routes for:
 
-- owner login
+- dashboard team authentication
 - quote/order requests
 - dashboard updates
 - featured-work updates
@@ -53,9 +53,14 @@ Required:
 
 ```text
 NEXT_PUBLIC_SITE_URL
-OWNER_PASSWORD
 AUTH_SECRET
+QUOTE_UPLOAD_SECRET             optional; AUTH_SECRET is used if omitted
 ```
+
+Dashboard access is managed from the dashboard Team tab. The first
+administrator is seeded as `hodltid@icloud.com` and must change the temporary
+password on first sign-in. Do not configure the old `OWNER_PASSWORD`; it is no
+longer used for dashboard authentication.
 
 Required when email sending goes live:
 
@@ -125,6 +130,10 @@ Run the D1 schema once:
 
 ```powershell
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0001_mmachine_runtime.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0002_remove_demo_featured_work.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0003_request_limits.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0004_featured_work_prices.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0005_team_auth.sql
 ```
 
 ## GitHub Auto Deploy

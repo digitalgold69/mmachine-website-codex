@@ -67,7 +67,7 @@ export type MMachineCloudflareEnv = {
   AWS_SES_SESSION_TOKEN?: string;
   AWS_SESSION_TOKEN?: string;
   NEXT_PUBLIC_SITE_URL?: string;
-  OWNER_PASSWORD?: string;
+  QUOTE_UPLOAD_SECRET?: string;
   QUOTE_CUSTOM_OWNER_EMAIL?: string;
   QUOTE_ENQUIRY_OWNER_EMAIL?: string;
   QUOTE_FEATURED_OWNER_EMAIL?: string;

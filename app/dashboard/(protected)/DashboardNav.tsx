@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-export default function DashboardNav({ initialNewRequestCount }: { initialNewRequestCount: number }) {
+export default function DashboardNav({
+  initialNewRequestCount,
+  userRole,
+}: {
+  initialNewRequestCount: number;
+  userRole: "admin" | "member";
+}) {
   const [newRequestCount, setNewRequestCount] = useState(initialNewRequestCount);
 
   useEffect(() => {
@@ -37,6 +43,11 @@ export default function DashboardNav({ initialNewRequestCount }: { initialNewReq
       <Link href="/dashboard/featured" className="inline-flex min-w-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-racing hover:bg-cream-dark sm:px-4">
         Featured Work
       </Link>
+      {userRole === "admin" && (
+        <Link href="/dashboard/team" className="inline-flex min-w-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-racing hover:bg-cream-dark sm:px-4">
+          Team
+        </Link>
+      )}
     </nav>
   );
 }

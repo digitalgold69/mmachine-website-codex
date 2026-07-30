@@ -15,8 +15,13 @@ Cloudflare dashboard path:
 | Name | Value |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Temporary Cloudflare URL first, then the live domain later |
-| `OWNER_PASSWORD` | Password used on `/dashboard/login` |
 | `AUTH_SECRET` | Fresh random 32+ character string |
+| `QUOTE_UPLOAD_SECRET` | Optional separate signing secret for quote uploads; if omitted, `AUTH_SECRET` is used |
+
+Dashboard access is managed from the Team tab. The first administrator is
+seeded as `hodltid@icloud.com` and must change the temporary password on first
+sign-in. Do not configure the old `OWNER_PASSWORD`; it is no longer used for
+dashboard authentication.
 
 ## Required When Email Sending Goes Live
 
