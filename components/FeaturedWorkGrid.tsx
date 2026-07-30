@@ -20,8 +20,8 @@ const GBP = "\u00a3";
 const categoryLabel = (job: FeaturedWork) => job.category?.trim() || "Featured Work";
 const categoryTextClass = "text-xs tracking-wider text-gold font-semibold";
 
-function price(value: number | null) {
-  return typeof value === "number" ? `${GBP}${value.toFixed(2)}` : "POA";
+function price(value: number) {
+  return `${GBP}${value.toFixed(2)}`;
 }
 
 function PlaceholderImage({ size = 80 }: { size?: number }) {

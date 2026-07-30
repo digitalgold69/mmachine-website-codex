@@ -200,7 +200,7 @@ export async function saveFeaturedEntry(input: {
     ? null
     : Number(rawPrice);
   if (priceExVat !== null && (!Number.isFinite(priceExVat) || priceExVat < 0)) {
-    throw new Error("Price must be a valid positive amount, or left blank for POA.");
+    throw new Error("Price must be a valid amount, or left blank.");
   }
   const result = await db
     .prepare(

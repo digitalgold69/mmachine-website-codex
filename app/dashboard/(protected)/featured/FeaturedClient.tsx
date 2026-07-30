@@ -512,7 +512,7 @@ function EditForm({
                 ...form,
                 priceExVat: e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
               })}
-              placeholder="Leave blank for POA"
+              placeholder="e.g. 125.00"
             />
           </div>
           <div className="sm:col-span-2">
