@@ -185,7 +185,7 @@ export default function MiniCataloguePage() {
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span className="text-ink-muted">{currentSection.subtitle}</span>
                 <a
-                  href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}`}
+                  href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}&view=1`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"

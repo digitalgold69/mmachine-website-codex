@@ -54,7 +54,7 @@ export async function GET(
 
     return new Response(body, {
       headers: {
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        "Cache-Control": "no-store",
         "Content-Disposition": `inline; filename="${miniSectionPdfFilename(section)}"`,
         "Content-Type": "application/pdf",
         "X-Content-Type-Options": "nosniff",
