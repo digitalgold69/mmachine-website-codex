@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as { email?: string; role?: AuthRole };
     const { invitation, token } = await createTeamInvitation({
       email: String(body.email || ""),
-      role: body.role === "admin" ? "admin" : "member",
+      role: body.role === "member" ? "member" : "admin",
       actor,
       request: req,
     });

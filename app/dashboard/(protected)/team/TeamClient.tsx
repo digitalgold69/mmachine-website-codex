@@ -66,7 +66,7 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: String(formData.get("email") || ""),
-            role: String(formData.get("role") || "member"),
+            role: String(formData.get("role") || "admin"),
           }),
         })
       );
@@ -144,9 +144,9 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           </div>
           <div>
             <label className="label">Role</label>
-            <select name="role" className="input" defaultValue="member">
-              <option value="member">Team Member</option>
+            <select name="role" className="input" defaultValue="admin">
               <option value="admin">Administrator</option>
+              <option value="member">Team Member</option>
             </select>
           </div>
           <button type="submit" disabled={busy === "invite"} className="btn-primary justify-center">
@@ -204,101 +204,105 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           </span>
         </div>
 
-        <div className="divide-y divide-racing/10">
+        <div className="space-y-4">
           {team.users.map((user) => {
             const isFinalAdmin = user.role === "admin" && user.status === "active" && activeAdminCount <= 1;
             return (
               <div
                 key={user.id}
-                className="grid gap-5 py-5 lg:grid-cols-[minmax(260px,1.35fr)_170px_190px_minmax(230px,0.95fr)_150px] lg:items-start"
+                className="rounded-lg border border-racing/10 bg-cream/20 p-4"
               >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <h3 className="truncate font-semibold text-racing">{user.name || "Unnamed"}</h3>
-                    {user.id === currentUserId && <span className="text-xs font-semibold text-ink-muted">(you)</span>}
+                <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.9fr)_minmax(700px,2.2fr)]">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <h3 className="truncate text-base font-semibold text-racing">{user.name || "Unnamed"}</h3>
+                      {user.id === currentUserId && <span className="text-xs font-semibold text-ink-muted">(you)</span>}
+                    </div>
+                    <p className="mt-1 break-all text-sm text-ink-muted">{user.email}</p>
+                    <dl className="mt-3 grid gap-2 text-xs text-ink-muted sm:grid-cols-2 xl:grid-cols-1">
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-ink-muted/80">Invited</dt>
+                        <dd>{formatOptionalDate(user.invitedAt || user.createdAt)}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-ink-muted/80">Last login</dt>
+                        <dd>{formatOptionalDate(user.lastLoginAt)}</dd>
+                      </div>
+                    </dl>
                   </div>
-                  <p className="mt-1 break-all text-sm text-ink-muted">{user.email}</p>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
-                    <span>Invited {formatOptionalDate(user.invitedAt || user.createdAt)}</span>
-                    <span>Last login {formatOptionalDate(user.lastLoginAt)}</span>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Access</div>
-                  <select
-                    className="input h-10 py-1 text-sm"
-                    value={user.role}
-                    disabled={Boolean(busy) || isFinalAdmin}
-                    onChange={(e) =>
-                      patch("change-role", { userId: user.id, role: e.target.value }, `role-${user.id}`)
-                    }
-                  >
-                    <option value="member">Team Member</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                  <StatusBadge status={user.status} />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">2FA</div>
-                  <TwoFactorControl
-                    user={user}
-                    currentUserId={currentUserId}
-                    busy={busy}
-                    onPatch={patch}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Notifications</div>
-                  <NotificationPicker
-                    user={user}
-                    busy={busy}
-                    onSave={(routes) =>
-                      patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`)
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2 lg:text-right">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Actions</div>
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
-                    <button
-                      type="button"
-                      className="btn-secondary justify-center px-3 py-2 text-sm"
-                      disabled={Boolean(busy) || user.status !== "active"}
-                      onClick={() => patch("send-reset", { userId: user.id }, `reset-${user.id}`)}
-                    >
-                      Send reset
-                    </button>
-                    {user.status === "disabled" ? (
-                      <button
-                        type="button"
-                        className="btn-secondary justify-center px-3 py-2 text-sm"
-                        disabled={Boolean(busy)}
-                        onClick={() => patch("enable", { userId: user.id }, `enable-${user.id}`)}
-                      >
-                        Enable
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn-secondary justify-center px-3 py-2 text-sm"
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[180px_190px_minmax(230px,1fr)_150px]">
+                    <ControlGroup label="Access">
+                      <select
+                        className="input h-10 py-1 text-sm"
+                        value={user.role}
                         disabled={Boolean(busy) || isFinalAdmin}
-                        onClick={() => patch("disable", { userId: user.id }, `disable-${user.id}`)}
+                        onChange={(e) =>
+                          patch("change-role", { userId: user.id, role: e.target.value }, `role-${user.id}`)
+                        }
                       >
-                        Disable
+                        <option value="admin">Administrator</option>
+                        <option value="member">Team Member</option>
+                      </select>
+                      <StatusBadge status={user.status} />
+                    </ControlGroup>
+
+                    <ControlGroup label="2FA">
+                      <TwoFactorControl
+                        user={user}
+                        currentUserId={currentUserId}
+                        busy={busy}
+                        onPatch={patch}
+                      />
+                    </ControlGroup>
+
+                    <ControlGroup label="Notifications">
+                      <NotificationPicker
+                        user={user}
+                        busy={busy}
+                        onSave={(routes) =>
+                          patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`)
+                        }
+                      />
+                    </ControlGroup>
+
+                    <ControlGroup label="Actions" align="end">
+                      <button
+                        type="button"
+                        className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+                        disabled={Boolean(busy) || user.status !== "active"}
+                        onClick={() => patch("send-reset", { userId: user.id }, `reset-${user.id}`)}
+                      >
+                        Send reset
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="px-3 py-2 text-sm font-semibold text-red-700 hover:text-red-900 disabled:opacity-50"
-                      disabled={Boolean(busy) || isFinalAdmin}
-                      onClick={() => removeUser(user)}
-                    >
-                      Remove
-                    </button>
+                      {user.status === "disabled" ? (
+                        <button
+                          type="button"
+                          className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+                          disabled={Boolean(busy)}
+                          onClick={() => patch("enable", { userId: user.id }, `enable-${user.id}`)}
+                        >
+                          Enable
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+                          disabled={Boolean(busy) || isFinalAdmin}
+                          onClick={() => patch("disable", { userId: user.id }, `disable-${user.id}`)}
+                        >
+                          Disable
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-center text-sm font-semibold text-red-700 hover:text-red-900 disabled:opacity-50"
+                        disabled={Boolean(busy) || isFinalAdmin}
+                        onClick={() => removeUser(user)}
+                      >
+                        Remove
+                      </button>
+                    </ControlGroup>
                   </div>
                 </div>
               </div>
@@ -337,7 +341,26 @@ function StatusBadge({ status }: { status: TeamUser["status"] }) {
       : status === "disabled"
         ? "bg-amber-50 text-amber-800"
         : "bg-red-50 text-red-800";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
+  return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
+}
+
+function ControlGroup({
+  label,
+  children,
+  align = "start",
+}: {
+  label: string;
+  children: React.ReactNode;
+  align?: "start" | "end";
+}) {
+  return (
+    <div className="min-w-0">
+      <div className={`mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted ${align === "end" ? "xl:text-right" : ""}`}>
+        {label}
+      </div>
+      <div className="flex min-h-[88px] flex-col items-stretch gap-2">{children}</div>
+    </div>
+  );
 }
 
 function TwoFactorControl({
@@ -357,9 +380,9 @@ function TwoFactorControl({
 
   if (isCurrentUser) {
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col items-stretch gap-2">
         <SecurityBadge enabled={user.totpEnabled} required={requirementActive} />
-        <Link href="/dashboard/account/security" className="btn-secondary justify-center px-3 py-2 text-sm">
+        <Link href="/dashboard/account/security" className="btn-secondary w-full justify-center px-3 py-2 text-sm">
           {user.totpEnabled ? "Manage 2FA" : "Set up 2FA"}
         </Link>
       </div>
@@ -368,7 +391,7 @@ function TwoFactorControl({
 
   if (user.totpEnabled) {
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col items-stretch gap-2">
         <SecurityBadge enabled required={false} />
         <button
           type="button"
@@ -387,11 +410,11 @@ function TwoFactorControl({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col items-stretch gap-2">
       <SecurityBadge enabled={false} required={requirementActive} />
       <button
         type="button"
-        className="btn-secondary justify-center px-3 py-2 text-sm"
+        className="btn-secondary w-full justify-center px-3 py-2 text-sm"
         disabled={disabled}
         onClick={() =>
           onPatch(
@@ -414,7 +437,7 @@ function SecurityBadge({ enabled, required }: { enabled: boolean; required: bool
     : required
       ? "bg-amber-50 text-amber-800"
       : "bg-cream-dark text-ink-muted";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
+  return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
 }
 
 function NotificationPicker({
@@ -450,8 +473,8 @@ function NotificationPicker({
   }
 
   async function save() {
-    await onSave(draft);
     setOpen(false);
+    await onSave(draft);
   }
 
   return (
@@ -483,9 +506,6 @@ function NotificationPicker({
             </label>
           ))}
         </div>
-        <p className="mt-3 text-xs leading-5 text-ink-muted">
-          Empty uses the Cloudflare fallback. Disabled users do not receive emails.
-        </p>
         <button
           type="button"
           className="btn-secondary mt-3 w-full justify-center px-3 py-2 text-sm"
