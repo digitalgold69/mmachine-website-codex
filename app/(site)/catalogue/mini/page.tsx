@@ -178,8 +178,28 @@ export default function MiniCataloguePage() {
           ref={sectionSummaryRef}
           className="mt-6 scroll-mt-28 rounded-lg border-l-4 border-gold bg-cream-dark p-4"
         >
-          <div className="flex flex-wrap items-center gap-3 gap-y-2">
-            <div className="font-mono text-2xl font-bold text-racing">{currentSection.code}</div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:gap-y-2">
+            <div className="flex items-start gap-4">
+              <div className="font-mono text-2xl font-bold leading-none text-racing">{currentSection.code}</div>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5 text-[11px] font-semibold leading-tight sm:hidden">
+                <a
+                  href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}&view=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-racing underline-offset-2 hover:text-gold hover:underline"
+                >
+                  Download {currentSection.code} Section PDF
+                </a>
+                <a
+                  href={miniCatalogueUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-racing underline-offset-2 hover:text-gold hover:underline"
+                >
+                  Download Full PDF Catalogue
+                </a>
+              </div>
+            </div>
             <div className="min-w-0">
               <div className="font-display text-lg text-racing leading-none">{currentSection.label}</div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -188,7 +208,7 @@ export default function MiniCataloguePage() {
                   href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}&view=1`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
+                  className="hidden font-semibold text-racing underline-offset-2 hover:text-gold hover:underline sm:inline"
                 >
                   Download {currentSection.code} Section PDF
                 </a>
@@ -196,7 +216,7 @@ export default function MiniCataloguePage() {
                   href={miniCatalogueUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
+                  className="hidden font-semibold text-racing underline-offset-2 hover:text-gold hover:underline sm:inline"
                 >
                   Download Full PDF Catalogue
                 </a>

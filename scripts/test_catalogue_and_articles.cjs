@@ -41,6 +41,8 @@ async function main() {
   assert.match(miniPage, /view=1/, "Section PDF links must avoid older cached attachment responses");
   assert.doesNotMatch(miniPage, /href=\{`\/api\/catalogue\/mini-sections[\s\S]*?download/, "Mini section PDFs should open in a browser tab instead of auto-downloading");
   assert.match(miniPage, /target="_blank"[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mini section PDF links should open in a new tab");
+  assert.match(miniPage, /sm:hidden[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mobile section PDF links should stack beside the section number");
+  assert.match(miniPage, /hidden font-semibold[\s\S]*sm:inline[\s\S]*Download \{currentSection\.code\} Section PDF/, "Desktop section PDF links should stay inline with the description");
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
