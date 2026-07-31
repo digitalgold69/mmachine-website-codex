@@ -1,4 +1,5 @@
 import { PDFDocument } from "pdf-lib";
+import { getCloudflareEnv } from "@/lib/cloudflare";
 import { miniCatalogueUrl } from "@/lib/catalogue-versions";
 import {
   getMiniSectionForPdf,
@@ -23,7 +24,10 @@ export async function GET(
   }
 
   const sourceUrl = new URL(miniCatalogueUrl, req.url);
-  const sourceResponse = await fetch(sourceUrl, { cache: "no-store" });
+  const env = await getCloudflareEnv().catch(() => null);
+  const sourceResponse = env?.ASSETS
+    ? await env.ASSETS.fetch(new Request(sourceUrl))
+    : await fetch(sourceUrl, { cache: "no-store" });
   if (!sourceResponse.ok) {
     return new Response("Catalogue PDF could not be loaded", { status: 502 });
   }

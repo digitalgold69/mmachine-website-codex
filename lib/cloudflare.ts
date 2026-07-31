@@ -51,6 +51,7 @@ export type R2MultipartUploadBinding = {
 
 export type MMachineCloudflareEnv = {
   [key: string]: unknown;
+  ASSETS?: { fetch: (request: Request | string) => Promise<Response> };
   DB?: D1DatabaseBinding;
   FEATURED_IMAGES?: R2BucketBinding;
   QUOTE_FILES?: R2BucketBinding;
