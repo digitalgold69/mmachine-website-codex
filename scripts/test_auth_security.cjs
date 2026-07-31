@@ -12,6 +12,9 @@ const securityRoute = read("app/api/auth/security/route.ts");
 const forgotPasswordForm = read("app/dashboard/forgot-password/ForgotPasswordForm.tsx");
 const dashboardNav = read("app/dashboard/(protected)/DashboardNav.tsx");
 const teamClient = read("app/dashboard/(protected)/team/TeamClient.tsx");
+const loginForm = read("app/dashboard/login/LoginForm.tsx");
+const acceptInvitationForm = read("app/dashboard/accept-invitation/[token]/AcceptInvitationForm.tsx");
+const resetPasswordForm = read("app/dashboard/reset-password/[token]/ResetPasswordForm.tsx");
 const uploadToken = read("lib/quote-upload-token.ts");
 const middleware = read("middleware.ts");
 const migration = read("migrations/0005_team_auth.sql");
@@ -64,6 +67,13 @@ assert.match(dashboardNav, /bg-gold text-cream/, "dashboard nav active tab must 
 assert.match(teamClient, /Reset Password/, "team reset button must use clear password reset wording");
 assert.doesNotMatch(teamClient, /Default fallback/, "team notification selector must not expose fallback copy");
 assert.match(teamClient, /Order Notifications/, "team notification column must be labelled for order notifications");
+assert.match(loginForm, /autoComplete="username"/, "login email field must be saved as the password-manager username");
+assert.match(acceptInvitationForm, /name="email"[\s\S]+autoComplete="username"/, "invite acceptance must save email as the password-manager username");
+assert.match(resetPasswordForm, /name="email"[\s\S]+autoComplete="username"/, "password reset must save email as the password-manager username");
+assert.match(loginForm, /window\.location\.assign/, "login should hard-navigate after setting the auth cookie");
+assert.match(acceptInvitationForm, /window\.location\.assign/, "invite acceptance should hard-navigate after setting the auth cookie");
+assert.doesNotMatch(loginForm, /router\.replace/, "login should not rely on client router navigation after auth");
+assert.doesNotMatch(acceptInvitationForm, /router\.replace/, "invite acceptance should not rely on client router navigation after auth");
 assert.equal(uploadToken.includes("OWNER_PASSWORD"), false, "upload tokens must not depend on OWNER_PASSWORD");
 
 console.log("ok - dashboard auth security guardrails are present");

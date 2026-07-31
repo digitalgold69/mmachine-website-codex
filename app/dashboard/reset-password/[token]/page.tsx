@@ -28,7 +28,7 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
               <p className="mb-6 text-sm text-ink-muted">
                 This reset link is valid until {formatDate(reset.expiresAt)}.
               </p>
-              <ResetPasswordForm token={token} />
+              <ResetPasswordForm token={token} email={reset.email} />
             </>
           ) : (
             <div>

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
-export default function ResetPasswordForm({ token }: { token: string }) {
-  const router = useRouter();
+export default function ResetPasswordForm({ token, email }: { token: string; email: string }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -33,8 +31,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; redirectTo?: string };
       if (!res.ok) throw new Error(data.error || "The password could not be reset.");
-      router.replace(data.redirectTo || "/dashboard/login");
-      router.refresh();
+      window.location.assign(data.redirectTo || "/dashboard/login");
     } catch (err) {
       setError((err as Error).message || "The password could not be reset.");
       setLoading(false);
@@ -43,6 +40,18 @@ export default function ResetPasswordForm({ token }: { token: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
+      <div>
+        <label className="label">Email</label>
+        <input
+          type="email"
+          name="email"
+          className="input bg-cream-dark"
+          value={email}
+          readOnly
+          autoComplete="username"
+        />
+      </div>
+
       <div>
         <div className="mb-1 flex items-center justify-between gap-3">
           <label className="label mb-0">New password</label>

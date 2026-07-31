@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function LoginForm({ nextPath }: { nextPath: string }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
@@ -51,8 +49,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
       }
 
       if (res.ok) {
-        router.replace(data.redirectTo || nextPath || "/dashboard");
-        router.refresh();
+        window.location.assign(data.redirectTo || nextPath || "/dashboard");
         return;
       }
 
@@ -73,7 +70,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
           name="email"
           className="input"
           placeholder="name@example.com"
-          autoComplete="email"
+          autoComplete="username"
           required
           autoFocus
         />

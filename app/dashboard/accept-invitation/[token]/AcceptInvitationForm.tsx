@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function AcceptInvitationForm({
   token,
@@ -11,7 +10,6 @@ export default function AcceptInvitationForm({
   token: string;
   email: string;
 }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -43,8 +41,7 @@ export default function AcceptInvitationForm({
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; redirectTo?: string };
       if (!res.ok) throw new Error(data.error || "The invitation could not be accepted.");
-      router.replace(data.redirectTo || "/dashboard");
-      router.refresh();
+      window.location.assign(data.redirectTo || "/dashboard");
     } catch (err) {
       setError((err as Error).message || "The invitation could not be accepted.");
       setLoading(false);
@@ -55,7 +52,14 @@ export default function AcceptInvitationForm({
     <form onSubmit={submit} className="space-y-5">
       <div>
         <label className="label">Email</label>
-        <input type="email" className="input bg-cream-dark" value={email} readOnly />
+        <input
+          type="email"
+          name="email"
+          className="input bg-cream-dark"
+          value={email}
+          readOnly
+          autoComplete="username"
+        />
       </div>
 
       <div>
