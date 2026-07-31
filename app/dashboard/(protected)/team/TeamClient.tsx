@@ -211,7 +211,6 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           {team.users.map((user) => {
             const isFinalAdmin = user.role === "admin" && user.status === "active" && activeAdminCount <= 1;
             const isCurrentUser = user.id === currentUserId;
-            const requireTwoFactorSetup = user.requireTwoFactorSetup && !user.totpEnabled;
             return (
               <div
                 key={user.id}
@@ -251,12 +250,10 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
                     <StatusBadge status={user.status} />
                   </ControlGroup>
 
-                  <ControlGroup label="2FA" adornment={<SecurityBadge enabled={user.totpEnabled} required={requireTwoFactorSetup} />}>
+                  <ControlGroup label="2FA" adornment={<SecurityBadge enabled={user.totpEnabled} />}>
                     <TwoFactorControl
                       user={user}
                       currentUserId={currentUserId}
-                      busy={busy}
-                      onPatch={patch}
                     />
                   </ControlGroup>
 
@@ -376,17 +373,11 @@ function ControlGroup({
 function TwoFactorControl({
   user,
   currentUserId,
-  busy,
-  onPatch,
 }: {
   user: TeamUser;
   currentUserId: string;
-  busy: string;
-  onPatch: (action: string, payload: Record<string, unknown>, label: string, successMessage?: string) => Promise<void>;
 }) {
-  const disabled = Boolean(busy) || user.status !== "active";
   const isCurrentUser = user.id === currentUserId;
-  const requirementActive = user.requireTwoFactorSetup && !user.totpEnabled;
 
   if (isCurrentUser) {
     return (
@@ -398,53 +389,18 @@ function TwoFactorControl({
     );
   }
 
-  if (user.totpEnabled) {
-    return (
-      <div className="flex flex-col items-stretch gap-2">
-        <button
-          type="button"
-          className="h-10 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 hover:text-red-900 disabled:opacity-50"
-          disabled={disabled}
-          onClick={() => {
-            if (window.confirm(`Turn off 2FA for ${user.email}? They will need to set it up again if required.`)) {
-              onPatch("disable-2fa", { userId: user.id }, `disable-2fa-${user.id}`, "2FA turned off.");
-            }
-          }}
-        >
-          Turn off 2FA
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-stretch gap-2">
-      <button
-        type="button"
-        className="btn-secondary h-10 w-full justify-center px-3 py-2 text-sm"
-        disabled={disabled}
-        onClick={() =>
-          onPatch(
-            "require-2fa",
-            { userId: user.id, required: !requirementActive },
-            `require-2fa-${user.id}`,
-            requirementActive ? "2FA requirement cancelled." : "2FA requirement enabled."
-          )
-        }
-      >
-        {requirementActive ? "Cancel requirement" : "Require 2FA"}
-      </button>
-    </div>
+    <p className="rounded-md bg-cream-dark px-3 py-2 text-sm leading-6 text-ink-muted">
+      Managed by this user.
+    </p>
   );
 }
 
-function SecurityBadge({ enabled, required }: { enabled: boolean; required: boolean }) {
-  const label = enabled ? "Enabled" : required ? "Required" : "Off";
+function SecurityBadge({ enabled }: { enabled: boolean }) {
+  const label = enabled ? "Enabled" : "Off";
   const classes = enabled
     ? "bg-green-50 text-racing"
-    : required
-      ? "bg-amber-50 text-amber-800"
-      : "bg-cream-dark text-ink-muted";
+    : "bg-cream-dark text-ink-muted";
   return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
 }
 

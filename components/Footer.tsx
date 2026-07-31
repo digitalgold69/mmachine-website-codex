@@ -73,7 +73,7 @@ export default function Footer() {
               Darlington, DL1 2PJ<br /><br />
               Metals &amp; Engineering:<br />
               <a href="tel:01325381302" className="hover:text-gold">01325 381302</a><br />
-              Mini Pressings &amp; Accounts:<br />
+              Mini Panels &amp; Accounts:<br />
               <a href="tel:01325381300" className="hover:text-gold">01325 381300</a><br />
               <a href="mailto:sales@m-machine.co.uk" className="hover:text-gold">sales@m-machine.co.uk</a>
             </address>

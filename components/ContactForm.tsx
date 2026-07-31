@@ -64,7 +64,7 @@ export default function ContactForm() {
           <h2 className="font-display text-lg text-racing mb-2">Phone</h2>
           <p className="text-sm text-ink-muted mb-1">Metals &amp; engineering</p>
           <a href="tel:01325381302" className="font-mono text-racing text-lg hover:text-gold">01325 381302</a>
-          <p className="text-sm text-ink-muted mt-3 mb-1">Mini pressings &amp; accounts</p>
+          <p className="text-sm text-ink-muted mt-3 mb-1">Mini panels &amp; accounts</p>
           <a href="tel:01325381300" className="font-mono text-racing text-lg hover:text-gold">01325 381300</a>
         </div>
         <div>

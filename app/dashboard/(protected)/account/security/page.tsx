@@ -16,7 +16,7 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
   const requiredReason =
     requiredParam === "1" || user.mustChangePassword
       ? "password"
-      : requiredParam === "2fa" || (user.requireTwoFactorSetup && !user.totpEnabled)
+      : requiredParam === "2fa"
         ? "2fa"
         : null;
 
@@ -35,7 +35,6 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
           name: user.name,
           role: user.role,
           mustChangePassword: user.mustChangePassword,
-          requireTwoFactorSetup: user.requireTwoFactorSetup,
           totpEnabled: user.totpEnabled,
         }}
         requiredReason={requiredReason}

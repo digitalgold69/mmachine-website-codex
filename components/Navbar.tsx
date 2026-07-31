@@ -7,9 +7,9 @@ import BrandMark from "@/components/BrandMark";
 
 const links = [
   { href: "/", label: "Home" },
-  { href: "/catalogue/mini", label: "Mini panels" },
+  { href: "/catalogue/mini", label: "Mini Panels" },
   { href: "/catalogue/metals", label: "Metals" },
-  { href: "/custom-engineering", label: "Custom work" },
+  { href: "/custom-engineering", label: "Custom Work" },
   { href: "/featured", label: "Featured Work" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
@@ -58,7 +58,7 @@ export default function Navbar() {
               <span className="font-mono">01325 381302</span>
             </a>
             <a href="tel:01325381300" className="hover:text-gold">
-              <span className="block font-semibold text-cream">Mini Pressings &amp; Accounts</span>
+              <span className="block font-semibold text-cream">Mini Panels &amp; Accounts</span>
               <span className="font-mono">01325 381300</span>
             </a>
           </div>
@@ -95,7 +95,7 @@ export default function Navbar() {
                 <span className="font-mono">01325 381302</span>
               </a>
               <a href="tel:01325381300" className="block text-cream/85 hover:text-gold">
-                <span className="block text-xs uppercase tracking-wide text-cream/60">Mini Pressings &amp; Accounts</span>
+                <span className="block text-xs uppercase tracking-wide text-cream/60">Mini Panels &amp; Accounts</span>
                 <span className="font-mono">01325 381300</span>
               </a>
             </div>

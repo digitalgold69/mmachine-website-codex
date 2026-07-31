@@ -4,7 +4,6 @@ import {
   cancelTeamInvitation,
   createPasswordReset,
   createTeamInvitation,
-  disableTeamUserTwoFactor,
   disableTeamUser,
   enableTeamUser,
   listAuditEvents,
@@ -13,7 +12,6 @@ import {
   requireAdminUser,
   requireSameOrigin,
   resendTeamInvitation,
-  setTeamUserTwoFactorRequirement,
   updateTeamUserNotificationRoutes,
   updateTeamUserRole,
   type AuthRole,
@@ -119,21 +117,6 @@ export async function PATCH(req: Request) {
         await updateTeamUserNotificationRoutes({
           userId: String(body.userId || ""),
           routes: body.routes,
-          actor,
-          request: req,
-        });
-        break;
-      case "require-2fa":
-        await setTeamUserTwoFactorRequirement({
-          userId: String(body.userId || ""),
-          required: Boolean(body.required),
-          actor,
-          request: req,
-        });
-        break;
-      case "disable-2fa":
-        await disableTeamUserTwoFactor({
-          userId: String(body.userId || ""),
           actor,
           request: req,
         });

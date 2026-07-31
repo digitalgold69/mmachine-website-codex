@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
 import { products, sections, getSection } from "@/lib/mini-data";
-import { miniCatalogueUrl } from "@/lib/catalogue-versions";
+import { miniCatalogueUrl, miniCatalogueVersion } from "@/lib/catalogue-versions";
 
 const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
   ssr: false,
@@ -30,6 +30,7 @@ export default function MiniCataloguePage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
   const partsListRef = useRef<HTMLDivElement | null>(null);
+  const sectionSummaryRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(() => {
     let list = products;
@@ -55,7 +56,8 @@ export default function MiniCataloguePage() {
     setSection(nextSection);
     setDisplayLimit(50);
     window.setTimeout(() => {
-      partsListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const target = nextSection === "all" ? partsListRef.current : sectionSummaryRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
   }
 
@@ -172,12 +174,31 @@ export default function MiniCataloguePage() {
 
       <div ref={partsListRef} className="scroll-mt-4" />
       {currentSection && (
-        <div className="bg-cream-dark rounded-lg p-4 mt-6 border-l-4 border-gold">
-          <div className="flex items-center gap-3 mb-1">
+        <div
+          ref={sectionSummaryRef}
+          className="mt-6 scroll-mt-28 rounded-lg border-l-4 border-gold bg-cream-dark p-4"
+        >
+          <div className="flex flex-wrap items-center gap-3 gap-y-2">
             <div className="font-mono text-2xl font-bold text-racing">{currentSection.code}</div>
-            <div>
+            <div className="min-w-0">
               <div className="font-display text-lg text-racing leading-none">{currentSection.label}</div>
-              <div className="text-xs text-ink-muted mt-0.5">{currentSection.subtitle}</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="text-ink-muted">{currentSection.subtitle}</span>
+                <a
+                  href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}`}
+                  download
+                  className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
+                >
+                  Download {currentSection.code} Section PDF
+                </a>
+                <a
+                  href={miniCatalogueUrl}
+                  download
+                  className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
+                >
+                  Download Full PDF Catalogue
+                </a>
+              </div>
             </div>
           </div>
         </div>

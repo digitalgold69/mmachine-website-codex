@@ -73,7 +73,7 @@ export default async function HomePage() {
               </p>
               <h1 className="home-hero-title font-display font-semibold text-racing leading-[1.1] mb-6">
                 Mini Panels, Custom Engineering,<br />{" "}
-                <span className="text-gold">Huge Material Range.</span>
+                <span className="text-gold">Extensive Material Range.</span>
               </h1>
               <p className="text-lg text-ink-muted leading-relaxed mb-8 max-w-xl">
                 Four decades supplying restorers, workshops and fabricators from our Darlington workshop.

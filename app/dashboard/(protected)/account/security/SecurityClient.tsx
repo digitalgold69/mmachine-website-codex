@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 
-type PublicUser = Pick<AuthUser, "email" | "name" | "role" | "mustChangePassword" | "requireTwoFactorSetup" | "totpEnabled">;
+type PublicUser = Pick<AuthUser, "email" | "name" | "role" | "mustChangePassword" | "totpEnabled">;
 
 type SecurityClientProps = {
   initialUser: PublicUser;

@@ -89,7 +89,7 @@ const customEngineeringGuide: Guide = {
     image: "/custom-engineering/cnc-machining.jpg",
     imageAlt: "CNC machining in the M-Machine workshop",
     readingTime: "8 min read",
-    publishedAt: "2026-07-01",
+    publishedAt: "2026-07-30",
   };
 
 export const guides: Guide[] = [
