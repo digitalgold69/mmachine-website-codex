@@ -10,10 +10,11 @@ export default function ForgotPasswordForm() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setLoading(true);
     setError("");
     setMessage("");
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
 
     try {
       const res = await fetch("/api/auth/forgot-password", {
@@ -25,7 +26,7 @@ export default function ForgotPasswordForm() {
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
       if (!res.ok) throw new Error(data.error || "The reset request failed.");
       setMessage(data.message || "If that email has dashboard access, a reset link will be sent.");
-      e.currentTarget.reset();
+      form.reset();
     } catch (err) {
       setError((err as Error).message || "The reset request failed.");
     } finally {

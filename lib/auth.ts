@@ -1294,18 +1294,32 @@ export async function removeTeamUser(input: {
 }) {
   await ensureAuthSchema();
   const db = await getD1();
+  if (input.userId === input.actor.id) {
+    throw new AuthError("You cannot remove your own account.", { status: 409, code: "self_remove" });
+  }
   const user = await assertNotFinalAdmin(db, input.userId);
 
-  await revokeUserSessions(input.userId);
+  await db.prepare("DELETE FROM auth_sessions WHERE user_id = ?").bind(input.userId).run();
   await db.prepare("DELETE FROM auth_recovery_codes WHERE user_id = ?").bind(input.userId).run();
   await db.prepare("DELETE FROM auth_password_resets WHERE user_id = ?").bind(input.userId).run();
+  await db.prepare("UPDATE auth_password_resets SET requested_by = NULL WHERE requested_by = ?").bind(input.userId).run();
   await db.prepare("DELETE FROM auth_notification_preferences WHERE user_id = ?").bind(input.userId).run();
+  await db.prepare("DELETE FROM auth_invitations WHERE email = ?").bind(user.email).run();
+  await db.prepare("UPDATE auth_invitations SET invited_by = NULL WHERE invited_by = ?").bind(input.userId).run();
+  await db
+    .prepare(
+      `DELETE FROM auth_audit_log
+       WHERE actor_user_id = ?
+          OR subject_user_id = ?
+          OR actor_email = ?
+          OR subject_email = ?`
+    )
+    .bind(input.userId, input.userId, user.email, user.email)
+    .run();
   await db.prepare("DELETE FROM auth_users WHERE id = ?").bind(input.userId).run();
   await recordAuditEvent({
     actor: input.actor,
     event: "team_user_removed",
-    subjectUserId: user.id,
-    subjectEmail: user.email,
     request: input.request,
   });
 }

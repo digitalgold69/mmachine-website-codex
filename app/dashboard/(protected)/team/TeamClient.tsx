@@ -42,12 +42,12 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
     [team.users]
   );
 
-  async function applyResponse(res: Response) {
+  async function applyResponse(res: Response, successMessage = "Saved.") {
     const data = (await res.json().catch(() => ({}))) as ApiResponse;
     if (!res.ok) throw new Error(data.error || "The team action failed.");
     if (data.team) setTeam(data.team);
     if (data.audit) setAudit(data.audit);
-    setMessage(data.warning || "Saved.");
+    setMessage(data.warning || successMessage);
     return data;
   }
 
@@ -68,7 +68,8 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
             email: String(formData.get("email") || ""),
             role: String(formData.get("role") || "admin"),
           }),
-        })
+        }),
+        "Invitation sent."
       );
       form.reset();
     } catch (err) {
@@ -78,7 +79,7 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
     }
   }
 
-  async function patch(action: string, payload: Record<string, unknown>, label: string) {
+  async function patch(action: string, payload: Record<string, unknown>, label: string, successMessage = "Saved.") {
     setBusy(label);
     setError("");
     setMessage("");
@@ -89,7 +90,8 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, ...payload }),
-        })
+        }),
+        successMessage
       );
     } catch (err) {
       setError((err as Error).message);
@@ -110,7 +112,8 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user.id }),
-        })
+        }),
+        "Account removed."
       );
     } catch (err) {
       setError((err as Error).message);
@@ -207,16 +210,18 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
         <div className="space-y-4">
           {team.users.map((user) => {
             const isFinalAdmin = user.role === "admin" && user.status === "active" && activeAdminCount <= 1;
+            const isCurrentUser = user.id === currentUserId;
+            const requireTwoFactorSetup = user.requireTwoFactorSetup && !user.totpEnabled;
             return (
               <div
                 key={user.id}
                 className="rounded-lg border border-racing/10 bg-cream/20 p-4"
               >
-                <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.9fr)_minmax(700px,2.2fr)]">
-                  <div className="min-w-0">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(270px,1.15fr)_180px_190px_minmax(250px,1fr)_160px] xl:items-start">
+                  <div className="min-w-0 md:col-span-2 xl:col-span-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <h3 className="truncate text-base font-semibold text-racing">{user.name || "Unnamed"}</h3>
-                      {user.id === currentUserId && <span className="text-xs font-semibold text-ink-muted">(you)</span>}
+                      {isCurrentUser && <span className="text-xs font-semibold text-ink-muted">(you)</span>}
                     </div>
                     <p className="mt-1 break-all text-sm text-ink-muted">{user.email}</p>
                     <dl className="mt-3 grid gap-2 text-xs text-ink-muted sm:grid-cols-2 xl:grid-cols-1">
@@ -231,79 +236,77 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
                     </dl>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[180px_190px_minmax(230px,1fr)_150px]">
-                    <ControlGroup label="Access">
-                      <select
-                        className="input h-10 py-1 text-sm"
-                        value={user.role}
-                        disabled={Boolean(busy) || isFinalAdmin}
-                        onChange={(e) =>
-                          patch("change-role", { userId: user.id, role: e.target.value }, `role-${user.id}`)
-                        }
-                      >
-                        <option value="admin">Administrator</option>
-                        <option value="member">Team Member</option>
-                      </select>
-                      <StatusBadge status={user.status} />
-                    </ControlGroup>
+                  <ControlGroup label="Access">
+                    <select
+                      className="input h-10 py-1 text-sm"
+                      value={user.role}
+                      disabled={Boolean(busy) || isFinalAdmin}
+                      onChange={(e) =>
+                        patch("change-role", { userId: user.id, role: e.target.value }, `role-${user.id}`, "Access updated.")
+                      }
+                    >
+                      <option value="admin">Administrator</option>
+                      <option value="member">Team Member</option>
+                    </select>
+                    <StatusBadge status={user.status} />
+                  </ControlGroup>
 
-                    <ControlGroup label="2FA">
-                      <TwoFactorControl
-                        user={user}
-                        currentUserId={currentUserId}
-                        busy={busy}
-                        onPatch={patch}
-                      />
-                    </ControlGroup>
+                  <ControlGroup label="2FA" adornment={<SecurityBadge enabled={user.totpEnabled} required={requireTwoFactorSetup} />}>
+                    <TwoFactorControl
+                      user={user}
+                      currentUserId={currentUserId}
+                      busy={busy}
+                      onPatch={patch}
+                    />
+                  </ControlGroup>
 
-                    <ControlGroup label="Notifications">
-                      <NotificationPicker
-                        user={user}
-                        busy={busy}
-                        onSave={(routes) =>
-                          patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`)
-                        }
-                      />
-                    </ControlGroup>
+                  <ControlGroup label="Order Notifications">
+                    <NotificationPicker
+                      user={user}
+                      busy={busy}
+                      onSave={(routes) =>
+                        patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`, "Order notifications updated.")
+                      }
+                    />
+                  </ControlGroup>
 
-                    <ControlGroup label="Actions" align="end">
+                  <ControlGroup label="Actions" align="end">
+                    <button
+                      type="button"
+                      className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+                      disabled={Boolean(busy) || user.status !== "active"}
+                      onClick={() => patch("send-reset", { userId: user.id }, `reset-${user.id}`, "Password reset link sent.")}
+                    >
+                      Reset Password
+                    </button>
+                    {user.status === "disabled" ? (
                       <button
                         type="button"
                         className="btn-secondary w-full justify-center px-3 py-2 text-sm"
-                        disabled={Boolean(busy) || user.status !== "active"}
-                        onClick={() => patch("send-reset", { userId: user.id }, `reset-${user.id}`)}
+                        disabled={Boolean(busy)}
+                        onClick={() => patch("enable", { userId: user.id }, `enable-${user.id}`, "Account enabled.")}
                       >
-                        Send reset
+                        Enable
                       </button>
-                      {user.status === "disabled" ? (
-                        <button
-                          type="button"
-                          className="btn-secondary w-full justify-center px-3 py-2 text-sm"
-                          disabled={Boolean(busy)}
-                          onClick={() => patch("enable", { userId: user.id }, `enable-${user.id}`)}
-                        >
-                          Enable
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn-secondary w-full justify-center px-3 py-2 text-sm"
-                          disabled={Boolean(busy) || isFinalAdmin}
-                          onClick={() => patch("disable", { userId: user.id }, `disable-${user.id}`)}
-                        >
-                          Disable
-                        </button>
-                      )}
+                    ) : (
                       <button
                         type="button"
-                        className="w-full px-3 py-2 text-center text-sm font-semibold text-red-700 hover:text-red-900 disabled:opacity-50"
-                        disabled={Boolean(busy) || isFinalAdmin}
-                        onClick={() => removeUser(user)}
+                        className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+                        disabled={Boolean(busy) || isFinalAdmin || isCurrentUser}
+                        onClick={() => patch("disable", { userId: user.id }, `disable-${user.id}`, "Account disabled.")}
                       >
-                        Remove
+                        Disable
                       </button>
-                    </ControlGroup>
-                  </div>
+                    )}
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-center text-sm font-semibold text-red-700 hover:text-red-900 disabled:opacity-50"
+                      disabled={Boolean(busy) || isFinalAdmin || isCurrentUser}
+                      onClick={() => removeUser(user)}
+                    >
+                      Remove
+                    </button>
+                  </ControlGroup>
                 </div>
               </div>
             );
@@ -348,15 +351,22 @@ function ControlGroup({
   label,
   children,
   align = "start",
+  adornment,
 }: {
   label: string;
   children: React.ReactNode;
   align?: "start" | "end";
+  adornment?: React.ReactNode;
 }) {
   return (
     <div className="min-w-0">
-      <div className={`mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted ${align === "end" ? "xl:text-right" : ""}`}>
-        {label}
+      <div
+        className={`mb-2 flex min-h-6 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-muted ${
+          align === "end" ? "justify-between xl:justify-end" : "justify-between"
+        }`}
+      >
+        <span>{label}</span>
+        {adornment}
       </div>
       <div className="flex min-h-[88px] flex-col items-stretch gap-2">{children}</div>
     </div>
@@ -372,7 +382,7 @@ function TwoFactorControl({
   user: TeamUser;
   currentUserId: string;
   busy: string;
-  onPatch: (action: string, payload: Record<string, unknown>, label: string) => Promise<void>;
+  onPatch: (action: string, payload: Record<string, unknown>, label: string, successMessage?: string) => Promise<void>;
 }) {
   const disabled = Boolean(busy) || user.status !== "active";
   const isCurrentUser = user.id === currentUserId;
@@ -381,8 +391,7 @@ function TwoFactorControl({
   if (isCurrentUser) {
     return (
       <div className="flex flex-col items-stretch gap-2">
-        <SecurityBadge enabled={user.totpEnabled} required={requirementActive} />
-        <Link href="/dashboard/account/security" className="btn-secondary w-full justify-center px-3 py-2 text-sm">
+        <Link href="/dashboard/account/security" className="btn-secondary h-10 w-full justify-center px-3 py-2 text-sm">
           {user.totpEnabled ? "Manage 2FA" : "Set up 2FA"}
         </Link>
       </div>
@@ -392,14 +401,13 @@ function TwoFactorControl({
   if (user.totpEnabled) {
     return (
       <div className="flex flex-col items-stretch gap-2">
-        <SecurityBadge enabled required={false} />
         <button
           type="button"
-          className="text-sm font-semibold text-red-700 hover:text-red-900 disabled:opacity-50"
+          className="h-10 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 hover:text-red-900 disabled:opacity-50"
           disabled={disabled}
           onClick={() => {
             if (window.confirm(`Turn off 2FA for ${user.email}? They will need to set it up again if required.`)) {
-              onPatch("disable-2fa", { userId: user.id }, `disable-2fa-${user.id}`);
+              onPatch("disable-2fa", { userId: user.id }, `disable-2fa-${user.id}`, "2FA turned off.");
             }
           }}
         >
@@ -411,16 +419,16 @@ function TwoFactorControl({
 
   return (
     <div className="flex flex-col items-stretch gap-2">
-      <SecurityBadge enabled={false} required={requirementActive} />
       <button
         type="button"
-        className="btn-secondary w-full justify-center px-3 py-2 text-sm"
+        className="btn-secondary h-10 w-full justify-center px-3 py-2 text-sm"
         disabled={disabled}
         onClick={() =>
           onPatch(
             "require-2fa",
             { userId: user.id, required: !requirementActive },
-            `require-2fa-${user.id}`
+            `require-2fa-${user.id}`,
+            requirementActive ? "2FA requirement cancelled." : "2FA requirement enabled."
           )
         }
       >
@@ -486,7 +494,7 @@ function NotificationPicker({
         onClick={() => setOpen((value) => !value)}
       >
         <span className="max-w-40 truncate">
-          {selectedLabels.length > 0 ? selectedLabels.join(", ") : "Default fallback"}
+          {selectedLabels.length > 0 ? selectedLabels.join(", ") : "None"}
         </span>
         <span aria-hidden="true" className="text-xs text-ink-muted">{open ? "^" : "v"}</span>
       </button>

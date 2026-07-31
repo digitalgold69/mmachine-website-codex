@@ -9,6 +9,9 @@ const auth = read("lib/auth.ts");
 const authRoute = read("app/api/auth/route.ts");
 const teamRoute = read("app/api/team/route.ts");
 const securityRoute = read("app/api/auth/security/route.ts");
+const forgotPasswordForm = read("app/dashboard/forgot-password/ForgotPasswordForm.tsx");
+const dashboardNav = read("app/dashboard/(protected)/DashboardNav.tsx");
+const teamClient = read("app/dashboard/(protected)/team/TeamClient.tsx");
 const uploadToken = read("lib/quote-upload-token.ts");
 const middleware = read("middleware.ts");
 const migration = read("migrations/0005_team_auth.sql");
@@ -51,6 +54,16 @@ assert.match(middleware, /next/, "dashboard middleware must preserve a next dest
 assert.match(middleware, /runtime = "experimental-edge"/, "dashboard middleware must use the edge runtime");
 assert.match(middleware, /AUTH_SESSION_MAX_AGE_SECONDS = 400 \* 24 \* 60 \* 60/, "dashboard session cookie should stay long-lived");
 assert.match(auth, /teamNotificationRecipientsForRoute/, "team notification recipients must be available to email routing");
+assert.match(auth, /DELETE FROM auth_sessions WHERE user_id/, "removed team users must have sessions hard-deleted");
+assert.match(auth, /DELETE FROM auth_invitations WHERE email/, "removed team users must not leave invite records that can conflict");
+assert.match(auth, /DELETE FROM auth_audit_log[\s\S]+actor_user_id[\s\S]+subject_user_id/, "removed team users must be cleared from audit records");
+assert.match(forgotPasswordForm, /const form = e\.currentTarget[\s\S]+new FormData\(form\)[\s\S]+form\.reset\(\)/, "forgot password form must keep a stable form reference across await");
+assert.doesNotMatch(forgotPasswordForm, /e\.currentTarget\.reset\(\)/, "forgot password form must not reset through a stale event target");
+assert.match(dashboardNav, /usePathname/, "dashboard nav must know the active route");
+assert.match(dashboardNav, /bg-gold text-cream/, "dashboard nav active tab must use red brand highlighting");
+assert.match(teamClient, /Reset Password/, "team reset button must use clear password reset wording");
+assert.doesNotMatch(teamClient, /Default fallback/, "team notification selector must not expose fallback copy");
+assert.match(teamClient, /Order Notifications/, "team notification column must be labelled for order notifications");
 assert.equal(uploadToken.includes("OWNER_PASSWORD"), false, "upload tokens must not depend on OWNER_PASSWORD");
 
 console.log("ok - dashboard auth security guardrails are present");
