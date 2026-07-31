@@ -13,6 +13,12 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
   if (!user) redirect("/dashboard/login");
   const params = searchParams ? await searchParams : {};
   const requiredParam = Array.isArray(params.required) ? params.required[0] : params.required;
+  const requiredReason =
+    requiredParam === "1" || user.mustChangePassword
+      ? "password"
+      : requiredParam === "2fa" || (user.requireTwoFactorSetup && !user.totpEnabled)
+        ? "2fa"
+        : null;
 
   return (
     <div>
@@ -29,9 +35,10 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
           name: user.name,
           role: user.role,
           mustChangePassword: user.mustChangePassword,
+          requireTwoFactorSetup: user.requireTwoFactorSetup,
           totpEnabled: user.totpEnabled,
         }}
-        required={requiredParam === "1" || user.mustChangePassword}
+        requiredReason={requiredReason}
       />
     </div>
   );

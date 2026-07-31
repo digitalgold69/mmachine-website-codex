@@ -16,6 +16,7 @@ export type AuthUser = {
   role: AuthRole;
   status: AuthStatus;
   mustChangePassword: boolean;
+  requireTwoFactorSetup: boolean;
   totpEnabled: boolean;
   createdAt: string;
   invitedAt: string | null;
@@ -52,6 +53,7 @@ export type TeamUser = Pick<
   | "name"
   | "role"
   | "status"
+  | "requireTwoFactorSetup"
   | "totpEnabled"
   | "createdAt"
   | "invitedAt"
@@ -256,6 +258,7 @@ function userFromRow(row: Record<string, unknown>): AuthUser {
     role: validateRole(asString(row.role)),
     status: (asString(row.status) || "active") as AuthStatus,
     mustChangePassword: boolFromDb(row.must_change_password),
+    requireTwoFactorSetup: boolFromDb(row.require_two_factor_setup),
     totpEnabled: boolFromDb(row.totp_enabled),
     createdAt: asString(row.created_at),
     invitedAt: asNullableString(row.invited_at),
@@ -288,6 +291,7 @@ function teamUserFromAuthUser(user: AuthUser, notificationRoutes: NotificationRo
     name: user.name,
     role: user.role,
     status: user.status,
+    requireTwoFactorSetup: user.requireTwoFactorSetup,
     totpEnabled: user.totpEnabled,
     createdAt: user.createdAt,
     invitedAt: user.invitedAt,
@@ -317,6 +321,7 @@ async function ensureAuthSchemaInner() {
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled', 'removed')),
       password_hash TEXT NOT NULL,
       must_change_password INTEGER NOT NULL DEFAULT 0,
+      require_two_factor_setup INTEGER NOT NULL DEFAULT 0,
       totp_secret TEXT,
       totp_pending_secret TEXT,
       totp_enabled INTEGER NOT NULL DEFAULT 0,
@@ -405,6 +410,7 @@ async function ensureAuthSchemaInner() {
     `ALTER TABLE auth_users ADD COLUMN failed_login_count INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE auth_users ADD COLUMN locked_until TEXT`,
     `ALTER TABLE auth_users ADD COLUMN security_version INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE auth_users ADD COLUMN require_two_factor_setup INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE auth_sessions ADD COLUMN security_version INTEGER NOT NULL DEFAULT 0`,
   ];
 
@@ -1215,6 +1221,72 @@ export async function enableTeamUser(input: {
   });
 }
 
+export async function setTeamUserTwoFactorRequirement(input: {
+  userId: string;
+  required: boolean;
+  actor: AuthUser;
+  request?: Request;
+}) {
+  await ensureAuthSchema();
+  const db = await getD1();
+  const row = await getUserRowById(db, input.userId);
+  if (!row) throw new AuthError("User not found.", { status: 404, code: "not_found" });
+  const user = userFromRow(row);
+  if (user.status !== "active") {
+    throw new AuthError("Only active users can be changed.", { status: 409, code: "inactive_user" });
+  }
+
+  await db
+    .prepare("UPDATE auth_users SET require_two_factor_setup = ?, updated_at = ? WHERE id = ?")
+    .bind(input.required ? 1 : 0, nowIso(), user.id)
+    .run();
+  await recordAuditEvent({
+    actor: input.actor,
+    event: input.required ? "team_user_two_factor_required" : "team_user_two_factor_requirement_removed",
+    subjectUserId: user.id,
+    subjectEmail: user.email,
+    request: input.request,
+  });
+}
+
+export async function disableTeamUserTwoFactor(input: {
+  userId: string;
+  actor: AuthUser;
+  request?: Request;
+}) {
+  await ensureAuthSchema();
+  const db = await getD1();
+  const row = await getUserRowById(db, input.userId);
+  if (!row) throw new AuthError("User not found.", { status: 404, code: "not_found" });
+  const user = userFromRow(row);
+  if (user.id === input.actor.id) {
+    throw new AuthError("Use Account Security to change your own 2FA.", {
+      status: 409,
+      code: "self_two_factor_change",
+    });
+  }
+  if (!user.totpEnabled && !user.requireTwoFactorSetup) return;
+
+  await db.prepare("DELETE FROM auth_recovery_codes WHERE user_id = ?").bind(user.id).run();
+  await db
+    .prepare(
+      `UPDATE auth_users
+       SET totp_secret = NULL, totp_pending_secret = NULL, totp_enabled = 0,
+           require_two_factor_setup = 0, security_version = security_version + 1, updated_at = ?
+       WHERE id = ?`
+    )
+    .bind(nowIso(), user.id)
+    .run();
+  await revokeUserSessions(user.id);
+  await recordAuditEvent({
+    actor: input.actor,
+    event: "team_user_two_factor_disabled",
+    subjectUserId: user.id,
+    subjectEmail: user.email,
+    request: input.request,
+  });
+}
+
 export async function removeTeamUser(input: {
   userId: string;
   actor: AuthUser;
@@ -1554,7 +1626,8 @@ export async function confirmTwoFactorSetup(input: {
   await db
     .prepare(
       `UPDATE auth_users
-       SET totp_secret = ?, totp_pending_secret = NULL, totp_enabled = 1, updated_at = ?
+       SET totp_secret = ?, totp_pending_secret = NULL, totp_enabled = 1,
+           require_two_factor_setup = 0, updated_at = ?
        WHERE id = ?`
     )
     .bind(pendingSecret, nowIso(), input.user.id)
@@ -1587,7 +1660,7 @@ export async function disableTwoFactor(input: {
     .prepare(
       `UPDATE auth_users
        SET totp_secret = NULL, totp_pending_secret = NULL, totp_enabled = 0,
-           updated_at = ?
+           require_two_factor_setup = 0, updated_at = ?
        WHERE id = ?`
     )
     .bind(nowIso(), input.user.id)

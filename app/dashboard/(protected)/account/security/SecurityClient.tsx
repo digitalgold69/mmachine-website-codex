@@ -3,11 +3,11 @@
 import { useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 
-type PublicUser = Pick<AuthUser, "email" | "name" | "role" | "mustChangePassword" | "totpEnabled">;
+type PublicUser = Pick<AuthUser, "email" | "name" | "role" | "mustChangePassword" | "requireTwoFactorSetup" | "totpEnabled">;
 
 type SecurityClientProps = {
   initialUser: PublicUser;
-  required: boolean;
+  requiredReason: "password" | "2fa" | null;
 };
 
 type SecurityResponse = {
@@ -20,9 +20,15 @@ type SecurityResponse = {
   recoveryCodes?: string[];
 };
 
-export default function SecurityClient({ initialUser, required }: SecurityClientProps) {
+export default function SecurityClient({ initialUser, requiredReason }: SecurityClientProps) {
   const [user, setUser] = useState(initialUser);
-  const [message, setMessage] = useState(required ? "Please choose a new password before continuing." : "");
+  const [message, setMessage] = useState(
+    requiredReason === "password"
+      ? "Please choose a new password before continuing."
+      : requiredReason === "2fa"
+        ? "Please set up two-factor authentication before continuing."
+        : ""
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [showPassword, setShowPassword] = useState(false);

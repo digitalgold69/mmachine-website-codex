@@ -18,6 +18,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (user.mustChangePassword && !requestedPath.startsWith("/dashboard/account/security")) {
     redirect("/dashboard/account/security?required=1");
   }
+  if (
+    user.requireTwoFactorSetup &&
+    !user.totpEnabled &&
+    !requestedPath.startsWith("/dashboard/account/security")
+  ) {
+    redirect("/dashboard/account/security?required=2fa");
+  }
 
   let newRequestCount = 0;
 
