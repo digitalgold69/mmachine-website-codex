@@ -38,10 +38,13 @@ async function main() {
   assert.match(miniPage, /Download \{currentSection\.code\} Section PDF/, "Mini section summary must link to section PDF downloads");
   assert.match(miniPage, /Download Full PDF Catalogue/, "Mini section summary must link to the full PDF");
   assert.match(miniPage, /miniCatalogueVersion/, "Section download links must be cache-busted with the latest catalogue version");
+  assert.doesNotMatch(miniPage, /href=\{`\/api\/catalogue\/mini-sections[\s\S]*?download/, "Mini section PDFs should open in a browser tab instead of auto-downloading");
+  assert.match(miniPage, /target="_blank"[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mini section PDF links should open in a new tab");
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
   assert.match(sectionPdfRoute, /fetch\(sourceUrl,\s*\{\s*cache:\s*"no-store"\s*\}\)/, "Local section PDF generation must keep a direct-fetch fallback");
+  assert.match(sectionPdfRoute, /"Content-Disposition": `inline;/, "Section PDFs should render in-browser by default");
 
   const guideDates = guides.map((guide) => Date.parse(guide.publishedAt));
   assert.deepEqual(

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getCurrentUser, loginUrlFor } from "@/lib/auth";
 import { countNewQuoteRequests } from "@/lib/quotes";
 import DashboardNav from "./DashboardNav";
+import DashboardLiveUpdates from "./DashboardLiveUpdates";
 import BrandMark from "@/components/BrandMark";
 import SignOutButton from "./SignOutButton";
 
@@ -52,6 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <DashboardNav initialNewRequestCount={newRequestCount} userRole={user.role} />
+        <DashboardLiveUpdates />
         <main className="min-w-0">{children}</main>
       </div>
     </div>

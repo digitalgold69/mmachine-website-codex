@@ -253,6 +253,9 @@ assert.deepEqual(setup.recipients.featured, ["featured@example.test"]);
 assert.deepEqual(setup.recipients.enquiry, ["enquiries@example.test"]);
 
 const ownerHtml = buildOwnerQuoteEmail(quote);
+assert.doesNotMatch(ownerHtml, /<img\b/i);
+assert.doesNotMatch(ownerHtml, /<link\b/i);
+assert.doesNotMatch(ownerHtml, /<style\b/i);
 assert.match(ownerHtml, /Alice Buyer/);
 assert.match(ownerHtml, /alice@example\.test/);
 assert.match(ownerHtml, /01325 000000/);
@@ -298,6 +301,9 @@ assert.match(enquiryHtml, /RP-120/);
 assert.match(enquiryHtml, /https:\/\/example\.test\/products\/mini-rear-panel/);
 
 const customerHtml = buildCustomerInvoiceEmail(quote);
+assert.doesNotMatch(customerHtml, /<img\b/i);
+assert.doesNotMatch(customerHtml, /<link\b/i);
+assert.doesNotMatch(customerHtml, /<style\b/i);
 assert.match(customerHtml, /Hello Alice Buyer/);
 assert.match(customerHtml, /Order invoice/);
 assert.match(customerHtml, /See your order summary below\./);

@@ -186,14 +186,16 @@ export default function MiniCataloguePage() {
                 <span className="text-ink-muted">{currentSection.subtitle}</span>
                 <a
                   href={`/api/catalogue/mini-sections/${encodeURIComponent(currentSection.code)}/pdf?v=${miniCatalogueVersion}`}
-                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
                 >
                   Download {currentSection.code} Section PDF
                 </a>
                 <a
                   href={miniCatalogueUrl}
-                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="font-semibold text-racing underline-offset-2 hover:text-gold hover:underline"
                 >
                   Download Full PDF Catalogue

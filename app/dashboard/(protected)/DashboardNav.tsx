@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
+type QuoteRequestsUpdatedEvent = CustomEvent<{
+  newRequestCount?: number;
+}>;
+
 export default function DashboardNav({
   initialNewRequestCount,
   userRole,
@@ -19,8 +23,19 @@ export default function DashboardNav({
       setNewRequestCount((count) => Math.max(0, count - 1));
     }
 
+    function handleQuoteRequestsUpdated(event: Event) {
+      const detail = (event as QuoteRequestsUpdatedEvent).detail;
+      if (typeof detail?.newRequestCount === "number") {
+        setNewRequestCount(detail.newRequestCount);
+      }
+    }
+
     window.addEventListener("mmachine:new-quote-viewed", handleViewed);
-    return () => window.removeEventListener("mmachine:new-quote-viewed", handleViewed);
+    window.addEventListener("mmachine:quote-requests-updated", handleQuoteRequestsUpdated);
+    return () => {
+      window.removeEventListener("mmachine:new-quote-viewed", handleViewed);
+      window.removeEventListener("mmachine:quote-requests-updated", handleQuoteRequestsUpdated);
+    };
   }, []);
 
   function linkClass(href: string) {

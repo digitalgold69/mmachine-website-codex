@@ -36,6 +36,10 @@ type ProductsResponse = {
   error?: string;
 };
 
+type QuoteRequestsUpdatedEvent = CustomEvent<{
+  quotes?: QuoteRequest[];
+}>;
+
 type ManualLineDraft = {
   qty: string;
   item: string;
@@ -295,6 +299,15 @@ function fileHref(key: string) {
 
 function cloneQuote(quote: QuoteRequest): QuoteRequest {
   return JSON.parse(JSON.stringify(quote));
+}
+
+function mergeQuoteUpdates(current: QuoteRequest[], incoming: QuoteRequest[]) {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((quote) => [quote.id, quote]));
+  for (const quote of incoming) {
+    byId.set(quote.id, quote);
+  }
+  return [...byId.values()];
 }
 
 function statusLabel(status: QuoteStatus) {
@@ -781,6 +794,20 @@ export default function OrdersClient({
     const timeout = window.setTimeout(() => setAddLineNotice(null), 1800);
     return () => window.clearTimeout(timeout);
   }, [addLineNotice]);
+
+  useEffect(() => {
+    function handleQuoteRequestsUpdated(event: Event) {
+      const detail = (event as QuoteRequestsUpdatedEvent).detail;
+      const incoming = Array.isArray(detail?.quotes) ? detail.quotes : [];
+      if (incoming.length === 0) return;
+
+      setQuotes((current) => mergeQuoteUpdates(current, incoming));
+      setHistoryRows((current) => current.map((quote) => incoming.find((item) => item.id === quote.id) || quote));
+    }
+
+    window.addEventListener("mmachine:quote-requests-updated", handleQuoteRequestsUpdated);
+    return () => window.removeEventListener("mmachine:quote-requests-updated", handleQuoteRequestsUpdated);
+  }, []);
 
   useEffect(() => {
     if (!requestedQuoteId) {
