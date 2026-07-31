@@ -12,6 +12,7 @@ import {
   requireAdminUser,
   requireSameOrigin,
   resendTeamInvitation,
+  updateTeamUserNotificationRoutes,
   updateTeamUserRole,
   type AuthRole,
 } from "@/lib/auth";
@@ -75,6 +76,7 @@ export async function PATCH(req: Request) {
       userId?: string;
       invitationId?: string;
       role?: AuthRole;
+      routes?: unknown;
     };
 
     let delivery: unknown = null;
@@ -106,6 +108,14 @@ export async function PATCH(req: Request) {
         await updateTeamUserRole({
           userId: String(body.userId || ""),
           role: body.role === "admin" ? "admin" : "member",
+          actor,
+          request: req,
+        });
+        break;
+      case "notifications":
+        await updateTeamUserNotificationRoutes({
+          userId: String(body.userId || ""),
+          routes: body.routes,
           actor,
           request: req,
         });

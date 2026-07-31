@@ -36,6 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const guidePages: MetadataRoute.Sitemap = guides.map((guide) => ({
     url: `${SITE_URL}${guideUrl(guide)}`,
+    lastModified: guide.publishedAt,
     priority: 0.72,
   }));
 

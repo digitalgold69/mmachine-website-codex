@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { AuditLogRow, TeamInvitation, TeamUser } from "@/lib/auth";
+import { useEffect, useMemo, useState } from "react";
+import type { AuditLogRow, NotificationRoute, TeamInvitation, TeamUser } from "@/lib/auth";
 
 type TeamState = {
   users: TeamUser[];
@@ -21,6 +21,13 @@ type ApiResponse = {
   team?: TeamState;
   audit?: AuditLogRow[];
 };
+
+const notificationOptions: { id: NotificationRoute; label: string }[] = [
+  { id: "mini", label: "Mini panels" },
+  { id: "metals", label: "Metals" },
+  { id: "custom", label: "Custom work" },
+  { id: "featured", label: "Featured work" },
+];
 
 export default function TeamClient({ initialTeam, initialAudit, currentUserId }: TeamClientProps) {
   const [team, setTeam] = useState(initialTeam);
@@ -205,6 +212,7 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
                 <th className="border-b border-racing/10 px-3 py-2">Role</th>
                 <th className="border-b border-racing/10 px-3 py-2">Status</th>
                 <th className="border-b border-racing/10 px-3 py-2">2FA</th>
+                <th className="border-b border-racing/10 px-3 py-2">Notifications</th>
                 <th className="border-b border-racing/10 px-3 py-2">Invited</th>
                 <th className="border-b border-racing/10 px-3 py-2">Last login</th>
                 <th className="border-b border-racing/10 px-3 py-2 text-right">Actions</th>
@@ -237,6 +245,15 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
                       <StatusBadge status={user.status} />
                     </td>
                     <td className="border-b border-racing/5 px-3 py-3">{user.totpEnabled ? "Enabled" : "Off"}</td>
+                    <td className="border-b border-racing/5 px-3 py-3">
+                      <NotificationPicker
+                        user={user}
+                        busy={busy}
+                        onSave={(routes) =>
+                          patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`)
+                        }
+                      />
+                    </td>
                     <td className="border-b border-racing/5 px-3 py-3">{formatOptionalDate(user.invitedAt || user.createdAt)}</td>
                     <td className="border-b border-racing/5 px-3 py-3">{formatOptionalDate(user.lastLoginAt)}</td>
                     <td className="border-b border-racing/5 px-3 py-3">
@@ -317,6 +334,75 @@ function StatusBadge({ status }: { status: TeamUser["status"] }) {
         ? "bg-amber-50 text-amber-800"
         : "bg-red-50 text-red-800";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${classes}`}>{label}</span>;
+}
+
+function NotificationPicker({
+  user,
+  busy,
+  onSave,
+}: {
+  user: TeamUser;
+  busy: string;
+  onSave: (routes: NotificationRoute[]) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<NotificationRoute[]>(user.notificationRoutes || []);
+  const busyKey = `notifications-${user.id}`;
+  const saving = busy === busyKey;
+  const disabled = Boolean(busy) || user.status !== "active";
+  const selectedLabels = notificationOptions
+    .filter((option) => draft.includes(option.id))
+    .map((option) => option.label);
+  const originalKey = (user.notificationRoutes || []).join("|");
+  const draftKey = draft.join("|");
+
+  useEffect(() => {
+    setDraft(user.notificationRoutes || []);
+  }, [originalKey, user.notificationRoutes]);
+
+  function toggle(route: NotificationRoute, checked: boolean) {
+    setDraft((current) => {
+      const next = checked ? [...current, route] : current.filter((item) => item !== route);
+      return notificationOptions.map((option) => option.id).filter((option) => next.includes(option));
+    });
+  }
+
+  return (
+    <details className="min-w-52">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-racing/10 bg-white px-3 py-2 text-sm font-semibold text-racing hover:border-racing/30">
+        <span className="max-w-40 truncate">
+          {selectedLabels.length > 0 ? selectedLabels.join(", ") : "Default fallback"}
+        </span>
+        <span aria-hidden="true" className="text-xs text-ink-muted">v</span>
+      </summary>
+      <div className="mt-2 rounded-lg border border-racing/10 bg-cream p-3 shadow-sm">
+        <div className="space-y-2">
+          {notificationOptions.map((option) => (
+            <label key={option.id} className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-racing"
+                checked={draft.includes(option.id)}
+                disabled={disabled}
+                onChange={(event) => toggle(option.id, event.target.checked)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-ink-muted">
+          Empty uses the Cloudflare fallback. Disabled users do not receive emails.
+        </p>
+        <button
+          type="button"
+          className="btn-secondary mt-3 w-full justify-center px-3 py-2 text-sm"
+          disabled={disabled || draftKey === originalKey}
+          onClick={() => onSave(draft)}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </details>
+  );
 }
 
 function roleLabel(role: "admin" | "member") {

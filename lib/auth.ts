@@ -5,6 +5,9 @@ import { getD1, type D1DatabaseBinding } from "./cloudflare";
 
 export type AuthRole = "admin" | "member";
 export type AuthStatus = "active" | "disabled" | "removed";
+export type NotificationRoute = "mini" | "metals" | "custom" | "featured";
+
+export const NOTIFICATION_ROUTES: NotificationRoute[] = ["mini", "metals", "custom", "featured"];
 
 export type AuthUser = {
   id: string;
@@ -54,7 +57,9 @@ export type TeamUser = Pick<
   | "invitedAt"
   | "lastLoginAt"
   | "disabledAt"
->;
+> & {
+  notificationRoutes: NotificationRoute[];
+};
 
 export type AuditLogRow = {
   id: string;
@@ -90,8 +95,8 @@ export function authErrorResponse(err: unknown, fallback = "The request could no
 }
 
 const COOKIE_NAME = "mmachine_session";
-const SESSION_HOURS = 12;
-const SESSION_MAX_AGE_SECONDS = SESSION_HOURS * 60 * 60;
+const SESSION_DAYS = 400;
+const SESSION_MAX_AGE_SECONDS = SESSION_DAYS * 24 * 60 * 60;
 const PASSWORD_ITERATIONS = 100000;
 const INITIAL_ADMIN_EMAIL = "hodltid@icloud.com";
 const INITIAL_ADMIN_PASSWORD_HASH =
@@ -227,6 +232,22 @@ function validateRole(role: string): AuthRole {
   throw new AuthError("Choose a valid role.", { code: "invalid_role" });
 }
 
+function validateNotificationRoute(route: string): NotificationRoute {
+  if ((NOTIFICATION_ROUTES as string[]).includes(route)) return route as NotificationRoute;
+  throw new AuthError("Choose a valid notification type.", { code: "invalid_notification_route" });
+}
+
+function normalizeNotificationRoutes(routes: unknown): NotificationRoute[] {
+  if (!Array.isArray(routes)) return [];
+  const unique = new Set<NotificationRoute>();
+  for (const route of routes) {
+    if (typeof route === "string" && (NOTIFICATION_ROUTES as string[]).includes(route)) {
+      unique.add(route as NotificationRoute);
+    }
+  }
+  return NOTIFICATION_ROUTES.filter((route) => unique.has(route));
+}
+
 function userFromRow(row: Record<string, unknown>): AuthUser {
   return {
     id: asString(row.id),
@@ -257,6 +278,22 @@ function invitationFromRow(row: Record<string, unknown>): TeamInvitation {
     acceptedAt: asNullableString(row.accepted_at),
     cancelledAt: asNullableString(row.cancelled_at),
     invitedBy: asNullableString(row.invited_by),
+  };
+}
+
+function teamUserFromAuthUser(user: AuthUser, notificationRoutes: NotificationRoute[] = []): TeamUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    status: user.status,
+    totpEnabled: user.totpEnabled,
+    createdAt: user.createdAt,
+    invitedAt: user.invitedAt,
+    lastLoginAt: user.lastLoginAt,
+    disabledAt: user.disabledAt,
+    notificationRoutes: normalizeNotificationRoutes(notificationRoutes),
   };
 }
 
@@ -345,6 +382,12 @@ async function ensureAuthSchemaInner() {
       metadata TEXT,
       created_at TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS auth_notification_preferences (
+      user_id TEXT NOT NULL,
+      route TEXT NOT NULL CHECK (route IN ('mini', 'metals', 'custom', 'featured')),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, route)
+    )`,
     `CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions(token_hash)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email)`,
@@ -352,6 +395,7 @@ async function ensureAuthSchemaInner() {
     `CREATE INDEX IF NOT EXISTS idx_auth_password_resets_token_hash ON auth_password_resets(token_hash)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_recovery_codes_user_id ON auth_recovery_codes(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_audit_created_at ON auth_audit_log(created_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_auth_notification_preferences_route ON auth_notification_preferences(route)`,
   ];
 
   for (const statement of statements) await executeSchema(db, statement);
@@ -453,7 +497,7 @@ export async function createSession(user: Pick<AuthUser, "id" | "securityVersion
   await ensureAuthSchema();
   const db = await getD1();
   const token = randomToken();
-  const expiresAt = addHours(SESSION_HOURS);
+  const expiresAt = addSeconds(SESSION_MAX_AGE_SECONDS);
   await db
     .prepare(
       `INSERT INTO auth_sessions
@@ -522,15 +566,16 @@ async function getCurrentSession() {
     return null;
   }
 
+  const refreshedExpiresAt = addSeconds(SESSION_MAX_AGE_SECONDS);
   await db
-    .prepare("UPDATE auth_sessions SET last_seen_at = ? WHERE id = ?")
-    .bind(nowIso(), asString(row.session_id))
+    .prepare("UPDATE auth_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?")
+    .bind(nowIso(), refreshedExpiresAt, asString(row.session_id))
     .run();
 
   return {
     id: asString(row.session_id),
     user,
-    expiresAt,
+    expiresAt: refreshedExpiresAt,
     tokenHash,
   } satisfies AuthSession;
 }
@@ -763,11 +808,88 @@ export async function listTeam() {
        ORDER BY created_at DESC`
     )
     .all<Record<string, unknown>>();
+  const preferenceRows = await db
+    .prepare(
+      `SELECT user_id, route
+       FROM auth_notification_preferences
+       ORDER BY route ASC`
+    )
+    .all<Record<string, unknown>>();
+  const routesByUser = new Map<string, NotificationRoute[]>();
+  for (const row of preferenceRows.results || []) {
+    const userId = asString(row.user_id);
+    const route = validateNotificationRoute(asString(row.route));
+    routesByUser.set(userId, [...(routesByUser.get(userId) || []), route]);
+  }
 
   return {
-    users: (usersRows.results || []).map(userFromRow) as TeamUser[],
+    users: (usersRows.results || []).map((row) => {
+      const user = userFromRow(row);
+      return teamUserFromAuthUser(user, routesByUser.get(user.id) || []);
+    }),
     invitations: (invitationRows.results || []).map(invitationFromRow),
   };
+}
+
+export async function updateTeamUserNotificationRoutes(input: {
+  userId: string;
+  routes: unknown;
+  actor: AuthUser;
+  request?: Request;
+}) {
+  await ensureAuthSchema();
+  const db = await getD1();
+  const row = await getUserRowById(db, input.userId);
+  if (!row) throw new AuthError("User not found.", { status: 404, code: "not_found" });
+  const user = userFromRow(row);
+  const routes = normalizeNotificationRoutes(input.routes);
+  const createdAt = nowIso();
+
+  await db.prepare("DELETE FROM auth_notification_preferences WHERE user_id = ?").bind(user.id).run();
+  for (const route of routes) {
+    await db
+      .prepare(
+        `INSERT INTO auth_notification_preferences
+          (user_id, route, created_at)
+         VALUES (?, ?, ?)`
+      )
+      .bind(user.id, route, createdAt)
+      .run();
+  }
+
+  await recordAuditEvent({
+    actor: input.actor,
+    event: "team_user_notifications_changed",
+    subjectUserId: user.id,
+    subjectEmail: user.email,
+    request: input.request,
+    metadata: { routes },
+  });
+}
+
+export async function teamNotificationRecipientsForRoute(route: NotificationRoute) {
+  await ensureAuthSchema();
+  const db = await getD1();
+  const cleanRoute = validateNotificationRoute(route);
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT u.email
+       FROM auth_notification_preferences p
+       JOIN auth_users u ON u.id = p.user_id
+       WHERE p.route = ?
+         AND u.status = 'active'
+       ORDER BY u.email ASC`
+    )
+    .bind(cleanRoute)
+    .all<{ email: string }>();
+
+  return Array.from(
+    new Set(
+      (rows.results || [])
+        .map((row) => normalizeEmail(row.email))
+        .filter((email) => isValidEmail(email))
+    )
+  );
 }
 
 export async function listAuditEvents(limit = 25) {
@@ -1105,6 +1227,7 @@ export async function removeTeamUser(input: {
   await revokeUserSessions(input.userId);
   await db.prepare("DELETE FROM auth_recovery_codes WHERE user_id = ?").bind(input.userId).run();
   await db.prepare("DELETE FROM auth_password_resets WHERE user_id = ?").bind(input.userId).run();
+  await db.prepare("DELETE FROM auth_notification_preferences WHERE user_id = ?").bind(input.userId).run();
   await db.prepare("DELETE FROM auth_users WHERE id = ?").bind(input.userId).run();
   await recordAuditEvent({
     actor: input.actor,

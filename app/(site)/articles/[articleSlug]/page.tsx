@@ -56,7 +56,10 @@ export default async function ArticlePage({ params }: PageProps) {
     author: { "@type": "Organization", name: "M-Machine", url: absoluteUrl("/") },
     publisher: { "@type": "Organization", name: "M-Machine", url: absoluteUrl("/") },
     about: article.category,
+    datePublished: article.publishedAt,
+    dateModified: article.publishedAt,
   };
+  const isReverseEngineeringGuide = article.slug === "reverse-engineering-worn-parts";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -97,18 +100,33 @@ export default async function ArticlePage({ params }: PageProps) {
           <div className="min-w-0">
             <ArticleContent slug={article.slug} />
 
-            <section className="mt-12 rounded-lg bg-racing p-7 text-cream">
-              <h2 className="font-display text-2xl mb-3">Need help choosing a material or process?</h2>
-              <p className="mb-5 max-w-2xl text-sm leading-7 text-cream/80">
-                Send us the grade, dimensions, drawing or a description of the job. We will help you identify the next step.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/contact" className="btn-gold">Ask M-Machine</Link>
-                <Link href="/catalogue/metals" className="inline-flex items-center rounded-lg border border-cream/40 px-5 py-3 text-sm font-semibold hover:bg-cream hover:text-racing">
-                  Browse metals
-                </Link>
-              </div>
-            </section>
+            {isReverseEngineeringGuide ? (
+              <section className="mt-12 rounded-lg bg-racing p-7 text-cream">
+                <h2 className="font-display text-2xl mb-3">Need a worn or obsolete part reverse engineered?</h2>
+                <p className="mb-5 max-w-2xl text-sm leading-7 text-cream/80">
+                  Send photos, measurements, drawings or the sample details through the custom work form. We will review the job and come back with the next practical step.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/custom-engineering#quote-form" className="btn-gold">Get started</Link>
+                  <Link href="/custom-engineering/guide" className="inline-flex items-center rounded-lg border border-cream/40 px-5 py-3 text-sm font-semibold hover:bg-cream hover:text-racing">
+                    Read the custom work guide
+                  </Link>
+                </div>
+              </section>
+            ) : (
+              <section className="mt-12 rounded-lg bg-racing p-7 text-cream">
+                <h2 className="font-display text-2xl mb-3">Need help choosing a material or process?</h2>
+                <p className="mb-5 max-w-2xl text-sm leading-7 text-cream/80">
+                  Send us the grade, dimensions, drawing or a description of the job. We will help you identify the next step.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/contact" className="btn-gold">Ask M-Machine</Link>
+                  <Link href="/catalogue/metals" className="inline-flex items-center rounded-lg border border-cream/40 px-5 py-3 text-sm font-semibold hover:bg-cream hover:text-racing">
+                    Browse metals
+                  </Link>
+                </div>
+              </section>
+            )}
           </div>
 
           <aside className="lg:pt-2">

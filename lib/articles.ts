@@ -8,6 +8,7 @@ export type Guide = {
   image: string;
   imageAlt: string;
   readingTime: string;
+  publishedAt: string;
 };
 
 export type Article = Omit<Guide, "id" | "href"> & {
@@ -25,6 +26,7 @@ export const articles: Article[] = [
     image: "/articles/reverse-engineering-worn-parts/hero.jpg",
     imageAlt: "Thread cutting a replacement component on a lathe",
     readingTime: "9 min read",
+    publishedAt: "2026-07-31",
   },
   {
     slug: "metal-grades-and-uses",
@@ -36,6 +38,7 @@ export const articles: Article[] = [
     image: "/articles/metal-grades/en8d.jpg",
     imageAlt: "EN8 engineering steel and a machined component",
     readingTime: "10 min read",
+    publishedAt: "2026-07-10",
   },
   {
     slug: "what-en-and-bs970-mean",
@@ -47,6 +50,7 @@ export const articles: Article[] = [
     image: "/articles/en-bs970/meaning.jpg",
     imageAlt: "Engineering steel grade reference for EN and BS970 specifications",
     readingTime: "6 min read",
+    publishedAt: "2026-07-09",
   },
   {
     slug: "heat-treating-tool-steel",
@@ -58,6 +62,7 @@ export const articles: Article[] = [
     image: "/articles/heat-treatment/hero.jpg",
     imageAlt: "Tool steel being heated in a workshop",
     readingTime: "11 min read",
+    publishedAt: "2026-07-08",
   },
   {
     slug: "how-to-use-a-dividing-head",
@@ -69,11 +74,11 @@ export const articles: Article[] = [
     image: "/articles/dividing-head/hero.jpg",
     imageAlt: "Dividing head and rotary index table in a machine workshop",
     readingTime: "12 min read",
+    publishedAt: "2026-07-07",
   },
 ];
 
-export const guides: Guide[] = [
-  {
+const customEngineeringGuide: Guide = {
     id: "custom-engineering-guide",
     href: "/custom-engineering/guide",
     title: "Custom Engineering: From Drawing to Finished Part",
@@ -84,13 +89,17 @@ export const guides: Guide[] = [
     image: "/custom-engineering/cnc-machining.jpg",
     imageAlt: "CNC machining in the M-Machine workshop",
     readingTime: "8 min read",
-  },
+    publishedAt: "2026-07-01",
+  };
+
+export const guides: Guide[] = [
+  customEngineeringGuide,
   ...articles.map((article) => ({
     ...article,
     id: article.slug,
     href: `/articles/${article.slug}`,
   })),
-];
+].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 
 export function getArticle(slug: string) {
   return articles.find((article) => article.slug === slug);

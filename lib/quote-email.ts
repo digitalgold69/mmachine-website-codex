@@ -1,5 +1,6 @@
 import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-sdk/client-sesv2";
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
+import { teamNotificationRecipientsForRoute, type NotificationRoute } from "./auth";
 import { getCloudflareEnv } from "./cloudflare";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
@@ -520,7 +521,24 @@ export function ownerQuoteRecipients(quote: QuoteRequest, env: EmailEnv = proces
   return unique.length > 0 ? unique : ownerFallbackRecipients(env);
 }
 
+function notificationRouteForQuote(quote: QuoteRequest): NotificationRoute {
+  const kinds = new Set(quote.items.map((item) => item.catalogue));
+  if (kinds.size > 1) return "mini";
+  if (kinds.has("metals")) return "metals";
+  if (kinds.has("custom")) return "custom";
+  if (kinds.has("featured")) return "featured";
+  return "mini";
+}
+
 export async function ownerQuoteRecipientsForRuntime(quote: QuoteRequest) {
+  try {
+    const teamRecipients = await teamNotificationRecipientsForRoute(notificationRouteForQuote(quote));
+    if (teamRecipients.length > 0) return teamRecipients;
+  } catch (err) {
+    console.warn("team_notification_recipients_unavailable", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
+  }
   return ownerQuoteRecipients(quote, await emailRuntimeEnv());
 }
 

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 type ArticleContentProps = {
   slug: string;
@@ -34,6 +35,23 @@ function Note({ children }: { children: React.ReactNode }) {
     <aside className="my-8 border-l-4 border-gold bg-cream-dark px-5 py-4 text-sm leading-7 text-ink">
       {children}
     </aside>
+  );
+}
+
+function ReverseEngineeringInlineCta() {
+  return (
+    <section className="my-10 border border-racing/10 bg-cream-dark p-6">
+      <p className="text-xs font-semibold uppercase tracking-[2px] text-gold">Custom work quote</p>
+      <h2 className="mt-2 font-display text-2xl text-racing">Need a part reverse engineered?</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">
+        Upload photos, drawings or notes through the custom work form. Add what the part does and any known sizes, then
+        M-Machine can review it and come back with what is needed next.
+      </p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link href="/custom-engineering#quote-form" className="btn-primary">Get started</Link>
+        <Link href="/custom-engineering/guide" className="btn-secondary">What to send</Link>
+      </div>
+    </section>
   );
 }
 
@@ -429,6 +447,7 @@ function ReverseEngineeringWornPartsArticle() {
         <li><strong>Material or use:</strong> tell us if it needs to be stainless, aluminium, mild steel, tool steel or a specific grade.</li>
         <li><strong>Finish:</strong> bare machined, polished, painted, plated, heat treated or supplied ready for your own finishing.</li>
       </ul>
+      <ReverseEngineeringInlineCta />
 
       <h2 className={headingClass}>Measuring A Worn Part</h2>
       <p className={paragraphClass}>
