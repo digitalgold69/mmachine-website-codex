@@ -9,6 +9,7 @@ import { metals } from "@/lib/metals-data";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import FeaturedWorkGrid from "@/components/FeaturedWorkGrid";
+import HomeHeroCarousel, { type HomeHeroSlide } from "@/components/HomeHeroCarousel";
 import { guideUrl, guides } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,32 @@ const heroJpegSrcSet = [
   "/home/mmachine-services-hero-960.jpg 960w",
   "/home/mmachine-services-hero-1280.jpg 1280w",
 ].join(", ");
+const heroV3AvifSrcSet = [
+  "/home/mmachine-hero-v3-640.avif 640w",
+  "/home/mmachine-hero-v3-960.avif 960w",
+  "/home/mmachine-hero-v3-1280.avif 1280w",
+].join(", ");
+const heroV3JpegSrcSet = "/home/mmachine-hero-v3-1280.jpg 1280w";
+const currentHeroSlide: HomeHeroSlide = {
+  label: "current services hero",
+  alt: "Classic Mini panels, precision machining and engineering metals at M-Machine",
+  avifSrcSet: heroAvifSrcSet,
+  webpSrcSet: heroWebpSrcSet,
+  jpegSrcSet: heroJpegSrcSet,
+  fallbackSrc: "/home/mmachine-services-hero-1280.jpg",
+  width: 1280,
+  height: 853,
+};
+const comparisonHeroSlide: HomeHeroSlide = {
+  label: "CNC machined Mini panel hero option",
+  alt: "CNC machined Mini panel tooling in the M-Machine workshop",
+  avifSrcSet: heroV3AvifSrcSet,
+  jpegSrcSet: heroV3JpegSrcSet,
+  fallbackSrc: "/home/mmachine-hero-v3-1280.jpg",
+  width: 1280,
+  height: 853,
+};
+const heroSlides = [currentHeroSlide, comparisonHeroSlide];
 const transparentPixel =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
@@ -90,36 +117,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <picture className="relative hidden aspect-[3/2] w-full overflow-hidden lg:block">
-              <source
-                media="(min-width: 1024px)"
-                type="image/avif"
-                srcSet={heroAvifSrcSet}
-                sizes="(min-width: 1280px) 590px, 48vw"
-              />
-              <source
-                media="(min-width: 1024px)"
-                type="image/webp"
-                srcSet={heroWebpSrcSet}
-                sizes="(min-width: 1280px) 590px, 48vw"
-              />
-              <source
-                media="(min-width: 1024px)"
-                type="image/jpeg"
-                srcSet={heroJpegSrcSet}
-                sizes="(min-width: 1280px) 590px, 48vw"
-              />
-              <img
-                src={transparentPixel}
-                alt="Classic Mini panels, precision machining and engineering metals at M-Machine"
-                width={1280}
-                height={853}
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                className="h-full w-full object-cover object-center"
-              />
-            </picture>
+            <HomeHeroCarousel slides={heroSlides} />
           </div>
         </div>
       </section>

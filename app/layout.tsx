@@ -18,11 +18,11 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "M-Machine | Classic Mini Panels & Engineering Metals | Est. 1980",
+    default: "M-Machine | Classic Mini Panels, Custom Engineering & Extensive Material Range | Est. 1980",
     template: "%s | M-Machine",
   },
   description:
-    "Specialist suppliers of classic Mini pressed steel panels, engineering metals and bespoke fabrication. Family-run from Darlington since 1980.",
+    "Specialist suppliers of Classic Mini pressed steel panels, custom engineering, fabrication and an extensive material range. Family-run from Darlington since 1980.",
   keywords: [
     "classic mini panels",
     "mini spare parts",
@@ -39,16 +39,23 @@ export const metadata: Metadata = {
     locale: "en_GB",
     url: SITE_URL,
     siteName: "M-Machine",
-    title: "M-Machine | Classic Mini Panels & Engineering Metals",
+    title: "M-Machine | Classic Mini Panels, Custom Engineering & Extensive Material Range",
     description:
-      "Four decades supplying classic Mini panels, engineering metals and bespoke fabrication from our Darlington workshop.",
-    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1600, height: 1200, alt: "Custom engineering work at M-Machine" }],
+      "Four decades supplying Classic Mini panels, custom engineering, fabrication and material stock from our Darlington workshop.",
+    images: [
+      {
+        url: absoluteUrl(DEFAULT_OG_IMAGE),
+        width: 1200,
+        height: 630,
+        alt: "M-Machine Classic Mini panels, custom engineering and extensive material range",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "M-Machine | Classic Mini Panels & Engineering Metals",
+    title: "M-Machine | Classic Mini Panels, Custom Engineering & Extensive Material Range",
     description:
-      "Classic Mini panels, tool steels, stainless and bespoke fabrication. Est. 1980.",
+      "Classic Mini panels, custom engineering, fabrication and extensive material stock. Est. 1980.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {

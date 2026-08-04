@@ -4,7 +4,7 @@ import { products, sections, type Product, type Section } from "@/lib/mini-data"
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk";
 
 export const SITE_URL = configuredSiteUrl.replace(/\/+$/, "");
-export const DEFAULT_OG_IMAGE = "/custom-engineering/custom-fabrication-cam.jpg";
+export const DEFAULT_OG_IMAGE = "/brand/m-machine-social-share.jpg";
 export const IS_PREVIEW_DEPLOYMENT = (() => {
   try {
     const hostname = new URL(SITE_URL).hostname;
@@ -56,8 +56,12 @@ export function absoluteUrl(path = "/") {
   return new URL(path, SITE_URL).toString();
 }
 
-export function openGraphImage(path = DEFAULT_OG_IMAGE, alt = "M-Machine engineering and fabrication") {
-  return [{ url: absoluteUrl(path), alt }];
+export function openGraphImage(
+  path = DEFAULT_OG_IMAGE,
+  alt = "M-Machine Classic Mini panels, custom engineering and material stock"
+) {
+  const image = { url: absoluteUrl(path), alt };
+  return path === DEFAULT_OG_IMAGE ? [{ ...image, width: 1200, height: 630 }] : [image];
 }
 
 export function slugify(value: string) {
