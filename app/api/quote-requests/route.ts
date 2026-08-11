@@ -910,6 +910,10 @@ export async function PATCH(req: Request) {
       next.paidAt = paidAt;
     }
 
+    if (next.websiteInvoiceNumber) {
+      next = await ensureWebsiteInvoiceNumber(next);
+    }
+
     const saved = await saveQuoteRequest(next);
     return NextResponse.json({ ok: true, quote: saved, customerEmailSent });
   } catch (err) {

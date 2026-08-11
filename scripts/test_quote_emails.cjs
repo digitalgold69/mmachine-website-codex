@@ -266,7 +266,7 @@ assert.doesNotMatch(ownerHtml, /Included details/);
 assert.doesNotMatch(ownerHtml, /Qty 2\s*\/\s*Ref Custom\s*\/\s*Unit job/);
 assert.doesNotMatch(ownerHtml, /Uploaded files:/);
 assert.match(ownerHtml, /Open this order in dashboard/);
-assert.match(ownerHtml, /W4321 \/ Custom fabrication/);
+assert.match(ownerHtml, /W4321-W4322 \/ Custom fabrication/);
 assert.match(ownerHtml, /https:\/\/example\.test\/dashboard\/orders\?quote=Q-CF-TEST/);
 assert.match(ownerHtml, /https:\/\/example\.test\/api\/quote-files\/quote-uploads\/session-1\/drawing%201\.dxf/);
 assert.doesNotMatch(ownerHtml, /Each ex VAT/);
@@ -314,7 +314,7 @@ assert.doesNotMatch(customerHtml, /We have reviewed it and added any carriage or
 assert.match(customerHtml, /Your Delivery Address/);
 assert.match(customerHtml, /1 Test Street<br>Darlington/);
 assert.match(customerHtml, /Items/);
-assert.match(customerHtml, /W4321/);
+assert.match(customerHtml, /W4321-W4322/);
 assert.doesNotMatch(customerHtml, /Reference[\s\S]*Q-CF-TEST/);
 assert.match(customerHtml, /Custom Job/);
 assert.match(customerHtml, /Price each ex VAT/);

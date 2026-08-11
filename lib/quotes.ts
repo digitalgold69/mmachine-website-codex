@@ -470,6 +470,10 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
     ? ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)
     : null;
   const totalExVat = quoteNetExVat(quote);
+  const storedWebsiteInvoiceCount = Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || 1));
+  const websiteInvoiceCount = quote.websiteInvoiceNumber
+    ? storedWebsiteInvoiceCount
+    : Math.max(1, requiredWebsiteInvoiceCount(quote));
 
   const result = await db
     .prepare(
@@ -540,7 +544,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       quote.ownerEmailSentAt ?? null,
       quote.includeVat === false ? 0 : 1,
       quote.websiteInvoiceNumber ?? null,
-      Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || requiredWebsiteInvoiceCount(quote))),
+      websiteInvoiceCount,
       JSON.stringify(quoteRefunds(quote))
     )
     .run();

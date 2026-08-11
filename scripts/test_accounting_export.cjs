@@ -15,6 +15,7 @@ const {
   roundAccounting,
   sageRefundRowsForQuote,
   sageSaleRowsForQuote,
+  requiredWebsiteInvoiceCount,
   websiteInvoiceDisplay,
 } = jiti("../lib/order-accounting.ts");
 
@@ -92,10 +93,12 @@ assert.deepEqual(
     [ACCOUNTING_NOMINALS.mini, "W1234"],
     [ACCOUNTING_NOMINALS.metals, "W1235"],
     [ACCOUNTING_NOMINALS.featured, "W1236"],
-    [ACCOUNTING_NOMINALS.carriage, "W1236"],
+    [ACCOUNTING_NOMINALS.carriage, "W1237"],
   ]
 );
-assert.equal(websiteInvoiceDisplay(quote), "W1234-W1236");
+assert.equal(new Set(saleRows.map((row) => row.Ref)).size, saleRows.length);
+assert.equal(requiredWebsiteInvoiceCount(quote), 4);
+assert.equal(websiteInvoiceDisplay(quote), "W1234-W1237");
 assert.equal(roundAccounting(saleRows.reduce((sum, row) => sum + row.Net, 0)), 650);
 assert.equal(roundAccounting(saleRows.reduce((sum, row) => sum + row.Tax, 0)), 130);
 assert.equal(saleRows.every((row) => row["T/C"] === "T1"), true);

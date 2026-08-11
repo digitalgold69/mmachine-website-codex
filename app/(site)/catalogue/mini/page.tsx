@@ -340,8 +340,8 @@ export default function MiniCataloguePage() {
         <div className="hidden md:block">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[150px]" />
-              <col className="w-[82px]" />
+              <col style={{ width: "132px" }} />
+              <col style={{ width: "58px" }} />
               <col />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
@@ -349,9 +349,9 @@ export default function MiniCataloguePage() {
             </colgroup>
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
-                <th className="text-left px-4 py-3">Code</th>
-                <th className="px-2 py-3 text-center">Photo</th>
-                <th className="text-left px-4 py-3">Description</th>
+                <th className="px-3 py-3 text-left">Code</th>
+                <th className="px-1 py-3 text-center">Photo</th>
+                <th className="px-3 py-3 text-left">Description</th>
                 <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-right px-4 py-3">&pound; Inc VAT</th>
                 <th className="text-center px-3 py-3">Order</th>
@@ -362,8 +362,8 @@ export default function MiniCataloguePage() {
                 const image = productImages[p.id];
                 return (
                   <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors">
-                    <td className="px-4 py-2 font-mono text-xs text-ink-muted whitespace-nowrap align-middle">{p.code}</td>
-                    <td className="px-2 py-2 text-center align-middle">
+                    <td className="px-3 py-2 font-mono text-xs text-ink-muted whitespace-nowrap align-middle">{p.code}</td>
+                    <td className="px-1 py-2 text-center align-middle">
                       {image ? (
                         <button
                           type="button"
@@ -375,7 +375,7 @@ export default function MiniCataloguePage() {
                         </button>
                       ) : null}
                     </td>
-                    <td className="px-4 py-2 align-middle">
+                    <td className="px-3 py-2 align-middle">
                       <div className="font-medium text-racing leading-snug">{p.name}</div>
                     </td>
                     <td className="px-4 py-2 text-right font-semibold text-racing whitespace-nowrap align-middle">

@@ -86,8 +86,10 @@ assert.match(ordersClient, /quoteMatchesOrderRequestFilter/, "orders tab filters
 assert.doesNotMatch(ordersClient, /orderRequestFilterCounts/, "orders tab type filters should not show per-type count badges");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(quoteRequestRoute, /orderTypeParam/, "quote request history API must accept order-type filtering");
+assert.match(quoteRequestRoute, /if \(next\.websiteInvoiceNumber\) \{\s+next = await ensureWebsiteInvoiceNumber\(next\);/s, "quote updates with existing invoice numbers must re-check allocated invoice ranges before saving");
 assert.match(quotesStore, /PaidHistoryOrderType/, "paid history store must type supported order filters");
 assert.match(quotesStore, /quoteMatchesPaidHistoryOrderType/, "paid history store must filter mixed orders by included item type");
+assert.doesNotMatch(quotesStore, /Number\(quote\.websiteInvoiceCount\) \|\| requiredWebsiteInvoiceCount\(quote\)/, "plain quote saves must not silently expand an existing invoice range without conflict checks");
 assert.match(productsClient, /optimiseProductImage/, "mini panel dashboard photos must be optimised before upload");
 assert.match(productsClient, /\/api\/mini-product-images/, "dashboard products tab must use the mini product image API");
 assert.match(miniProductImagesRoute, /export async function GET/, "mini product image listing should be public for the catalogue");

@@ -193,7 +193,7 @@ export function quoteAccountingGroups(quote: QuoteRequest): AccountingGroup[] {
 }
 
 export function requiredWebsiteInvoiceCount(quote: QuoteRequest) {
-  return Math.max(1, quoteProductAccountingGroups(quote).length);
+  return Math.max(1, quoteAccountingGroups(quote).length);
 }
 
 function invoiceNumberValue(ref: string | null | undefined) {
@@ -219,12 +219,8 @@ export function websiteInvoiceDisplay(quote: QuoteRequest) {
 }
 
 export function websiteInvoiceRefForBucket(quote: QuoteRequest, bucket: QuoteAccountingBucket) {
-  const productGroups = quoteProductAccountingGroups(quote);
-  if (bucket === "carriage") {
-    return invoiceRefAt(quote, Math.max(0, productGroups.length - 1));
-  }
-  const productIndex = productGroups.findIndex((group) => group.bucket === bucket);
-  return invoiceRefAt(quote, productIndex >= 0 ? productIndex : 0);
+  const groupIndex = quoteAccountingGroups(quote).findIndex((group) => group.bucket === bucket);
+  return invoiceRefAt(quote, groupIndex >= 0 ? groupIndex : 0);
 }
 
 export function quoteGrossExVat(quote: QuoteRequest) {
