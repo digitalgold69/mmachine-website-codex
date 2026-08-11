@@ -201,10 +201,14 @@ function invoiceNumberValue(ref: string | null | undefined) {
   return match ? Number(match[1]) : null;
 }
 
-function invoiceRefAt(quote: QuoteRequest, offset: number) {
-  const base = invoiceNumberValue(quote.websiteInvoiceNumber);
-  if (!base) return quote.websiteInvoiceNumber || quote.id;
+function invoiceRefFromBase(ref: string | null | undefined, offset: number, fallback: string) {
+  const base = invoiceNumberValue(ref);
+  if (!base) return ref || fallback;
   return `W${base + Math.max(0, offset)}`;
+}
+
+function invoiceRefAt(quote: QuoteRequest, offset: number) {
+  return invoiceRefFromBase(quote.websiteInvoiceNumber, offset, quote.id);
 }
 
 function storedInvoiceCount(quote: Pick<QuoteRequest, "websiteInvoiceCount">) {
@@ -221,6 +225,14 @@ export function websiteInvoiceDisplay(quote: QuoteRequest) {
 export function websiteInvoiceRefForBucket(quote: QuoteRequest, bucket: QuoteAccountingBucket) {
   const groupIndex = quoteAccountingGroups(quote).findIndex((group) => group.bucket === bucket);
   return invoiceRefAt(quote, groupIndex >= 0 ? groupIndex : 0);
+}
+
+export function requiredRefundInvoiceCount(refund: QuoteRefund) {
+  return Math.max(1, refund.lines.length);
+}
+
+export function websiteRefundRefForLine(refund: QuoteRefund, lineIndex: number) {
+  return invoiceRefFromBase(refund.websiteInvoiceNumber, lineIndex, refund.id);
 }
 
 export function quoteGrossExVat(quote: QuoteRequest) {
@@ -323,14 +335,14 @@ export function sageSaleRowsForQuote(quote: QuoteRequest): SageExportRow[] {
 export function sageRefundRowsForQuote(quote: QuoteRequest, refunds = quoteRefunds(quote)): SageExportRow[] {
   const details = accountingDetailsName(quote);
   const rows = refunds.flatMap((refund) =>
-    refund.lines.map((line) => ({
+    refund.lines.map((line, lineIndex) => ({
       Type: "SI" as const,
       Account: "WEB" as const,
       Nominal: ACCOUNTING_NOMINALS[line.bucket],
       Dept: 0 as const,
       Details: details,
       Date: exportDate(refund.createdAt),
-      Ref: websiteInvoiceRefForBucket(quote, line.bucket),
+      Ref: websiteRefundRefForLine(refund, lineIndex),
       Net: roundAccounting(-positiveAmount(line.amountExVat)),
       Tax: 0,
       "T/C": taxCode(quote),

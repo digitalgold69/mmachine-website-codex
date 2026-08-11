@@ -115,6 +115,8 @@ const refundedQuote = {
       id: "refund-1",
       createdAt: "2026-08-05T12:00:00.000Z",
       reason: "Partial return",
+      websiteInvoiceNumber: "W2000",
+      websiteInvoiceCount: 2,
       lines: [
         { bucket: "mini", amountExVat: 50 },
         { bucket: "metals", amountExVat: 10 },
@@ -124,6 +126,9 @@ const refundedQuote = {
 };
 const refundRows = sageRefundRowsForQuote(refundedQuote);
 assert.equal(refundRows.length, 2);
+assert.deepEqual(refundRows.map((row) => row.Ref), ["W2000", "W2001"]);
+assert.equal(new Set(refundRows.map((row) => row.Ref)).size, refundRows.length);
+assert.equal(refundRows.some((row) => saleRows.some((saleRow) => saleRow.Ref === row.Ref)), false);
 assert.deepEqual(refundRows.map((row) => row.Net).sort((a, b) => a - b), [-50, -10]);
 assert.equal(roundAccounting(refundRows.reduce((sum, row) => sum + row.Tax, 0)), -12);
 assert.equal(quoteTotals(refundedQuote).totalExVat, 590);

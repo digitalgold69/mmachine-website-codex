@@ -66,6 +66,8 @@ export type QuoteRefund = {
   id: string;
   createdAt: string;
   reason?: string;
+  websiteInvoiceNumber?: string | null;
+  websiteInvoiceCount?: number | null;
   lines: QuoteRefundLine[];
 };
 

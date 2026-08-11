@@ -2,9 +2,10 @@ import { getD1 } from "@/lib/cloudflare";
 import {
   quoteNetExVat,
   quoteRefunds,
+  requiredRefundInvoiceCount,
   requiredWebsiteInvoiceCount,
 } from "@/lib/order-accounting";
-import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import type { QuoteItem, QuoteRefund, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
 
 type QuoteRow = {
@@ -69,7 +70,22 @@ async function ensureQuoteAccountingSchemaInner() {
        WHERE website_invoice_number LIKE 'W%'`
     )
     .first<{ max_ref: number | null }>();
-  const nextNumber = Math.max(1234, Number(maxRow?.max_ref || 0) + 1);
+  const refundMaxRow = await db
+    .prepare(
+      `SELECT MAX(
+         CAST(SUBSTR(json_extract(refund.value, '$.websiteInvoiceNumber'), 2) AS INTEGER)
+         + coalesce(CAST(json_extract(refund.value, '$.websiteInvoiceCount') AS INTEGER), 1)
+         - 1
+       ) AS max_ref
+       FROM quote_requests, json_each(coalesce(quote_requests.refunds, '[]')) AS refund
+       WHERE json_extract(refund.value, '$.websiteInvoiceNumber') LIKE 'W%'`
+    )
+    .first<{ max_ref: number | null }>();
+  const nextNumber = Math.max(
+    1234,
+    Number(maxRow?.max_ref || 0) + 1,
+    Number(refundMaxRow?.max_ref || 0) + 1
+  );
   await db
     .prepare(
       `UPDATE accounting_sequences
@@ -341,6 +357,13 @@ function invoiceNumberValue(ref: string | null | undefined) {
   return match ? Number(match[1]) : null;
 }
 
+function invoiceNumberRange(ref: string | null | undefined, count: number) {
+  const base = invoiceNumberValue(ref);
+  if (!base) return null;
+  const safeCount = Math.max(1, Math.floor(Number(count) || 1));
+  return { base, end: base + safeCount - 1 };
+}
+
 async function ensureInvoiceSequenceAfter(ref: string | null | undefined, count: number) {
   const base = invoiceNumberValue(ref);
   if (!base) return;
@@ -356,24 +379,87 @@ async function ensureInvoiceSequenceAfter(ref: string | null | undefined, count:
     .run();
 }
 
-async function invoiceRangeHasConflict(quoteId: string, ref: string | null | undefined, count: number) {
-  const base = invoiceNumberValue(ref);
-  if (!base) return false;
-  const end = base + Math.max(1, Math.floor(count)) - 1;
+async function saleInvoiceRangeHasConflict(ref: string | null | undefined, count: number, excludedQuoteId = "") {
+  const range = invoiceNumberRange(ref, count);
+  if (!range) return false;
   const db = await getD1();
   const row = await db
     .prepare(
       `SELECT id
        FROM quote_requests
-       WHERE id != ?
+       WHERE (? = '' OR id != ?)
          AND website_invoice_number LIKE 'W%'
          AND CAST(SUBSTR(website_invoice_number, 2) AS INTEGER) <= ?
          AND CAST(SUBSTR(website_invoice_number, 2) AS INTEGER) + coalesce(website_invoice_count, 1) - 1 >= ?
        LIMIT 1`
     )
-    .bind(quoteId, end, base)
+    .bind(excludedQuoteId, excludedQuoteId, range.end, range.base)
     .first<{ id: string }>();
   return Boolean(row?.id);
+}
+
+async function refundInvoiceRangeHasConflict(
+  quoteId: string,
+  refundId: string,
+  ref: string | null | undefined,
+  count: number
+) {
+  const range = invoiceNumberRange(ref, count);
+  if (!range) return false;
+  if (await saleInvoiceRangeHasConflict(ref, count)) return true;
+
+  const db = await getD1();
+  const row = await db
+    .prepare(
+      `SELECT quote_requests.id AS quote_id
+       FROM quote_requests, json_each(coalesce(quote_requests.refunds, '[]')) AS refund
+       WHERE json_extract(refund.value, '$.websiteInvoiceNumber') LIKE 'W%'
+         AND NOT (
+           quote_requests.id = ?
+           AND json_extract(refund.value, '$.id') = ?
+         )
+         AND CAST(SUBSTR(json_extract(refund.value, '$.websiteInvoiceNumber'), 2) AS INTEGER) <= ?
+         AND CAST(SUBSTR(json_extract(refund.value, '$.websiteInvoiceNumber'), 2) AS INTEGER)
+             + coalesce(CAST(json_extract(refund.value, '$.websiteInvoiceCount') AS INTEGER), 1)
+             - 1 >= ?
+       LIMIT 1`
+    )
+    .bind(quoteId, refundId, range.end, range.base)
+    .first<{ quote_id: string }>();
+  return Boolean(row?.quote_id);
+}
+
+async function invoiceRangeHasConflict(quoteId: string, ref: string | null | undefined, count: number) {
+  const range = invoiceNumberRange(ref, count);
+  if (!range) return false;
+  if (await saleInvoiceRangeHasConflict(ref, count, quoteId)) return true;
+
+  const db = await getD1();
+  const row = await db
+    .prepare(
+      `SELECT quote_requests.id AS quote_id
+       FROM quote_requests, json_each(coalesce(quote_requests.refunds, '[]')) AS refund
+       WHERE json_extract(refund.value, '$.websiteInvoiceNumber') LIKE 'W%'
+         AND CAST(SUBSTR(json_extract(refund.value, '$.websiteInvoiceNumber'), 2) AS INTEGER) <= ?
+         AND CAST(SUBSTR(json_extract(refund.value, '$.websiteInvoiceNumber'), 2) AS INTEGER)
+             + coalesce(CAST(json_extract(refund.value, '$.websiteInvoiceCount') AS INTEGER), 1)
+             - 1 >= ?
+       LIMIT 1`
+    )
+    .bind(range.end, range.base)
+    .first<{ quote_id: string }>();
+  return Boolean(row?.quote_id);
+}
+
+async function allocateAvailableInvoiceNumber(
+  count: number,
+  hasConflict: (ref: string) => Promise<boolean>
+) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const ref = await allocateWebsiteInvoiceNumber(count);
+    if (!(await hasConflict(ref))) return ref;
+  }
+  throw new Error("Website invoice number range could not be allocated without a conflict.");
 }
 
 export async function allocateWebsiteInvoiceNumber(count = 1): Promise<string> {
@@ -419,7 +505,9 @@ export async function ensureWebsiteInvoiceNumber(quote: QuoteRequest): Promise<Q
   if (fresh?.websiteInvoiceNumber || quote.websiteInvoiceNumber) {
     const websiteInvoiceNumber = fresh?.websiteInvoiceNumber || quote.websiteInvoiceNumber || null;
     if (await invoiceRangeHasConflict(quote.id, websiteInvoiceNumber, requiredCount)) {
-      const freshWebsiteInvoiceNumber = await allocateWebsiteInvoiceNumber(requiredCount);
+      const freshWebsiteInvoiceNumber = await allocateAvailableInvoiceNumber(requiredCount, (ref) =>
+        invoiceRangeHasConflict(quote.id, ref, requiredCount)
+      );
       return saveQuoteRequest({
         ...quote,
         websiteInvoiceNumber: freshWebsiteInvoiceNumber,
@@ -434,8 +522,49 @@ export async function ensureWebsiteInvoiceNumber(quote: QuoteRequest): Promise<Q
     });
   }
 
-  const websiteInvoiceNumber = await allocateWebsiteInvoiceNumber(requiredCount);
+  const websiteInvoiceNumber = await allocateAvailableInvoiceNumber(requiredCount, (ref) =>
+    invoiceRangeHasConflict(quote.id, ref, requiredCount)
+  );
   return saveQuoteRequest({ ...quote, websiteInvoiceNumber, websiteInvoiceCount: requiredCount });
+}
+
+export async function ensureRefundInvoiceNumbers(quote: QuoteRequest): Promise<QuoteRequest> {
+  const refunds = quoteRefunds(quote);
+  if (refunds.length === 0) return quote;
+
+  let changed = false;
+  const numberedRefunds: QuoteRefund[] = [];
+
+  for (const refund of refunds) {
+    const requiredCount = requiredRefundInvoiceCount(refund);
+    const currentCount = Math.max(1, Math.floor(Number(refund.websiteInvoiceCount) || 1));
+
+    if (
+      refund.websiteInvoiceNumber &&
+      currentCount >= requiredCount &&
+      !(await refundInvoiceRangeHasConflict(quote.id, refund.id, refund.websiteInvoiceNumber, currentCount))
+    ) {
+      changed ||= refund.websiteInvoiceCount !== currentCount;
+      numberedRefunds.push({
+        ...refund,
+        websiteInvoiceCount: currentCount,
+      });
+      continue;
+    }
+
+    const websiteInvoiceNumber = await allocateAvailableInvoiceNumber(requiredCount, (ref) =>
+      refundInvoiceRangeHasConflict(quote.id, refund.id, ref, requiredCount)
+    );
+    numberedRefunds.push({
+      ...refund,
+      websiteInvoiceNumber,
+      websiteInvoiceCount: requiredCount,
+    });
+    changed = true;
+  }
+
+  if (!changed) return quote;
+  return saveQuoteRequest({ ...quote, refunds: numberedRefunds });
 }
 
 export async function listPaidQuoteRecordsForExport(): Promise<QuoteRequest[]> {

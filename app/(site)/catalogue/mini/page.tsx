@@ -351,7 +351,7 @@ export default function MiniCataloguePage() {
               <tr>
                 <th className="px-3 py-3 text-left">Code</th>
                 <th className="px-1 py-3 text-center">Photo</th>
-                <th className="py-3 pl-16 pr-3 text-left xl:pl-28">Description</th>
+                <th className="py-3 pl-12 pr-3 text-left xl:pl-20">Description</th>
                 <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-right px-4 py-3">&pound; Inc VAT</th>
                 <th className="text-center px-3 py-3">Order</th>
@@ -375,7 +375,7 @@ export default function MiniCataloguePage() {
                         </button>
                       ) : null}
                     </td>
-                    <td className="py-2 pl-16 pr-3 align-middle xl:pl-28">
+                    <td className="py-2 pl-12 pr-3 align-middle xl:pl-20">
                       <div className="font-medium text-racing leading-snug">{p.name}</div>
                     </td>
                     <td className="px-4 py-2 text-right font-semibold text-racing whitespace-nowrap align-middle">

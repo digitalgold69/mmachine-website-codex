@@ -19,6 +19,7 @@ import {
 } from "@/lib/order-accounting";
 import {
   getQuoteRequest,
+  ensureRefundInvoiceNumbers,
   ensureWebsiteInvoiceNumber,
   listActiveQuoteRequests,
   listPaidQuoteHistory,
@@ -824,6 +825,7 @@ export async function PATCH(req: Request) {
           lines: refundLines.lines,
         },
       ];
+      next = await ensureRefundInvoiceNumbers(next);
     }
 
     if (body.saveNoEmail && !body.emailCustomer) {

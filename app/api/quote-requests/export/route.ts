@@ -7,7 +7,7 @@ import {
   quoteRefunds,
   type SageExportRow,
 } from "@/lib/order-accounting";
-import { ensureWebsiteInvoiceNumber, listPaidQuoteRecordsForExport } from "@/lib/quotes";
+import { ensureRefundInvoiceNumbers, ensureWebsiteInvoiceNumber, listPaidQuoteRecordsForExport } from "@/lib/quotes";
 import type { QuoteRefund, QuoteRequest } from "@/lib/quote-types";
 import { shiftUkDateKey, ukMidnightUtc } from "@/lib/uk-time";
 
@@ -102,9 +102,12 @@ async function rowsForExport(start: Date | null, end: Date | null) {
     const refunds = includedRefunds(quote, start, end);
     if (!saleIncluded && refunds.length === 0) continue;
 
-    const numbered = await ensureWebsiteInvoiceNumber(quote);
+    let numbered = await ensureWebsiteInvoiceNumber(quote);
+    if (refunds.length > 0) numbered = await ensureRefundInvoiceNumbers(numbered);
     if (saleIncluded) rows.push(...sageSaleRowsForQuote(numbered));
-    if (refunds.length > 0) rows.push(...sageRefundRowsForQuote(numbered, refunds as QuoteRefund[]));
+    if (refunds.length > 0) {
+      rows.push(...sageRefundRowsForQuote(numbered, includedRefunds(numbered, start, end) as QuoteRefund[]));
+    }
   }
 
   return rows.sort((a, b) => {
