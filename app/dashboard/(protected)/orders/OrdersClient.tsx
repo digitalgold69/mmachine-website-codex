@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  ACCOUNTING_BUCKET_LABELS,
+  ACCOUNTING_BUCKETS,
+  quoteIncludesVat,
+  quoteRefunds,
+  quoteTotals,
+  refundNetExVat,
+  remainingRefundByBucket,
+  roundAccounting,
+} from "@/lib/order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
-import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import type { QuoteAccountingBucket, QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 
 const GBP = "\u00a3";
 const PAGE_SIZE = 8;
@@ -47,6 +57,12 @@ type ManualLineDraft = {
   priceExVat: string;
 };
 
+type RefundDraft = {
+  open: boolean;
+  reason: string;
+  amounts: Record<QuoteAccountingBucket, string>;
+};
+
 const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "reviewing", label: "Reviewing" },
@@ -70,6 +86,18 @@ const BLANK_MANUAL_LINE: ManualLineDraft = {
   priceExVat: "",
 };
 
+function blankRefundDraft(): RefundDraft {
+  return {
+    open: false,
+    reason: "",
+    amounts: {
+      mini: "",
+      metals: "",
+      engineering: "",
+    },
+  };
+}
+
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   new: "bg-gold/15 text-gold",
   reviewing: "bg-blue-50 text-blue-800",
@@ -89,12 +117,19 @@ const lineExVat = (item: QuoteItem) =>
 
 const totals = (quote: QuoteRequest) => {
   const hasPoaItems = quote.items.some((item) => typeof item.unitPriceExVat !== "number");
-  const goods = quote.items.reduce((sum, item) => sum + (lineExVat(item) ?? 0), 0);
-  const carriage = quote.carriageExVat ?? 0;
-  const extra = quote.extraChargesExVat ?? 0;
-  const totalEx = goods + carriage + extra;
-  const vat = totalEx * 0.2;
-  return { goods, carriage, extra, totalEx, vat, totalInc: totalEx + vat, hasPoaItems };
+  const quoteTotal = quoteTotals(quote);
+  return {
+    goods: quoteTotal.goodsExVat,
+    carriage: quoteTotal.carriageExVat,
+    extra: quoteTotal.extraChargesExVat,
+    refunds: quoteTotal.refundsExVat,
+    subtotalEx: quoteTotal.subtotalExVat,
+    totalEx: quoteTotal.totalExVat,
+    vat: quoteTotal.vat,
+    totalInc: quoteTotal.totalIncVat,
+    includeVat: quoteTotal.includeVat,
+    hasPoaItems,
+  };
 };
 
 const itemName = (item: QuoteItem) =>
@@ -158,6 +193,18 @@ function invoiceLineSubtitle(item: QuoteItem) {
 
 function totalsReadyText(value: number | null | undefined, hasPoaItems: boolean) {
   return hasPoaItems ? "Add prices" : money(value);
+}
+
+function priceLabel(quote: QuoteRequest) {
+  return quoteIncludesVat(quote) ? "Price ex VAT" : "Price";
+}
+
+function baseTotalLabel(quote: QuoteRequest, label: string) {
+  return quoteIncludesVat(quote) ? `${label} ex VAT` : label;
+}
+
+function cardTotalSubLabel(quote: QuoteRequest) {
+  return quoteIncludesVat(quote) ? "ex VAT" : "VAT not applied";
 }
 
 function defaultAddLineCatalogue(quote: QuoteRequest): AddLineCatalogue {
@@ -515,7 +562,7 @@ function OrderCard({
             <div className="font-semibold text-racing">
               {quoteTotals.hasPoaItems ? "POA" : money(quoteTotals.totalEx)}
             </div>
-            <div className="text-xs text-ink-muted">ex VAT</div>
+            <div className="text-xs text-ink-muted">{cardTotalSubLabel(quote)}</div>
           </div>
         </div>
       </button>
@@ -586,6 +633,8 @@ export default function OrdersClient({
   const [query, setQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [monthFilter, setMonthFilter] = useState(initialMonth);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
   const [page, setPage] = useState(1);
   const [savingAction, setSavingAction] = useState("");
   const [message, setMessage] = useState(initialError);
@@ -599,6 +648,7 @@ export default function OrdersClient({
   const [addLineError, setAddLineError] = useState("");
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
+  const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
   const historyRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -632,6 +682,14 @@ export default function OrdersClient({
   const currentPage = Math.min(page, pageCount);
   const pageQuotes = historyRows;
   const monthStats = useMemo(() => new Map(Object.entries(historyMonthStats)), [historyMonthStats]);
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (exportFrom) params.set("from", exportFrom);
+    if (exportTo) params.set("to", exportTo);
+    const queryString = params.toString();
+    return `/api/quote-requests/export${queryString ? `?${queryString}` : ""}`;
+  }, [exportFrom, exportTo]);
+  const exportButtonLabel = exportFrom || exportTo ? "Download range" : "Download all";
 
   const pageGroups = useMemo(() => {
     const groups = new Map<string, { key: string; label: string; quotes: QuoteRequest[]; salesValue: number; salesCount: number }>();
@@ -750,6 +808,7 @@ export default function OrdersClient({
     setAddLineError("");
     setAddLineNotice(null);
     setManualLine(BLANK_MANUAL_LINE);
+    setRefundDraft(blankRefundDraft());
   }, [draft?.id]);
 
   useEffect(() => {
@@ -1136,6 +1195,73 @@ export default function OrdersClient({
     }
   }
 
+  function setRefundAmount(bucket: QuoteAccountingBucket, value: string) {
+    setRefundDraft((current) => ({
+      ...current,
+      amounts: { ...current.amounts, [bucket]: value },
+    }));
+  }
+
+  function fillFullRefund() {
+    if (!draft) return;
+    const remaining = remainingRefundByBucket(draft);
+    setRefundDraft((current) => ({
+      ...current,
+      open: true,
+      amounts: {
+        mini: remaining.mini > 0 ? remaining.mini.toFixed(2) : "",
+        metals: remaining.metals > 0 ? remaining.metals.toFixed(2) : "",
+        engineering: remaining.engineering > 0 ? remaining.engineering.toFixed(2) : "",
+      },
+    }));
+  }
+
+  async function saveRefund() {
+    if (!draft) return;
+    const lines = ACCOUNTING_BUCKETS
+      .map((bucket) => ({
+        bucket,
+        amountExVat: priceFromInput(refundDraft.amounts[bucket]) ?? 0,
+      }))
+      .filter((line) => line.amountExVat > 0);
+
+    if (lines.length === 0) {
+      setActionNotice({ quoteId: draft.id, tone: "error", text: "Add at least one refund amount." });
+      return;
+    }
+
+    setSavingAction(`${draft.id}:refund`);
+    setMessage("");
+    setActionNotice(null);
+    try {
+      const res = await fetch("/api/quote-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draft.id,
+          refund: {
+            reason: refundDraft.reason,
+            lines,
+          },
+        }),
+      });
+      const data = await res.json() as { error?: string; quote?: QuoteRequest };
+      if (!res.ok) throw new Error(data.error || "Refund could not be saved.");
+      if (!data.quote) throw new Error("Refund saved without returning the order.");
+      updateQuote(data.quote);
+      setRefundDraft(blankRefundDraft());
+      setActionNotice({ quoteId: data.quote.id, tone: "success", text: "Refund saved and sales totals updated." });
+    } catch (err) {
+      setActionNotice({
+        quoteId: draft.id,
+        tone: "error",
+        text: (err as Error).message || "Refund could not be saved.",
+      });
+    } finally {
+      setSavingAction("");
+    }
+  }
+
   const draftTotals = draft ? totals(draft) : null;
   const hasDraftPoaItems = Boolean(draftTotals?.hasPoaItems);
   const draftInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt || draft.invoiceSentAt) : false;
@@ -1145,6 +1271,11 @@ export default function OrdersClient({
   const isSaving = Boolean(savingAction);
   const showingFrom = historyCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const showingTo = Math.min(currentPage * PAGE_SIZE, historyCount);
+  const draftRefundRemaining = draft ? remainingRefundByBucket(draft) : null;
+  const draftRefunds = draft ? quoteRefunds(draft) : [];
+  const draftHasRefundCapacity = Boolean(
+    draftRefundRemaining && ACCOUNTING_BUCKETS.some((bucket) => draftRefundRemaining[bucket] > 0)
+  );
 
   return (
     <div>
@@ -1241,6 +1372,54 @@ export default function OrdersClient({
                 </button>
               </div>
             )}
+
+            <div className="mt-4 rounded-lg border border-racing/10 bg-cream-dark p-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_140px_auto] lg:items-end">
+                <div>
+                  <div className="text-sm font-semibold text-racing">Sage export</div>
+                  <p className="mt-1 text-xs leading-5 text-ink-muted">
+                    Downloads paid website sales and refunds in the SageBook format.
+                  </p>
+                </div>
+                <div>
+                  <label className="label" htmlFor="export-from">From</label>
+                  <input
+                    id="export-from"
+                    type="date"
+                    value={exportFrom}
+                    onChange={(event) => setExportFrom(event.target.value)}
+                    className="input min-h-0 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="export-to">To</label>
+                  <input
+                    id="export-to"
+                    type="date"
+                    value={exportTo}
+                    onChange={(event) => setExportTo(event.target.value)}
+                    className="input min-h-0 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {(exportFrom || exportTo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportFrom("");
+                        setExportTo("");
+                      }}
+                      className="rounded-lg border border-racing/20 px-3 py-2 text-sm font-semibold text-racing hover:bg-white"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <a href={exportHref} className="btn-primary whitespace-nowrap px-4 py-2 text-sm">
+                    {exportButtonLabel}
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className={`space-y-5 p-4 transition-opacity ${historyLoading ? "opacity-60" : "opacity-100"}`} aria-busy={historyLoading}>
@@ -1331,6 +1510,7 @@ export default function OrdersClient({
                       {draft.customer.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
+                      {draft.websiteInvoiceNumber && <span>Invoice {draft.websiteInvoiceNumber}</span>}
                       <span>{draft.id}</span>
                       <span>Submitted {formatDateTime(draft.submittedAt)}</span>
                       <span>{draft.customer.email}</span>
@@ -1473,7 +1653,7 @@ export default function OrdersClient({
                         <div>Qty</div>
                         <div>Item</div>
                         <div>Unit</div>
-                        <div className="text-right">Price ex VAT</div>
+                        <div className="text-right">{priceLabel(draft)}</div>
                       </div>
 
                       <div className="divide-y divide-racing/10">
@@ -1536,7 +1716,7 @@ export default function OrdersClient({
                               </div>
 
                               <div>
-                                <label className="label lg:hidden" htmlFor={`price-${draft.id}-${index}`}>Price ex VAT</label>
+                                <label className="label lg:hidden" htmlFor={`price-${draft.id}-${index}`}>{priceLabel(draft)}</label>
                                 <input
                                   id={`price-${draft.id}-${index}`}
                                   type="number"
@@ -1717,7 +1897,7 @@ export default function OrdersClient({
                                 />
                               </div>
                               <div>
-                                <label className="label" htmlFor="manual-line-price">Price ex VAT</label>
+                                <label className="label" htmlFor="manual-line-price">{priceLabel(draft)}</label>
                                 <input
                                   id="manual-line-price"
                                   type="number"
@@ -1748,9 +1928,19 @@ export default function OrdersClient({
                         <div className="flex justify-between gap-3">
                           <span>Invoice</span>
                           <strong className="text-right text-racing">
-                            {draft.invoiceSentAt ? formatDateTime(draft.invoiceSentAt) : "Not sent"}
+                            {draft.websiteInvoiceNumber
+                              ? draft.websiteInvoiceNumber
+                              : draft.invoiceSentAt
+                                ? formatDateTime(draft.invoiceSentAt)
+                                : "Not sent"}
                           </strong>
                         </div>
+                        {draft.websiteInvoiceNumber && draft.invoiceSentAt && (
+                          <div className="flex justify-between gap-3">
+                            <span>Sent</span>
+                            <strong className="text-right text-racing">{formatDateTime(draft.invoiceSentAt)}</strong>
+                          </div>
+                        )}
                         <div className="flex justify-between gap-3">
                           <span>Payment</span>
                           <strong className="text-right text-racing">
@@ -1761,9 +1951,25 @@ export default function OrdersClient({
                     </section>
 
                     <section className="rounded-lg border border-racing/10 p-3">
+                      <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={quoteIncludesVat(draft)}
+                          onChange={(e) => patchDraft({ includeVat: e.target.checked })}
+                          className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-racing">Include VAT</span>
+                          <span className="block text-xs leading-5 text-ink-muted">
+                            {quoteIncludesVat(draft)
+                              ? "VAT will be added to this invoice and exported as T1."
+                              : "No VAT will be applied and the export will use T0."}
+                          </span>
+                        </span>
+                      </label>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
-                          <label className="label" htmlFor="carriage">Carriage ex VAT</label>
+                          <label className="label" htmlFor="carriage">{baseTotalLabel(draft, "Carriage")}</label>
                           <input
                             id="carriage"
                             type="number"
@@ -1774,7 +1980,7 @@ export default function OrdersClient({
                           />
                         </div>
                         <div>
-                          <label className="label" htmlFor="extra-charges">Extra charges ex VAT</label>
+                          <label className="label" htmlFor="extra-charges">{baseTotalLabel(draft, "Extra charges")}</label>
                           <input
                             id="extra-charges"
                             type="number"
@@ -1788,15 +1994,141 @@ export default function OrdersClient({
                       <div className="mt-3 space-y-1 rounded-md bg-cream-dark p-3 text-sm">
                         {hasDraftPoaItems && (
                           <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                            Totals calculate after every invoice line has an ex VAT price.
+                            Totals calculate after every invoice line has a price.
                           </div>
                         )}
-                        <div className="flex justify-between gap-3"><span>Goods ex VAT</span><strong>{totalsReadyText(draftTotals?.goods, hasDraftPoaItems)}</strong></div>
-                        <div className="flex justify-between gap-3"><span>VAT</span><strong>{totalsReadyText(draftTotals?.vat, hasDraftPoaItems)}</strong></div>
-                        <div className="flex justify-between gap-3"><span>Total ex VAT</span><strong>{totalsReadyText(draftTotals?.totalEx, hasDraftPoaItems)}</strong></div>
-                        <div className="flex justify-between gap-3 text-racing"><span>Total inc VAT</span><strong>{totalsReadyText(draftTotals?.totalInc, hasDraftPoaItems)}</strong></div>
+                        <div className="flex justify-between gap-3"><span>{baseTotalLabel(draft, "Goods")}</span><strong>{totalsReadyText(draftTotals?.goods, hasDraftPoaItems)}</strong></div>
+                        {draftTotals && draftTotals.refunds > 0 && (
+                          <div className="flex justify-between gap-3 text-red-700">
+                            <span>{baseTotalLabel(draft, "Refunds")}</span>
+                            <strong>-{totalsReadyText(draftTotals.refunds, hasDraftPoaItems)}</strong>
+                          </div>
+                        )}
+                        {quoteIncludesVat(draft) ? (
+                          <>
+                            <div className="flex justify-between gap-3"><span>VAT</span><strong>{totalsReadyText(draftTotals?.vat, hasDraftPoaItems)}</strong></div>
+                            <div className="flex justify-between gap-3"><span>Total ex VAT</span><strong>{totalsReadyText(draftTotals?.totalEx, hasDraftPoaItems)}</strong></div>
+                            <div className="flex justify-between gap-3 text-racing"><span>Total inc VAT</span><strong>{totalsReadyText(draftTotals?.totalInc, hasDraftPoaItems)}</strong></div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex justify-between gap-3"><span>VAT</span><strong>Not applied</strong></div>
+                            <div className="flex justify-between gap-3 text-racing"><span>Total</span><strong>{totalsReadyText(draftTotals?.totalInc, hasDraftPoaItems)}</strong></div>
+                          </>
+                        )}
                       </div>
                     </section>
+
+                    {isPaidQuote(draft) && (
+                      <section className="rounded-lg border border-racing/10 p-3">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-racing">Refunds</div>
+                            <div className="text-xs text-ink-muted">
+                              {draftRefunds.length > 0
+                                ? `${draftRefunds.length} recorded`
+                                : "No refunds recorded"}
+                            </div>
+                          </div>
+                          {draftHasRefundCapacity && (
+                            <button
+                              type="button"
+                              onClick={() => setRefundDraft((current) => ({ ...current, open: !current.open }))}
+                              className="btn-secondary px-3 py-2 text-sm"
+                              aria-expanded={refundDraft.open}
+                            >
+                              {refundDraft.open ? "Hide" : "Add refund"}
+                            </button>
+                          )}
+                        </div>
+
+                        {draftRefunds.length > 0 && (
+                          <div className="mb-3 space-y-2">
+                            {draftRefunds.map((refund) => {
+                              const net = refundNetExVat(refund);
+                              const vat = quoteIncludesVat(draft) ? roundAccounting(net * 0.2) : 0;
+                              return (
+                                <div key={refund.id} className="rounded-md bg-cream-dark px-3 py-2 text-xs">
+                                  <div className="flex justify-between gap-3 font-semibold text-racing">
+                                    <span>{formatDateTime(refund.createdAt)}</span>
+                                    <span>-{money(net)}{quoteIncludesVat(draft) ? ` ex VAT / -${money(net + vat)} inc VAT` : ""}</span>
+                                  </div>
+                                  <div className="mt-1 text-ink-muted">
+                                    {refund.lines.map((line) => `${ACCOUNTING_BUCKET_LABELS[line.bucket]} ${money(line.amountExVat)}`).join(" / ")}
+                                  </div>
+                                  {refund.reason && <div className="mt-1 text-ink-muted">{refund.reason}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {!draftHasRefundCapacity && (
+                          <div className="rounded-md bg-cream-dark px-3 py-2 text-xs text-ink-muted">
+                            This order has no remaining refundable value.
+                          </div>
+                        )}
+
+                        {refundDraft.open && draftRefundRemaining && (
+                          <div className="space-y-3 border-t border-racing/10 pt-3">
+                            <div className="grid gap-2">
+                              {ACCOUNTING_BUCKETS.map((bucket) => {
+                                const remaining = draftRefundRemaining[bucket];
+                                if (remaining <= 0) return null;
+                                return (
+                                  <div key={bucket}>
+                                    <label className="label" htmlFor={`refund-${bucket}`}>
+                                      {ACCOUNTING_BUCKET_LABELS[bucket]} refund
+                                      <span className="ml-2 font-normal text-ink-muted">remaining {money(remaining)}</span>
+                                    </label>
+                                    <input
+                                      id={`refund-${bucket}`}
+                                      type="number"
+                                      min="0"
+                                      max={remaining}
+                                      step="0.01"
+                                      value={refundDraft.amounts[bucket]}
+                                      onChange={(event) => setRefundAmount(bucket, event.target.value)}
+                                      className="input text-right"
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div>
+                              <label className="label" htmlFor="refund-reason">Reason or note</label>
+                              <textarea
+                                id="refund-reason"
+                                value={refundDraft.reason}
+                                onChange={(event) => setRefundDraft((current) => ({ ...current, reason: event.target.value }))}
+                                rows={2}
+                                className="input resize-none text-sm"
+                                placeholder="Optional note for the order record"
+                              />
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={fillFullRefund}
+                                disabled={isSaving}
+                                className="rounded-lg border border-racing/20 px-3 py-2 text-sm font-semibold text-racing hover:bg-cream-dark disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Full remaining refund
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveRefund}
+                                disabled={isSaving}
+                                className="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {savingAction === `${draft.id}:refund` ? "Saving..." : "Save refund"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    )}
 
                     <section>
                       <label className="label" htmlFor="customer-message">Message to customer</label>
@@ -1836,7 +2168,8 @@ export default function OrdersClient({
 
                     {!invoiceReady && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        Add an ex VAT price to every invoice line before emailing it to the customer. VAT is added automatically.
+                        Add a price to every invoice line before emailing it to the customer.
+                        {draft && quoteIncludesVat(draft) ? " VAT is added automatically." : ""}
                       </div>
                     )}
                   </aside>

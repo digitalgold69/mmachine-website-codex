@@ -2,6 +2,7 @@ import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 import { teamNotificationRecipientsForRoute, type NotificationRoute } from "./auth";
 import { getCloudflareEnv } from "./cloudflare";
+import { quoteIncludesVat, quoteTotals as accountingQuoteTotals } from "./order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 
@@ -113,9 +114,6 @@ export function ownerNotificationFromName(quote: QuoteRequest) {
 const lineExVat = (item: QuoteItem) =>
   typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : null;
 
-const numericTotal = (items: QuoteItem[]) =>
-  items.reduce((sum, item) => sum + (lineExVat(item) ?? 0), 0);
-
 function fileDownloadUrl(key: string, env: EmailEnv = process.env) {
   return `${siteUrl(env)}/api/quote-files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
@@ -175,15 +173,7 @@ function ownerVehicleDetailsBlock(quote: QuoteRequest) {
   `;
 }
 
-export function quoteTotals(quote: QuoteRequest) {
-  const goodsExVat = numericTotal(quote.items);
-  const carriageExVat = quote.carriageExVat ?? 0;
-  const extraChargesExVat = quote.extraChargesExVat ?? 0;
-  const totalExVat = goodsExVat + carriageExVat + extraChargesExVat;
-  const totalIncVat = totalExVat * 1.2;
-  const vat = totalIncVat - totalExVat;
-  return { goodsExVat, carriageExVat, extraChargesExVat, totalExVat, vat, totalIncVat };
-}
+export const quoteTotals = accountingQuoteTotals;
 
 function ownerLineMeta(item: QuoteItem) {
   const parts = [`Qty ${escapeHtml(item.qty)}`];
@@ -310,7 +300,9 @@ function formatDate(value: string | null | undefined) {
   }).format(value ? new Date(value) : new Date());
 }
 
-function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
+function invoiceLineCards(items: QuoteItem[], includeVat: boolean, env: EmailEnv = process.env) {
+  const linePriceLabel = includeVat ? "Price ex VAT" : "Price";
+  const eachPriceLabel = includeVat ? "Price each ex VAT" : "Price each";
   return items
     .map((item) => {
       const line = lineExVat(item);
@@ -318,16 +310,16 @@ function invoiceLineCards(items: QuoteItem[], env: EmailEnv = process.env) {
       const priceRows = item.qty > 1
         ? `
               <tr>
-                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price each ex VAT</td>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">${eachPriceLabel}</td>
                 <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:700">${escapeHtml(money(item.unitPriceExVat))}</td>
               </tr>
               <tr>
-                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price ex VAT</td>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">${linePriceLabel}</td>
                 <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
               </tr>`
         : `
               <tr>
-                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">Price ex VAT</td>
+                <td style="padding:10px 14px;color:#6b5a46;border-top:1px solid #eadfca">${linePriceLabel}</td>
                 <td style="padding:10px 14px;text-align:right;border-top:1px solid #eadfca;font-weight:800;color:#0f3d2e">${escapeHtml(money(line))}</td>
               </tr>`;
       return `
@@ -370,17 +362,20 @@ function customerDeliveryBlock(quote: QuoteRequest) {
 
 export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
   const totals = quoteTotals(quote);
+  const includeVat = quoteIncludesVat(quote);
   const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
   const isUpdatedInvoice = Boolean(quote.customerEmailSentAt || quote.invoiceSentAt);
   const title = isUpdatedInvoice ? "Updated invoice" : "Order invoice";
   const invoiceDate = quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt || new Date().toISOString();
+  const invoiceRef = quote.websiteInvoiceNumber || quote.id;
+  const basePriceLabel = includeVat ? "ex VAT" : "";
   return `
     <div style="margin:0;background:#fbf8f1;padding:18px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">
       <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #eadfca;border-radius:12px;overflow:hidden">
         <div style="background:#0f3d2e;color:#fbf8f1;padding:20px">
           <div style="font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:#DF1718">M-Machine</div>
           <h1 style="margin:6px 0 0;font-family:Georgia,serif;font-size:28px;font-weight:600">${title}</h1>
-          <div style="margin-top:8px;color:#d8e7df">Invoice ${escapeHtml(quote.id)} / ${escapeHtml(formatDate(invoiceDate))}</div>
+          <div style="margin-top:8px;color:#d8e7df">Invoice ${escapeHtml(invoiceRef)} / ${escapeHtml(formatDate(invoiceDate))}</div>
         </div>
 
         <div style="padding:20px">
@@ -406,7 +401,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
               </tr>
               <tr>
                 <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Reference</td>
-                <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(quote.id)}</td>
+                <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(invoiceRef)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Submitted</td>
@@ -418,15 +413,25 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
           ${customerDeliveryBlock(quote)}
 
           <h2 style="margin:0 0 10px;color:#0f3d2e;font-size:18px">Items</h2>
-          ${invoiceLineCards(quote.items, env)}
+          ${invoiceLineCards(quote.items, includeVat, env)}
 
           <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:360px;margin:24px 0 0 auto;font-size:14px">
             <tbody>
-              <tr><td style="padding:6px 0;color:#6b5a46">Goods ex VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.goodsExVat))}</td></tr>
-              <tr><td style="padding:6px 0;color:#6b5a46">Carriage ex VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.carriageExVat))}</td></tr>
-              <tr><td style="padding:6px 0;color:#6b5a46">Extra charges ex VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.extraChargesExVat))}</td></tr>
-              <tr><td style="padding:6px 0;color:#6b5a46">VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.vat))}</td></tr>
-              <tr><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;color:#0f3d2e;font-weight:700">Total inc VAT</td><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;text-align:right;color:#0f3d2e;font-size:20px;font-weight:800">${escapeHtml(money(totals.totalIncVat))}</td></tr>
+              <tr><td style="padding:6px 0;color:#6b5a46">Goods${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.goodsExVat))}</td></tr>
+              <tr><td style="padding:6px 0;color:#6b5a46">Carriage${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.carriageExVat))}</td></tr>
+              <tr><td style="padding:6px 0;color:#6b5a46">Extra charges${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.extraChargesExVat))}</td></tr>
+              ${
+                totals.refundsExVat > 0
+                  ? `<tr><td style="padding:6px 0;color:#6b5a46">Refunds${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">-${escapeHtml(money(totals.refundsExVat))}</td></tr>`
+                  : ""
+              }
+              ${
+                includeVat
+                  ? `<tr><td style="padding:6px 0;color:#6b5a46">VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.vat))}</td></tr>
+                     <tr><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;color:#0f3d2e;font-weight:700">Total inc VAT</td><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;text-align:right;color:#0f3d2e;font-size:20px;font-weight:800">${escapeHtml(money(totals.totalIncVat))}</td></tr>`
+                  : `<tr><td style="padding:6px 0;color:#6b5a46">VAT</td><td style="padding:6px 0;text-align:right;font-weight:700">Not applied</td></tr>
+                     <tr><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;color:#0f3d2e;font-weight:700">Total</td><td style="padding:12px 0 0;border-top:2px solid #0f3d2e;text-align:right;color:#0f3d2e;font-size:20px;font-weight:800">${escapeHtml(money(totals.totalIncVat))}</td></tr>`
+              }
             </tbody>
           </table>
 

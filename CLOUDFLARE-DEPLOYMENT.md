@@ -134,6 +134,9 @@ npx wrangler d1 execute mmachine-runtime --remote --file migrations/0002_remove_
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0003_request_limits.sql
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0004_featured_work_prices.sql
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0005_team_auth.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0006_team_notification_preferences.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0007_team_two_factor_requirement.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0008_quote_accounting_exports.sql
 ```
 
 ## GitHub Auto Deploy

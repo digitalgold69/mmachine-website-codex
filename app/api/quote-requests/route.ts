@@ -9,8 +9,28 @@ import {
   ownerQuoteRecipientsForRuntime,
   sendQuoteEmail,
 } from "@/lib/quote-email";
-import { getQuoteRequest, listActiveQuoteRequests, listPaidQuoteHistory, saveQuoteRequest } from "@/lib/quotes";
-import type { CustomQuoteDetails, QuoteFile, QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import {
+  ACCOUNTING_BUCKETS,
+  quoteRefunds,
+  remainingRefundByBucket,
+  roundAccounting,
+} from "@/lib/order-accounting";
+import {
+  allocateWebsiteInvoiceNumber,
+  getQuoteRequest,
+  listActiveQuoteRequests,
+  listPaidQuoteHistory,
+  saveQuoteRequest,
+} from "@/lib/quotes";
+import type {
+  CustomQuoteDetails,
+  QuoteAccountingBucket,
+  QuoteFile,
+  QuoteItem,
+  QuoteRefundLine,
+  QuoteRequest,
+  QuoteStatus,
+} from "@/lib/quote-types";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { checkRateLimit } from "@/lib/request-limits";
@@ -39,6 +59,13 @@ function asNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function asBoolean(value: unknown, fallback: boolean) {
+  if (typeof value === "boolean") return value;
+  if (value === "true" || value === "1" || value === 1) return true;
+  if (value === "false" || value === "0" || value === 0) return false;
+  return fallback;
 }
 
 function normaliseMiniVehicleModel(value: unknown) {
@@ -146,6 +173,46 @@ function safeStatus(value: unknown): QuoteStatus {
   if (value === "quoted" || value === "invoice_sent") return "invoice_sent";
   if (value === "reviewing" || value === "paid" || value === "closed") return value;
   return "new";
+}
+
+function safeRefundBucket(value: unknown): QuoteAccountingBucket | null {
+  return ACCOUNTING_BUCKETS.find((bucket) => bucket === value) || null;
+}
+
+function safeRefundLines(
+  rawLines: unknown,
+  quote: QuoteRequest
+): { lines: QuoteRefundLine[]; error: string } {
+  if (!Array.isArray(rawLines)) return { lines: [], error: "Add at least one refund amount." };
+
+  const remaining = remainingRefundByBucket(quote);
+  const totals: Record<QuoteAccountingBucket, number> = {
+    mini: 0,
+    metals: 0,
+    engineering: 0,
+  };
+
+  for (const rawLine of rawLines) {
+    const line = rawLine as { bucket?: unknown; amountExVat?: unknown };
+    const bucket = safeRefundBucket(line.bucket);
+    const amount = asNumberOrNull(line.amountExVat);
+    if (!bucket || typeof amount !== "number" || amount <= 0) continue;
+    totals[bucket] = roundAccounting(totals[bucket] + amount);
+  }
+
+  const lines = ACCOUNTING_BUCKETS
+    .map((bucket) => ({ bucket, amountExVat: roundAccounting(totals[bucket]) }))
+    .filter((line) => line.amountExVat > 0);
+
+  if (lines.length === 0) return { lines: [], error: "Add at least one refund amount." };
+
+  for (const line of lines) {
+    if (line.amountExVat > remaining[line.bucket] + 0.005) {
+      return { lines: [], error: "Refund amount is higher than the remaining paid value for that order type." };
+    }
+  }
+
+  return { lines, error: "" };
 }
 
 function quoteId(kind = "") {
@@ -682,6 +749,11 @@ export async function PATCH(req: Request) {
     extraChargesExVat?: number | string | null;
     emailCustomer?: boolean;
     markPaid?: boolean;
+    includeVat?: boolean | string | number;
+    refund?: {
+      reason?: string;
+      lines?: unknown;
+    };
   } = {};
 
   try {
@@ -696,13 +768,14 @@ export async function PATCH(req: Request) {
     const current = await getQuoteRequest(body.id);
     if (!current) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
 
-    const next: QuoteRequest = {
+    let next: QuoteRequest = {
       ...current,
       status: body.status ? safeStatus(body.status) : current.status,
       ownerNotes: asString(body.ownerNotes ?? current.ownerNotes, 3000),
       customerMessage: asString(body.customerMessage ?? current.customerMessage, 3000),
-      carriageExVat: asNumberOrNull(body.carriageExVat),
-      extraChargesExVat: asNumberOrNull(body.extraChargesExVat),
+      carriageExVat: body.carriageExVat === undefined ? current.carriageExVat : asNumberOrNull(body.carriageExVat),
+      extraChargesExVat: body.extraChargesExVat === undefined ? current.extraChargesExVat : asNumberOrNull(body.extraChargesExVat),
+      includeVat: asBoolean(body.includeVat, current.includeVat !== false),
       updatedAt: new Date().toISOString(),
     };
 
@@ -721,6 +794,30 @@ export async function PATCH(req: Request) {
       next.paidAt = new Date().toISOString();
     }
 
+    if (body.refund) {
+      if (current.status !== "paid" && !current.paidAt) {
+        return NextResponse.json({ error: "Only paid orders can be refunded." }, { status: 400 });
+      }
+
+      const refundLines = safeRefundLines(body.refund.lines, next);
+      if (refundLines.error) {
+        return NextResponse.json({ error: refundLines.error }, { status: 400 });
+      }
+
+      const createdAt = new Date().toISOString();
+      next.status = "paid";
+      next.paidAt = next.paidAt || current.paidAt || createdAt;
+      next.refunds = [
+        ...quoteRefunds(next),
+        {
+          id: `refund-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
+          createdAt,
+          reason: asString(body.refund.reason, 500),
+          lines: refundLines.lines,
+        },
+      ];
+    }
+
     let customerEmailSent = false;
     if (body.emailCustomer) {
       const incompleteLine = next.items.find(
@@ -728,9 +825,13 @@ export async function PATCH(req: Request) {
       );
       if (incompleteLine) {
         return NextResponse.json(
-          { error: "Add an ex VAT price to every invoice line before emailing the customer." },
+          { error: "Add a price to every invoice line before emailing the customer." },
           { status: 400 }
         );
+      }
+
+      if (!next.websiteInvoiceNumber) {
+        next = { ...next, websiteInvoiceNumber: await allocateWebsiteInvoiceNumber() };
       }
 
       const savedDraft = await saveQuoteRequest(next);
@@ -738,7 +839,7 @@ export async function PATCH(req: Request) {
       const replyTo = (await ownerQuoteRecipientsForRuntime(savedDraft))[0];
       const email = await sendQuoteEmail({
         to: savedDraft.customer.email,
-        subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${savedDraft.id}`,
+        subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${savedDraft.websiteInvoiceNumber || savedDraft.id}`,
         html: await buildCustomerInvoiceEmailForRuntime(savedDraft),
         replyTo,
         fromName: CUSTOMER_INVOICE_FROM_NAME,
@@ -775,11 +876,14 @@ export async function PATCH(req: Request) {
       );
       if (incompleteLine) {
         return NextResponse.json(
-          { error: "Add an ex VAT price to every invoice line before marking the order as paid." },
+          { error: "Add a price to every invoice line before marking the order as paid." },
           { status: 400 }
         );
       }
       const paidAt = new Date().toISOString();
+      if (!next.websiteInvoiceNumber) {
+        next = { ...next, websiteInvoiceNumber: await allocateWebsiteInvoiceNumber() };
+      }
       next.status = "paid";
       next.paidAt = paidAt;
     }

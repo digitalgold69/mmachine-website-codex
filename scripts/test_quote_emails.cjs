@@ -339,6 +339,19 @@ assert.match(safeCustomerDeliveryHtml, /Your Delivery Address/);
 assert.match(safeCustomerDeliveryHtml, /65 Stanhope Road North<br>Darlington<br>DL3 7AP/);
 assert.doesNotMatch(safeCustomerDeliveryHtml, /You selected collection/);
 
+const noVatCustomerHtml = buildCustomerInvoiceEmail({
+  ...singleMiniQuote,
+  includeVat: false,
+  websiteInvoiceNumber: "W1234",
+});
+assert.match(noVatCustomerHtml, /Invoice W1234/);
+assert.match(noVatCustomerHtml, /Reference[\s\S]*W1234/);
+assert.match(noVatCustomerHtml, />Price</);
+assert.doesNotMatch(noVatCustomerHtml, /Price ex VAT/);
+assert.match(noVatCustomerHtml, /VAT[\s\S]*Not applied/);
+assert.match(noVatCustomerHtml, />Total</);
+assert.doesNotMatch(noVatCustomerHtml, /Total inc VAT/);
+
 const updatedCustomerHtml = buildCustomerInvoiceEmail({
   ...quote,
   status: "invoice_sent",

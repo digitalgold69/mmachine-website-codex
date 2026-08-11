@@ -1,4 +1,8 @@
 import { getD1 } from "@/lib/cloudflare";
+import {
+  quoteNetExVat,
+  quoteRefunds,
+} from "@/lib/order-accounting";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
 
@@ -20,7 +24,68 @@ type QuoteRow = {
   total_ex_vat: number | null;
   customer_email_sent_at: string | null;
   owner_email_sent_at: string | null;
+  include_vat?: number | string | boolean | null;
+  website_invoice_number?: string | null;
+  refunds?: string | null;
 };
+
+let quoteSchemaReady: Promise<void> | null = null;
+
+async function executeSchema(db: Awaited<ReturnType<typeof getD1>>, sql: string) {
+  try {
+    await db.prepare(sql).run();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/duplicate column name|already exists/i.test(message)) throw err;
+  }
+}
+
+async function ensureQuoteAccountingSchemaInner() {
+  const db = await getD1();
+  const statements = [
+    `ALTER TABLE quote_requests ADD COLUMN include_vat INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE quote_requests ADD COLUMN website_invoice_number TEXT`,
+    `ALTER TABLE quote_requests ADD COLUMN refunds TEXT NOT NULL DEFAULT '[]'`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS quote_requests_website_invoice_number_idx
+      ON quote_requests(website_invoice_number)`,
+    `CREATE TABLE IF NOT EXISTS accounting_sequences (
+      name TEXT PRIMARY KEY,
+      next_number INTEGER NOT NULL
+    )`,
+    `INSERT INTO accounting_sequences (name, next_number)
+      VALUES ('website_invoice', 1234)
+      ON CONFLICT(name) DO NOTHING`,
+  ];
+
+  for (const statement of statements) await executeSchema(db, statement);
+
+  const maxRow = await db
+    .prepare(
+      `SELECT MAX(CAST(SUBSTR(website_invoice_number, 2) AS INTEGER)) AS max_ref
+       FROM quote_requests
+       WHERE website_invoice_number LIKE 'W%'`
+    )
+    .first<{ max_ref: number | null }>();
+  const nextNumber = Math.max(1234, Number(maxRow?.max_ref || 0) + 1);
+  await db
+    .prepare(
+      `UPDATE accounting_sequences
+       SET next_number = CASE WHEN next_number < ? THEN ? ELSE next_number END
+       WHERE name = 'website_invoice'`
+    )
+    .bind(nextNumber, nextNumber)
+    .run();
+}
+
+export async function ensureQuoteAccountingSchema() {
+  if (!quoteSchemaReady) {
+    quoteSchemaReady = ensureQuoteAccountingSchemaInner().catch((err) => {
+      quoteSchemaReady = null;
+      throw err;
+    });
+  }
+  return quoteSchemaReady;
+}
 
 function normaliseStatus(status: string): QuoteStatus {
   if (status === "quoted") return "invoice_sent";
@@ -45,6 +110,11 @@ function parseJson<T>(value: string | null, fallback: T): T {
   }
 }
 
+function boolFromDb(value: unknown, fallback = true) {
+  if (value === null || value === undefined || value === "") return fallback;
+  return value === 1 || value === true || value === "1";
+}
+
 function rowToQuote(row: QuoteRow): QuoteRequest {
   return {
     id: row.id,
@@ -62,6 +132,9 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     paidAt: row.paid_at,
     customerEmailSentAt: row.customer_email_sent_at,
     ownerEmailSentAt: row.owner_email_sent_at,
+    includeVat: boolFromDb(row.include_vat, true),
+    websiteInvoiceNumber: row.website_invoice_number || null,
+    refunds: quoteRefunds({ refunds: parseJson(row.refunds || null, []) }),
   };
 }
 
@@ -243,15 +316,64 @@ export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> 
   return row ? rowToQuote(row) : null;
 }
 
+export async function allocateWebsiteInvoiceNumber(): Promise<string> {
+  await ensureQuoteAccountingSchema();
+  const db = await getD1();
+  const row = await db
+    .prepare(
+      `UPDATE accounting_sequences
+       SET next_number = next_number + 1
+       WHERE name = 'website_invoice'
+       RETURNING next_number - 1 AS allocated`
+    )
+    .first<{ allocated: number }>();
+
+  if (!row?.allocated) throw new Error("Website invoice number could not be allocated.");
+  const allocated = Math.max(1234, Number(row.allocated));
+  return `W${allocated}`;
+}
+
+export async function ensureWebsiteInvoiceNumber(quote: QuoteRequest): Promise<QuoteRequest> {
+  if (quote.websiteInvoiceNumber) return quote;
+
+  const fresh = await getQuoteRequest(quote.id);
+  if (fresh?.websiteInvoiceNumber) {
+    return { ...quote, websiteInvoiceNumber: fresh.websiteInvoiceNumber };
+  }
+
+  const websiteInvoiceNumber = await allocateWebsiteInvoiceNumber();
+  return saveQuoteRequest({ ...quote, websiteInvoiceNumber });
+}
+
+export async function listPaidQuoteRecordsForExport(): Promise<QuoteRequest[]> {
+  await ensureQuoteAccountingSchema();
+  const db = await getD1();
+  const quotes: QuoteRequest[] = [];
+  const pageSize = 500;
+  let offset = 0;
+
+  for (;;) {
+    const result = await db
+      .prepare("select * from quote_requests where status = 'paid' order by paid_at asc limit ? offset ?")
+      .bind(pageSize, offset)
+      .all<QuoteRow>();
+    if (result.error) throw new Error(`D1 paid export read failed: ${result.error}`);
+    const rows = result.results || [];
+    quotes.push(...rows.map(rowToQuote));
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return quotes;
+}
+
 export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteRequest> {
+  await ensureQuoteAccountingSchema();
   const db = await getD1();
   const paidMonthUk = quote.status === "paid"
     ? ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)
     : null;
-  const totalExVat = quote.items.reduce(
-    (sum, item) => sum + (typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : 0),
-    0
-  ) + (quote.carriageExVat ?? 0) + (quote.extraChargesExVat ?? 0);
+  const totalExVat = quoteNetExVat(quote);
 
   const result = await db
     .prepare(
@@ -273,8 +395,11 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         paid_month_uk,
         total_ex_vat,
         customer_email_sent_at,
-        owner_email_sent_at
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        owner_email_sent_at,
+        include_vat,
+        website_invoice_number,
+        refunds
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       on conflict(id) do update set
         submitted_at = excluded.submitted_at,
         updated_at = excluded.updated_at,
@@ -291,7 +416,10 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         paid_month_uk = excluded.paid_month_uk,
         total_ex_vat = excluded.total_ex_vat,
         customer_email_sent_at = excluded.customer_email_sent_at,
-        owner_email_sent_at = excluded.owner_email_sent_at
+        owner_email_sent_at = excluded.owner_email_sent_at,
+        include_vat = excluded.include_vat,
+        website_invoice_number = excluded.website_invoice_number,
+        refunds = excluded.refunds
       `
     )
     .bind(
@@ -311,7 +439,10 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       paidMonthUk,
       totalExVat,
       quote.customerEmailSentAt ?? null,
-      quote.ownerEmailSentAt ?? null
+      quote.ownerEmailSentAt ?? null,
+      quote.includeVat === false ? 0 : 1,
+      quote.websiteInvoiceNumber ?? null,
+      JSON.stringify(quoteRefunds(quote))
     )
     .run();
 

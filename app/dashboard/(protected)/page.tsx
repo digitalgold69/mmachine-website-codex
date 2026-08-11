@@ -4,6 +4,7 @@ import { isLoggedIn } from "@/lib/auth";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { listFeaturedWork } from "@/lib/featured";
+import { accountingBucketForCatalogue, quoteRefunds, roundAccounting } from "@/lib/order-accounting";
 import { getBestPaidMonth, listDashboardQuoteRequests, type BestPaidMonth } from "@/lib/quotes";
 import { quoteTotals } from "@/lib/quote-email";
 import type { QuoteItem, QuoteRequest } from "@/lib/quote-types";
@@ -329,9 +330,16 @@ function buildAnalytics(
 function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
   const map = new Map<string, RankedItem>();
   for (const quote of quotes) {
+    const refundByBucket = refundTotalsByBucket(quote);
+    const goodsByBucket = goodsTotalsByBucket(quote);
     for (const item of quote.items) {
       if (item.catalogue === "custom") continue;
 
+      const bucket = accountingBucketForCatalogue(item.catalogue);
+      const itemValue = lineExVat(item);
+      const refundShare = goodsByBucket[bucket] > 0
+        ? refundByBucket[bucket] * (itemValue / goodsByBucket[bucket])
+        : 0;
       const label = itemLabel(item);
       const current = map.get(label) || {
         label,
@@ -345,7 +353,7 @@ function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
         value: 0,
       };
       current.qty += item.qty;
-      current.value += lineExVat(item);
+      current.value += Math.max(0, roundAccounting(itemValue - refundShare));
       map.set(label, current);
     }
   }
@@ -405,6 +413,24 @@ function itemLabel(item: QuoteItem) {
     : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
+}
+
+function emptyAccountingBuckets() {
+  return { mini: 0, metals: 0, engineering: 0 };
+}
+
+function refundTotalsByBucket(quote: QuoteRequest) {
+  const totals = emptyAccountingBuckets();
+  for (const refund of quoteRefunds(quote)) {
+    for (const line of refund.lines) totals[line.bucket] += line.amountExVat;
+  }
+  return totals;
+}
+
+function goodsTotalsByBucket(quote: QuoteRequest) {
+  const totals = emptyAccountingBuckets();
+  for (const item of quote.items) totals[accountingBucketForCatalogue(item.catalogue)] += lineExVat(item);
+  return totals;
 }
 
 function formatDateTime(value: string) {
