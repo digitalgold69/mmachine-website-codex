@@ -206,6 +206,10 @@ function cardTotalSubLabel(quote: QuoteRequest) {
   return quoteIncludesVat(quote) ? "ex VAT" : "VAT not applied";
 }
 
+function quoteDisplayRef(quote: QuoteRequest) {
+  return quote.websiteInvoiceNumber ? websiteInvoiceDisplay(quote) : "Invoice pending";
+}
+
 function defaultAddLineCatalogue(quote: QuoteRequest): AddLineCatalogue {
   return quote.items.some((item) => item.catalogue === "metals") ? "metals" : "mini";
 }
@@ -515,6 +519,7 @@ function OrderCard({
   const quoteTotals = totals(quote);
   const cardSaving = savingAction.startsWith(`${quote.id}:`);
   const itemQuantity = orderItemQuantity(quote);
+  const displayRef = quoteDisplayRef(quote);
   const customerLines = [
     quote.customer.name,
     quote.customer.company,
@@ -540,8 +545,8 @@ function OrderCard({
           <OrderTypePill quote={quote} />
           <StatusPill status={quote.status} />
         </div>
-        <div title={quote.id} className="mt-2 max-w-full truncate text-lg font-semibold leading-6 text-racing">
-          {quote.id}
+        <div title={displayRef} className="mt-2 max-w-full truncate text-lg font-semibold leading-6 text-racing">
+          {displayRef}
         </div>
         <div className="mt-1 space-y-0.5">
           {customerLines.map((line, index) => (
@@ -580,7 +585,7 @@ function OrderCard({
                 type="button"
                 onClick={() => onDelete(quote)}
                 disabled={isSaving}
-                aria-label={`Delete order ${quote.id}`}
+                aria-label={`Delete order ${displayRef}`}
                 className="rounded-lg px-2 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 Delete
@@ -591,7 +596,7 @@ function OrderCard({
                 type="button"
                 onClick={() => onMarkPaid(quote)}
                 disabled={isSaving}
-                aria-label={`Mark order ${quote.id} as paid`}
+                aria-label={`Mark order ${displayRef} as paid`}
                 className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
@@ -1194,7 +1199,7 @@ export default function OrdersClient({
       if (data.quote) updateQuote(data.quote);
       else removeQuoteFromDashboard(quote.id);
       setPendingDelete(null);
-      setMessage(`Deleted ${quote.id}.`);
+      setMessage(`Deleted ${quoteDisplayRef(quote)}.`);
     } catch (err) {
       setMessage((err as Error).message || "Order could not be deleted.");
     } finally {
@@ -1381,49 +1386,51 @@ export default function OrdersClient({
             )}
 
             <div className="mt-4 rounded-lg border border-racing/10 bg-cream-dark p-3">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_140px_140px_auto] lg:items-end">
-                <div>
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                <div className="min-w-0">
                   <div className="text-sm font-semibold text-racing">Sage export</div>
                   <p className="mt-1 text-xs leading-5 text-ink-muted">
                     Downloads paid website sales and refunds in the SageBook format.
                   </p>
                 </div>
-                <div>
-                  <label className="label" htmlFor="export-from">From</label>
-                  <input
-                    id="export-from"
-                    type="date"
-                    value={exportFrom}
-                    onChange={(event) => setExportFrom(event.target.value)}
-                    className="input min-h-0 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="export-to">To</label>
-                  <input
-                    id="export-to"
-                    type="date"
-                    value={exportTo}
-                    onChange={(event) => setExportTo(event.target.value)}
-                    className="input min-h-0 py-2 text-sm"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  {(exportFrom || exportTo) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExportFrom("");
-                        setExportTo("");
-                      }}
-                      className="rounded-lg border border-racing/20 px-3 py-2 text-sm font-semibold text-racing hover:bg-white"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  <a href={exportHref} className="btn-primary whitespace-nowrap px-4 py-2 text-sm">
-                    {exportButtonLabel}
-                  </a>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted" htmlFor="export-from">From</label>
+                    <input
+                      id="export-from"
+                      type="date"
+                      value={exportFrom}
+                      onChange={(event) => setExportFrom(event.target.value)}
+                      className="input min-h-0 w-[10.75rem] px-2 py-2 pr-1 text-sm leading-tight"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted" htmlFor="export-to">To</label>
+                    <input
+                      id="export-to"
+                      type="date"
+                      value={exportTo}
+                      onChange={(event) => setExportTo(event.target.value)}
+                      className="input min-h-0 w-[10.75rem] px-2 py-2 pr-1 text-sm leading-tight"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {(exportFrom || exportTo) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExportFrom("");
+                          setExportTo("");
+                        }}
+                        className="rounded-lg border border-racing/20 px-3 py-2 text-sm font-semibold text-racing hover:bg-white"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <a href={exportHref} className="btn-primary whitespace-nowrap px-4 py-2 text-sm">
+                      {exportButtonLabel}
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1517,8 +1524,7 @@ export default function OrdersClient({
                       {draft.customer.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
-                      {draft.websiteInvoiceNumber && <span>Invoice {websiteInvoiceDisplay(draft)}</span>}
-                      <span>{draft.id}</span>
+                      <span>Invoice {quoteDisplayRef(draft)}</span>
                       <span>Submitted {formatDateTime(draft.submittedAt)}</span>
                       <span>{draft.customer.email}</span>
                       {draft.customer.phone && <span>{draft.customer.phone}</span>}
@@ -2241,7 +2247,7 @@ export default function OrdersClient({
             <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
               <h2 id="delete-order-title" className="font-display text-2xl text-racing">Delete this job?</h2>
               <p className="mt-3 text-sm leading-6 text-ink-muted">
-                {pendingDelete.id} for {pendingDelete.customer.name} will be removed from the active dashboard.
+                {quoteDisplayRef(pendingDelete)} for {pendingDelete.customer.name} will be removed from the active dashboard.
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button

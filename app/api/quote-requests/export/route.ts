@@ -89,15 +89,8 @@ function buildWorkbook(rows: SageExportRow[]) {
   return XLSX.write(workbook, { bookType: "xlsx", type: "array", cellDates: true }) as ArrayBuffer;
 }
 
-function filename(from: string, to: string) {
-  const suffix = from && to
-    ? `${from}_to_${to}`
-    : from
-      ? `from_${from}`
-      : to
-        ? `to_${to}`
-        : "all";
-  return `m-machine-website-sales-${suffix}.xlsx`;
+function filename(_from: string, _to: string) {
+  return "WebsiteInvoiceRecordSheet.xlsx";
 }
 
 async function rowsForExport(start: Date | null, end: Date | null) {

@@ -248,11 +248,12 @@ function ownerDeliveryContent(quote: QuoteRequest) {
 
 export function buildOwnerQuoteEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
   const dashboardLink = dashboardUrl(env, quote.id);
+  const invoiceRef = websiteInvoiceDisplay(quote);
   return `
     <div style="margin:0;padding:24px;background:#fbf8f1;font-family:Arial,sans-serif;color:#2c2c2a">
       <div style="max-width:680px;margin:0 auto">
         <h2 style="margin:0 0 8px;color:#0f3d2e">New M-Machine order request</h2>
-        <p style="margin:0 0 18px;color:#6b5a46">${escapeHtml(quote.id)} / ${escapeHtml(orderType(quote))} / submitted ${escapeHtml(formatDate(quote.submittedAt))}</p>
+        <p style="margin:0 0 18px;color:#6b5a46">${escapeHtml(invoiceRef)} / ${escapeHtml(orderType(quote))} / submitted ${escapeHtml(formatDate(quote.submittedAt))}</p>
 
         <div style="margin:0 0 14px;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#ffffff">
           <strong style="display:block;margin-bottom:8px;color:#0f3d2e">Customer</strong>

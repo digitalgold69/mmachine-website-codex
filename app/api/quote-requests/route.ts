@@ -321,14 +321,14 @@ async function persistCustomQuote(
     ownerEmailSentAt: null,
   };
 
-  let saved = await saveQuoteRequest(quote);
-  const recipients = await ownerQuoteRecipientsForRuntime(quote);
+  let saved = await ensureWebsiteInvoiceNumber(await saveQuoteRequest(quote));
+  const recipients = await ownerQuoteRecipientsForRuntime(saved);
   const email = await sendQuoteEmail({
     to: recipients,
-    subject: `New M-Machine custom fabrication request ${quote.id}`,
-    html: await buildOwnerQuoteEmailForRuntime(quote),
-    replyTo: quote.customer.email,
-    fromName: ownerNotificationFromName(quote),
+    subject: `New M-Machine custom fabrication request ${websiteInvoiceDisplay(saved)}`,
+    html: await buildOwnerQuoteEmailForRuntime(saved),
+    replyTo: saved.customer.email,
+    fromName: ownerNotificationFromName(saved),
   });
   if (email.ok) {
     saved = await saveQuoteRequest({
@@ -338,7 +338,7 @@ async function persistCustomQuote(
     });
   } else {
     console.error("owner_quote_email_failed", {
-      quoteId: quote.id,
+      quoteId: saved.id,
       skipped: email.skipped,
       code: email.code,
       missing: email.missing,
@@ -350,7 +350,7 @@ async function persistCustomQuote(
 
   return NextResponse.json({
     ok: true,
-    quoteId: saved.id,
+    quoteId: websiteInvoiceDisplay(saved),
     ownerEmailSent: email.ok,
     files: files.map((file) => ({
       name: file.name,
@@ -531,7 +531,7 @@ export async function GET(request: Request) {
     if (quoteIdParam) {
       const quote = await getQuoteRequest(quoteIdParam);
       if (!quote) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
-      return NextResponse.json({ quote });
+      return NextResponse.json({ quote: await ensureWebsiteInvoiceNumber(quote) });
     }
 
     if (url.searchParams.get("history") === "paid") {
@@ -690,16 +690,16 @@ export async function POST(req: Request) {
       ownerEmailSentAt: null,
     };
 
-    let saved = await saveQuoteRequest(quote);
-    const recipients = await ownerQuoteRecipientsForRuntime(quote);
+    let saved = await ensureWebsiteInvoiceNumber(await saveQuoteRequest(quote));
+    const recipients = await ownerQuoteRecipientsForRuntime(saved);
     const email = await sendQuoteEmail({
       to: recipients,
       subject: featuredOnly
-        ? `New M-Machine Featured Work order ${quote.id}`
-        : `New M-Machine quote request ${quote.id}`,
-      html: await buildOwnerQuoteEmailForRuntime(quote),
-      replyTo: quote.customer.email,
-      fromName: ownerNotificationFromName(quote),
+        ? `New M-Machine Featured Work order ${websiteInvoiceDisplay(saved)}`
+        : `New M-Machine quote request ${websiteInvoiceDisplay(saved)}`,
+      html: await buildOwnerQuoteEmailForRuntime(saved),
+      replyTo: saved.customer.email,
+      fromName: ownerNotificationFromName(saved),
     });
     if (email.ok) {
       saved = await saveQuoteRequest({
@@ -709,7 +709,7 @@ export async function POST(req: Request) {
       });
     } else {
       console.error("owner_quote_email_failed", {
-        quoteId: quote.id,
+        quoteId: saved.id,
         skipped: email.skipped,
         code: email.code,
         missing: email.missing,
@@ -718,7 +718,7 @@ export async function POST(req: Request) {
           : undefined,
       });
     }
-    return NextResponse.json({ ok: true, quoteId: saved.id, ownerEmailSent: email.ok });
+    return NextResponse.json({ ok: true, quoteId: websiteInvoiceDisplay(saved), ownerEmailSent: email.ok });
   } catch (err) {
     console.error("catalogue_quote_submission_failed", {
       error: err instanceof Error ? err.message : "unknown error",

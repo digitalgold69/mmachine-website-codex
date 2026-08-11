@@ -149,7 +149,7 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
 
 async function ensureStoredInvoiceRanges(quotes: QuoteRequest[]) {
   return Promise.all(
-    quotes.map((quote) => quote.websiteInvoiceNumber ? ensureWebsiteInvoiceNumber(quote) : quote)
+    quotes.map((quote) => ensureWebsiteInvoiceNumber(quote))
   );
 }
 

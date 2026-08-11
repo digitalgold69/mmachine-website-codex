@@ -9,6 +9,7 @@ import {
   emptyAccountingTotals,
   quoteRefunds,
   roundAccounting,
+  websiteInvoiceDisplay,
 } from "@/lib/order-accounting";
 import { getBestPaidMonth, listDashboardQuoteRequests, type BestPaidMonth } from "@/lib/quotes";
 import { quoteTotals } from "@/lib/quote-email";
@@ -122,7 +123,7 @@ export default async function DashboardHomePage() {
                     <div>
                       <div className="font-semibold text-racing">{quote.customer.name}</div>
                       <div className="text-xs text-ink-muted">
-                        {quote.id} / {formatDateTime(quote.submittedAt)}
+                        {websiteInvoiceDisplay(quote)} / {formatDateTime(quote.submittedAt)}
                       </div>
                     </div>
                     <div className="text-right">
