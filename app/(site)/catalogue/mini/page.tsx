@@ -24,6 +24,7 @@ type MiniProductImage = {
 
 type ProductPreviewImage = MiniProductImage & {
   alt: string;
+  code: string;
 };
 
 const BODY_TYPES = ["All", "Saloon", "Traveller", "Van", "Pick-Up", "Cooper", "Elf/Hornet", "Clubman", "Clubman Estate"];
@@ -350,7 +351,9 @@ export default function MiniCataloguePage() {
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="px-3 py-3 text-left">Code</th>
-                <th className="px-1 py-3 text-center">Photo</th>
+                <th className="px-1 py-3 text-center">
+                  <span className="inline-block translate-x-5">Photo</span>
+                </th>
                 <th className="py-3 pl-12 pr-3 text-left xl:pl-20">Description</th>
                 <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-right px-4 py-3">&pound; Inc VAT</th>
@@ -367,8 +370,8 @@ export default function MiniCataloguePage() {
                       {image ? (
                         <button
                           type="button"
-                          onClick={() => setPreviewImage({ ...image, alt: p.name })}
-                          className="mx-auto block h-11 w-11 overflow-hidden rounded-md border border-racing/10 bg-cream-dark"
+                          onClick={() => setPreviewImage({ ...image, alt: p.name, code: p.code })}
+                          className="mx-auto block h-11 w-11 translate-x-5 overflow-hidden rounded-md border border-racing/10 bg-cream-dark"
                           aria-label={`View photo for ${p.name}`}
                         >
                           <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -422,7 +425,7 @@ export default function MiniCataloguePage() {
                     {image && (
                       <button
                         type="button"
-                        onClick={() => setPreviewImage({ ...image, alt: p.name })}
+                        onClick={() => setPreviewImage({ ...image, alt: p.name, code: p.code })}
                         className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-racing/10 bg-cream-dark"
                         aria-label={`View photo for ${p.name}`}
                       >
@@ -504,6 +507,14 @@ export default function MiniCataloguePage() {
           onClick={() => setPreviewImage(null)}
         >
           <div className="relative max-h-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+            <div className="absolute left-3 top-3 z-10 flex max-w-[min(72vw,34rem)] flex-col items-start gap-1">
+              <span className="inline-block max-w-full truncate rounded-full bg-racing px-3 py-1 text-xs font-semibold text-cream shadow">
+                {previewImage.alt}
+              </span>
+              <span className="inline-block max-w-full truncate rounded-full bg-cream px-2.5 py-0.5 font-mono text-[11px] font-semibold text-racing shadow">
+                {previewImage.code}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => setPreviewImage(null)}

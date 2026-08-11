@@ -53,7 +53,12 @@ async function main() {
   assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");
   assert.match(miniPage, /<col className="w-\[58px\]" \/>/, "Mini catalogue desktop photo column should stay compact between code and description");
   assert.match(miniPage, /xl:pl-20/, "Mini catalogue desktop descriptions should sit closer to the photo column without losing the column spacing");
-  assert.match(miniPage, /text-center">Photo/, "Mini catalogue desktop photo column should be centred");
+  assert.match(miniPage, /text-center">[\s\S]*Photo/, "Mini catalogue desktop photo column should be centred");
+  assert.match(miniPage, /translate-x-5[\s\S]*Photo/, "Mini catalogue desktop photo heading should be nudged toward the description column");
+  assert.match(miniPage, /h-11 w-11 translate-x-5/, "Mini catalogue desktop thumbnails should sit closer to the description column");
+  assert.match(miniPage, /previewImage\.alt[\s\S]*previewImage\.code/, "Mini catalogue image preview should label the description and part number");
+  assert.match(miniPage, /bg-racing[\s\S]*previewImage\.alt/, "Mini catalogue preview description label should use the primary pill style");
+  assert.match(miniPage, /bg-cream[\s\S]*previewImage\.code/, "Mini catalogue preview part number should use a secondary pill style");
   assert.match(miniPage, /Inc VAT:[\s\S]*<strong className="text-racing">\{money\(p\.priceIncVat\)\}<\/strong>/, "Mobile mini cards must keep inc VAT beside the part number");
 
   const navbar = read("components/Navbar.tsx");
