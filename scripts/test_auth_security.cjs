@@ -105,6 +105,9 @@ assert.match(quotesStore, /json_each\(coalesce\(quote_requests\.refunds, '\[\]'\
 assert.match(orderAccounting, /websiteRefundRefForLine/, "refund export rows must use refund-specific invoice refs");
 assert.match(orderAccounting, /Ref: websiteRefundRefForLine\(refund, lineIndex\)/, "refund export rows must not reuse sale invoice refs");
 assert.match(ordersClient, /draftTotals && draftTotals\.carriage > 0[\s\S]+baseTotalLabel\(draft, "Carriage"\)[\s\S]+money\(draftTotals\.carriage\)/, "dashboard invoice totals must show carriage as its own row only when a carriage value exists");
+assert.match(ordersClient, /function refundCardText/, "dashboard quote cards must calculate a readable refund note");
+assert.match(ordersClient, /Fully refunded/, "dashboard quote cards must distinguish full refunds");
+assert.match(ordersClient, /Refunded[\s\S]+money\(quoteTotal\.refunds\)/, "dashboard quote cards must show the refund amount");
 assert.match(productsClient, /optimiseProductImage/, "mini panel dashboard photos must be optimised before upload");
 assert.match(productsClient, /\/api\/mini-product-images/, "dashboard products tab must use the mini product image API");
 assert.match(miniProductImagesRoute, /export async function GET/, "mini product image listing should be public for the catalogue");

@@ -215,6 +215,13 @@ function cardTotalSubLabel(quote: QuoteRequest) {
   return quoteIncludesVat(quote) ? "ex VAT" : "VAT not applied";
 }
 
+function refundCardText(quote: QuoteRequest, quoteTotal: ReturnType<typeof totals>) {
+  if (quoteTotal.refunds <= 0 || quoteTotal.hasPoaItems) return "";
+  const fullRefund = quoteTotal.subtotalEx > 0 && quoteTotal.refunds >= quoteTotal.subtotalEx - 0.005;
+  const suffix = quoteIncludesVat(quote) ? " ex VAT" : "";
+  return `${fullRefund ? "Fully refunded" : "Refunded"} ${money(quoteTotal.refunds)}${suffix}`;
+}
+
 function quoteDisplayRef(quote: QuoteRequest) {
   return quote.websiteInvoiceNumber ? websiteInvoiceDisplay(quote) : "Invoice pending";
 }
@@ -534,6 +541,7 @@ function OrderCard({
   const cardSaving = savingAction.startsWith(`${quote.id}:`);
   const itemQuantity = orderItemQuantity(quote);
   const displayRef = quoteDisplayRef(quote);
+  const refundText = refundCardText(quote, quoteTotals);
   const customerLines = [
     quote.customer.name,
     quote.customer.company,
@@ -581,6 +589,11 @@ function OrderCard({
               {quoteTotals.hasPoaItems ? "POA" : money(quoteTotals.totalEx)}
             </div>
             <div className="text-xs text-ink-muted">{cardTotalSubLabel(quote)}</div>
+            {refundText && (
+              <div className="mt-1 text-[11px] font-semibold leading-4 text-red-700">
+                {refundText}
+              </div>
+            )}
           </div>
         </div>
       </button>
