@@ -695,20 +695,6 @@ export default function OrdersClient({
     [sortedQuotes]
   );
 
-  const activeRequestQuotes = useMemo(
-    () => [...openRequestQuotes, ...pendingPaymentQuotes],
-    [openRequestQuotes, pendingPaymentQuotes]
-  );
-
-  const orderRequestFilterCounts = useMemo(() => {
-    return ORDER_REQUEST_FILTERS.reduce((counts, filter) => {
-      counts[filter.value] = activeRequestQuotes.filter((quote) =>
-        quoteMatchesOrderRequestFilter(quote, filter.value)
-      ).length;
-      return counts;
-    }, {} as Record<OrderRequestFilter, number>);
-  }, [activeRequestQuotes]);
-
   const filteredOpenRequestQuotes = useMemo(
     () => openRequestQuotes.filter((quote) => quoteMatchesOrderRequestFilter(quote, orderRequestFilter)),
     [openRequestQuotes, orderRequestFilter]
@@ -726,7 +712,7 @@ export default function OrdersClient({
 
   const pageCount = Math.max(1, Math.ceil(historyCount / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageQuotes = historyRows;
+  const pageQuotes = historyRows.filter((quote) => quoteMatchesOrderRequestFilter(quote, orderRequestFilter));
   const monthStats = useMemo(() => new Map(Object.entries(historyMonthStats)), [historyMonthStats]);
   const exportHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -804,6 +790,7 @@ export default function OrdersClient({
           time: timeFilter,
           month: monthFilter,
         });
+        if (orderRequestFilter !== "all") params.set("orderType", orderRequestFilter);
         const response = await fetch(`/api/quote-requests?${params}`, { signal: controller.signal });
         const data = await response.json() as {
           error?: string;
@@ -834,11 +821,11 @@ export default function OrdersClient({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [currentPage, historyRevision, monthFilter, query, timeFilter]);
+  }, [currentPage, historyRevision, monthFilter, orderRequestFilter, query, timeFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [monthFilter, query, timeFilter]);
+  }, [monthFilter, orderRequestFilter, query, timeFilter]);
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
@@ -1358,7 +1345,10 @@ export default function OrdersClient({
                 <button
                   key={filter.value}
                   type="button"
-                  onClick={() => setOrderRequestFilter(filter.value)}
+                  onClick={() => {
+                    setOrderRequestFilter(filter.value);
+                    setPage(1);
+                  }}
                   aria-pressed={active}
                   className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                     active
@@ -1367,11 +1357,6 @@ export default function OrdersClient({
                   }`}
                 >
                   <span>{filter.label}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] leading-none ${
-                    active ? "bg-cream/15 text-cream" : "bg-cream-dark text-ink-muted"
-                  }`}>
-                    {orderRequestFilterCounts[filter.value] || 0}
-                  </span>
                 </button>
               );
             })}

@@ -340,8 +340,8 @@ export default function MiniCataloguePage() {
         <div className="hidden md:block">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[16%]" />
-              <col className="w-[70px]" />
+              <col className="w-[150px]" />
+              <col className="w-[82px]" />
               <col />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
@@ -350,7 +350,7 @@ export default function MiniCataloguePage() {
             <thead className="bg-cream-dark text-xs uppercase tracking-wider text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-3">Code</th>
-                <th className="text-left px-2 py-3">Photo</th>
+                <th className="px-2 py-3 text-center">Photo</th>
                 <th className="text-left px-4 py-3">Description</th>
                 <th className="text-right px-4 py-3">&pound; ex VAT</th>
                 <th className="text-right px-4 py-3">&pound; Inc VAT</th>
@@ -363,19 +363,17 @@ export default function MiniCataloguePage() {
                 return (
                   <tr key={p.id} className="border-t border-racing/5 hover:bg-cream-dark/50 transition-colors">
                     <td className="px-4 py-2 font-mono text-xs text-ink-muted whitespace-nowrap align-middle">{p.code}</td>
-                    <td className="px-2 py-2 align-middle">
+                    <td className="px-2 py-2 text-center align-middle">
                       {image ? (
                         <button
                           type="button"
                           onClick={() => setPreviewImage({ ...image, alt: p.name })}
-                          className="block h-11 w-11 overflow-hidden rounded-md border border-racing/10 bg-cream-dark"
+                          className="mx-auto block h-11 w-11 overflow-hidden rounded-md border border-racing/10 bg-cream-dark"
                           aria-label={`View photo for ${p.name}`}
                         >
                           <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                         </button>
-                      ) : (
-                        <span className="block h-11 w-11 rounded-md border border-dashed border-racing/10 bg-cream-dark/50" aria-hidden="true" />
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-4 py-2 align-middle">
                       <div className="font-medium text-racing leading-snug">{p.name}</div>
@@ -433,7 +431,6 @@ export default function MiniCataloguePage() {
                     )}
                     <div className="min-w-0">
                       <div className="font-medium text-racing leading-snug">{p.name}</div>
-                      <div className="font-mono text-xs text-ink-muted mt-1">{p.code}</div>
                     </div>
                   </div>
                   <div className="font-semibold text-racing whitespace-nowrap text-right">
@@ -441,8 +438,11 @@ export default function MiniCataloguePage() {
                     <div className="text-xs font-normal text-ink-muted">ex VAT</div>
                   </div>
                 </div>
-                <div className="mt-2 text-xs text-ink-muted">
-                  Inc VAT: <strong className="text-racing">{money(p.priceIncVat)}</strong>
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
+                  <span className="font-mono">{p.code}</span>
+                  <span className="text-right">
+                    Inc VAT: <strong className="text-racing">{money(p.priceIncVat)}</strong>
+                  </span>
                 </div>
                 <div className="mt-3">
                   <OrderButton

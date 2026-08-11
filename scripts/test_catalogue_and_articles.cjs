@@ -50,6 +50,9 @@ async function main() {
   assert.match(miniPage, /HYDROLASTIC_DIGITS/, "Mini catalogue must support Hydrolastic-only filtering");
   assert.match(miniPage, /\/api\/mini-product-images/, "Mini catalogue must load uploaded product photos");
   assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
+  assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");
+  assert.match(miniPage, /text-center">Photo/, "Mini catalogue desktop photo column should be centred");
+  assert.match(miniPage, /Inc VAT:[\s\S]*<strong className="text-racing">\{money\(p\.priceIncVat\)\}<\/strong>/, "Mobile mini cards must keep inc VAT beside the part number");
 
   const navbar = read("components/Navbar.tsx");
   assert.match(navbar, /Custom Engineering Work/, "Header navigation should use the fuller custom engineering wording where space allows");

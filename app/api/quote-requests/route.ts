@@ -539,6 +539,14 @@ export async function GET(request: Request) {
       const pageSize = Math.max(1, Math.min(50, Math.floor(Number(url.searchParams.get("pageSize")) || 8)));
       const month = url.searchParams.get("month") || "";
       const time = url.searchParams.get("time") || "all";
+      const orderTypeParam = url.searchParams.get("orderType") || "all";
+      const orderType =
+        orderTypeParam === "mini" ||
+        orderTypeParam === "metals" ||
+        orderTypeParam === "engineering" ||
+        orderTypeParam === "custom"
+          ? orderTypeParam
+          : "all";
       const bounds = /^\d{4}-\d{2}$/.test(month)
         ? ukMonthBounds(month)
         : ukHistoryBounds(
@@ -552,6 +560,7 @@ export async function GET(request: Request) {
         query: asString(url.searchParams.get("q"), 200),
         start: bounds?.start.toISOString(),
         end: bounds?.end.toISOString(),
+        orderType,
       });
       return NextResponse.json(history);
     }

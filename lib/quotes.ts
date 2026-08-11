@@ -238,6 +238,16 @@ export type PaidHistoryResult = {
   monthStats: Record<string, { salesValue: number; salesCount: number }>;
 };
 
+export type PaidHistoryOrderType = "all" | "mini" | "metals" | "engineering" | "custom";
+
+function quoteMatchesPaidHistoryOrderType(quote: QuoteRequest, orderType: PaidHistoryOrderType = "all") {
+  if (orderType === "all") return true;
+  return quote.items.some((item) => {
+    if (orderType === "engineering") return item.catalogue === "featured";
+    return item.catalogue === orderType;
+  });
+}
+
 export async function listActiveQuoteRequests(): Promise<QuoteRequest[]> {
   const db = await getD1();
   const result = await db
@@ -253,6 +263,7 @@ export async function listPaidQuoteHistory(options: {
   query?: string;
   start?: string;
   end?: string;
+  orderType?: PaidHistoryOrderType;
 }): Promise<PaidHistoryResult> {
   const db = await getD1();
   const clauses = ["status = 'paid'"];
@@ -273,42 +284,39 @@ export async function listPaidQuoteHistory(options: {
   }
 
   const where = clauses.join(" and ");
-  const countRow = await db
-    .prepare(`select count(*) as count from quote_requests where ${where}`)
-    .bind(...bindings)
-    .first<{ count: number }>();
   const result = await db
-    .prepare(`select * from quote_requests where ${where} order by paid_at desc limit ? offset ?`)
-    .bind(...bindings, Math.max(1, Math.min(100, options.limit)), Math.max(0, options.offset))
+    .prepare(`select * from quote_requests where ${where} order by paid_at desc`)
+    .bind(...bindings)
     .all<QuoteRow>();
 
   if (result.error) throw new Error(`D1 paid history read failed: ${result.error}`);
-  const quotes = await ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
+  const allQuotes = await ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
+  const filteredQuotes = allQuotes.filter((quote) =>
+    quoteMatchesPaidHistoryOrderType(quote, options.orderType || "all")
+  );
+  const offset = Math.max(0, options.offset);
+  const limit = Math.max(1, Math.min(100, options.limit));
+  const quotes = filteredQuotes.slice(offset, offset + limit);
   const monthKeys = [...new Set(quotes.map((quote) => ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)))];
+  const filteredMonthStats = filteredQuotes.reduce((stats, quote) => {
+    const monthKey = ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7);
+    const current = stats[monthKey] || { salesValue: 0, salesCount: 0 };
+    current.salesCount += 1;
+    current.salesValue += quoteNetExVat(quote);
+    stats[monthKey] = current;
+    return stats;
+  }, {} as Record<string, { salesValue: number; salesCount: number }>);
   const monthStats: Record<string, { salesValue: number; salesCount: number }> = {};
 
   for (const monthKey of monthKeys) {
-    const bounds = ukMonthBounds(monthKey);
-    const row = await db
-      .prepare(
-        `select count(*) as sales_count, coalesce(sum(total_ex_vat), 0) as sales_value
-         from (
-           select ${QUOTE_TOTAL_SQL} as total_ex_vat
-           from quote_requests
-           where status = 'paid'
-             and paid_at >= ?
-             and paid_at < ?
-         )`
-      )
-      .bind(bounds.start.toISOString(), bounds.end.toISOString())
-      .first<{ sales_count: number; sales_value: number }>();
+    const row = filteredMonthStats[monthKey];
     monthStats[monthKey] = {
-      salesCount: Number(row?.sales_count || 0),
-      salesValue: Number(row?.sales_value || 0),
+      salesCount: Number(row?.salesCount || 0),
+      salesValue: Number(row?.salesValue || 0),
     };
   }
 
-  return { quotes, count: Number(countRow?.count || 0), monthStats };
+  return { quotes, count: filteredQuotes.length, monthStats };
 }
 
 export async function countNewQuoteRequests(): Promise<number> {
