@@ -2,6 +2,7 @@ import { getD1 } from "@/lib/cloudflare";
 import {
   quoteNetExVat,
   quoteRefunds,
+  requiredWebsiteInvoiceCount,
 } from "@/lib/order-accounting";
 import type { QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
@@ -26,6 +27,7 @@ type QuoteRow = {
   owner_email_sent_at: string | null;
   include_vat?: number | string | boolean | null;
   website_invoice_number?: string | null;
+  website_invoice_count?: number | string | null;
   refunds?: string | null;
 };
 
@@ -45,6 +47,7 @@ async function ensureQuoteAccountingSchemaInner() {
   const statements = [
     `ALTER TABLE quote_requests ADD COLUMN include_vat INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE quote_requests ADD COLUMN website_invoice_number TEXT`,
+    `ALTER TABLE quote_requests ADD COLUMN website_invoice_count INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE quote_requests ADD COLUMN refunds TEXT NOT NULL DEFAULT '[]'`,
     `CREATE UNIQUE INDEX IF NOT EXISTS quote_requests_website_invoice_number_idx
       ON quote_requests(website_invoice_number)`,
@@ -61,7 +64,7 @@ async function ensureQuoteAccountingSchemaInner() {
 
   const maxRow = await db
     .prepare(
-      `SELECT MAX(CAST(SUBSTR(website_invoice_number, 2) AS INTEGER)) AS max_ref
+      `SELECT MAX(CAST(SUBSTR(website_invoice_number, 2) AS INTEGER) + coalesce(website_invoice_count, 1) - 1) AS max_ref
        FROM quote_requests
        WHERE website_invoice_number LIKE 'W%'`
     )
@@ -115,6 +118,11 @@ function boolFromDb(value: unknown, fallback = true) {
   return value === 1 || value === true || value === "1";
 }
 
+function intFromDb(value: unknown, fallback = 1) {
+  const parsed = Math.floor(Number(value));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function rowToQuote(row: QuoteRow): QuoteRequest {
   return {
     id: row.id,
@@ -134,8 +142,15 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     ownerEmailSentAt: row.owner_email_sent_at,
     includeVat: boolFromDb(row.include_vat, true),
     websiteInvoiceNumber: row.website_invoice_number || null,
+    websiteInvoiceCount: intFromDb(row.website_invoice_count, 1),
     refunds: quoteRefunds({ refunds: parseJson(row.refunds || null, []) }),
   };
+}
+
+async function ensureStoredInvoiceRanges(quotes: QuoteRequest[]) {
+  return Promise.all(
+    quotes.map((quote) => quote.websiteInvoiceNumber ? ensureWebsiteInvoiceNumber(quote) : quote)
+  );
 }
 
 export async function listDashboardQuoteRequests(sincePaidAt: string): Promise<QuoteRequest[]> {
@@ -151,7 +166,7 @@ export async function listDashboardQuoteRequests(sincePaidAt: string): Promise<Q
     .all<QuoteRow>();
 
   if (result.error) throw new Error(`D1 dashboard quote read failed: ${result.error}`);
-  return (result.results || []).map(rowToQuote);
+  return ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
 }
 
 const QUOTE_TOTAL_SQL = `
@@ -229,7 +244,7 @@ export async function listActiveQuoteRequests(): Promise<QuoteRequest[]> {
     .prepare("select * from quote_requests where status in ('new', 'reviewing', 'invoice_sent') order by submitted_at desc")
     .all<QuoteRow>();
   if (result.error) throw new Error(`D1 active quote read failed: ${result.error}`);
-  return (result.results || []).map(rowToQuote);
+  return ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
 }
 
 export async function listPaidQuoteHistory(options: {
@@ -268,7 +283,7 @@ export async function listPaidQuoteHistory(options: {
     .all<QuoteRow>();
 
   if (result.error) throw new Error(`D1 paid history read failed: ${result.error}`);
-  const quotes = (result.results || []).map(rowToQuote);
+  const quotes = await ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
   const monthKeys = [...new Set(quotes.map((quote) => ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)))];
   const monthStats: Record<string, { salesValue: number; salesCount: number }> = {};
 
@@ -316,16 +331,58 @@ export async function getQuoteRequest(id: string): Promise<QuoteRequest | null> 
   return row ? rowToQuote(row) : null;
 }
 
-export async function allocateWebsiteInvoiceNumber(): Promise<string> {
+function invoiceNumberValue(ref: string | null | undefined) {
+  const match = String(ref || "").match(/^W(\d+)$/i);
+  return match ? Number(match[1]) : null;
+}
+
+async function ensureInvoiceSequenceAfter(ref: string | null | undefined, count: number) {
+  const base = invoiceNumberValue(ref);
+  if (!base) return;
+  const nextNumber = base + Math.max(1, Math.floor(count));
+  const db = await getD1();
+  await db
+    .prepare(
+      `UPDATE accounting_sequences
+       SET next_number = CASE WHEN next_number < ? THEN ? ELSE next_number END
+       WHERE name = 'website_invoice'`
+    )
+    .bind(nextNumber, nextNumber)
+    .run();
+}
+
+async function invoiceRangeHasConflict(quoteId: string, ref: string | null | undefined, count: number) {
+  const base = invoiceNumberValue(ref);
+  if (!base) return false;
+  const end = base + Math.max(1, Math.floor(count)) - 1;
+  const db = await getD1();
+  const row = await db
+    .prepare(
+      `SELECT id
+       FROM quote_requests
+       WHERE id != ?
+         AND website_invoice_number LIKE 'W%'
+         AND CAST(SUBSTR(website_invoice_number, 2) AS INTEGER) <= ?
+         AND CAST(SUBSTR(website_invoice_number, 2) AS INTEGER) + coalesce(website_invoice_count, 1) - 1 >= ?
+       LIMIT 1`
+    )
+    .bind(quoteId, end, base)
+    .first<{ id: string }>();
+  return Boolean(row?.id);
+}
+
+export async function allocateWebsiteInvoiceNumber(count = 1): Promise<string> {
   await ensureQuoteAccountingSchema();
+  const requestedCount = Math.max(1, Math.floor(Number(count) || 1));
   const db = await getD1();
   const row = await db
     .prepare(
       `UPDATE accounting_sequences
-       SET next_number = next_number + 1
+       SET next_number = next_number + ?
        WHERE name = 'website_invoice'
-       RETURNING next_number - 1 AS allocated`
+       RETURNING next_number - ? AS allocated`
     )
+    .bind(requestedCount, requestedCount)
     .first<{ allocated: number }>();
 
   if (!row?.allocated) throw new Error("Website invoice number could not be allocated.");
@@ -334,15 +391,46 @@ export async function allocateWebsiteInvoiceNumber(): Promise<string> {
 }
 
 export async function ensureWebsiteInvoiceNumber(quote: QuoteRequest): Promise<QuoteRequest> {
-  if (quote.websiteInvoiceNumber) return quote;
-
-  const fresh = await getQuoteRequest(quote.id);
-  if (fresh?.websiteInvoiceNumber) {
-    return { ...quote, websiteInvoiceNumber: fresh.websiteInvoiceNumber };
+  const requiredCount = requiredWebsiteInvoiceCount(quote);
+  const currentCount = Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || 1));
+  if (
+    quote.websiteInvoiceNumber &&
+    currentCount >= requiredCount &&
+    !(await invoiceRangeHasConflict(quote.id, quote.websiteInvoiceNumber, currentCount))
+  ) {
+    return quote;
   }
 
-  const websiteInvoiceNumber = await allocateWebsiteInvoiceNumber();
-  return saveQuoteRequest({ ...quote, websiteInvoiceNumber });
+  const fresh = await getQuoteRequest(quote.id);
+  const freshCount = Math.max(1, Math.floor(Number(fresh?.websiteInvoiceCount) || 1));
+  if (
+    fresh?.websiteInvoiceNumber &&
+    freshCount >= requiredCount &&
+    !(await invoiceRangeHasConflict(quote.id, fresh.websiteInvoiceNumber, freshCount))
+  ) {
+    return { ...quote, websiteInvoiceNumber: fresh.websiteInvoiceNumber, websiteInvoiceCount: freshCount };
+  }
+
+  if (fresh?.websiteInvoiceNumber || quote.websiteInvoiceNumber) {
+    const websiteInvoiceNumber = fresh?.websiteInvoiceNumber || quote.websiteInvoiceNumber || null;
+    if (await invoiceRangeHasConflict(quote.id, websiteInvoiceNumber, requiredCount)) {
+      const freshWebsiteInvoiceNumber = await allocateWebsiteInvoiceNumber(requiredCount);
+      return saveQuoteRequest({
+        ...quote,
+        websiteInvoiceNumber: freshWebsiteInvoiceNumber,
+        websiteInvoiceCount: requiredCount,
+      });
+    }
+    await ensureInvoiceSequenceAfter(websiteInvoiceNumber, requiredCount);
+    return saveQuoteRequest({
+      ...quote,
+      websiteInvoiceNumber,
+      websiteInvoiceCount: requiredCount,
+    });
+  }
+
+  const websiteInvoiceNumber = await allocateWebsiteInvoiceNumber(requiredCount);
+  return saveQuoteRequest({ ...quote, websiteInvoiceNumber, websiteInvoiceCount: requiredCount });
 }
 
 export async function listPaidQuoteRecordsForExport(): Promise<QuoteRequest[]> {
@@ -398,8 +486,9 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         owner_email_sent_at,
         include_vat,
         website_invoice_number,
+        website_invoice_count,
         refunds
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       on conflict(id) do update set
         submitted_at = excluded.submitted_at,
         updated_at = excluded.updated_at,
@@ -419,6 +508,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         owner_email_sent_at = excluded.owner_email_sent_at,
         include_vat = excluded.include_vat,
         website_invoice_number = excluded.website_invoice_number,
+        website_invoice_count = excluded.website_invoice_count,
         refunds = excluded.refunds
       `
     )
@@ -442,6 +532,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       quote.ownerEmailSentAt ?? null,
       quote.includeVat === false ? 0 : 1,
       quote.websiteInvoiceNumber ?? null,
+      Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || requiredWebsiteInvoiceCount(quote))),
       JSON.stringify(quoteRefunds(quote))
     )
     .run();

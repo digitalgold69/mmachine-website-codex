@@ -15,6 +15,7 @@ const {
   roundAccounting,
   sageRefundRowsForQuote,
   sageSaleRowsForQuote,
+  websiteInvoiceDisplay,
 } = jiti("../lib/order-accounting.ts");
 
 const quote = {
@@ -76,14 +77,25 @@ const quote = {
 };
 
 const saleRows = sageSaleRowsForQuote(quote);
-assert.equal(saleRows.length, 3);
+assert.equal(saleRows.length, 4);
 assert.deepEqual(saleRows.map((row) => row.Nominal).sort(), [
-  ACCOUNTING_NOMINALS.engineering,
+  ACCOUNTING_NOMINALS.carriage,
+  ACCOUNTING_NOMINALS.featured,
   ACCOUNTING_NOMINALS.metals,
   ACCOUNTING_NOMINALS.mini,
 ].sort());
 assert.equal(saleRows.every((row) => row.Type === "SI" && row.Account === "WEB" && row.Dept === 0), true);
-assert.equal(saleRows.every((row) => row.Ref === "W1234" && row.Details === "Alice Works"), true);
+assert.equal(saleRows.every((row) => row.Details === "Alice Works"), true);
+assert.deepEqual(
+  saleRows.map((row) => [row.Nominal, row.Ref]),
+  [
+    [ACCOUNTING_NOMINALS.mini, "W1234"],
+    [ACCOUNTING_NOMINALS.metals, "W1235"],
+    [ACCOUNTING_NOMINALS.featured, "W1236"],
+    [ACCOUNTING_NOMINALS.carriage, "W1236"],
+  ]
+);
+assert.equal(websiteInvoiceDisplay(quote), "W1234-W1236");
 assert.equal(roundAccounting(saleRows.reduce((sum, row) => sum + row.Net, 0)), 650);
 assert.equal(roundAccounting(saleRows.reduce((sum, row) => sum + row.Tax, 0)), 130);
 assert.equal(saleRows.every((row) => row["T/C"] === "T1"), true);

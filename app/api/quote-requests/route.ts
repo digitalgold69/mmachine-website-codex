@@ -11,13 +11,15 @@ import {
 } from "@/lib/quote-email";
 import {
   ACCOUNTING_BUCKETS,
+  emptyAccountingTotals,
   quoteRefunds,
   remainingRefundByBucket,
   roundAccounting,
+  websiteInvoiceDisplay,
 } from "@/lib/order-accounting";
 import {
-  allocateWebsiteInvoiceNumber,
   getQuoteRequest,
+  ensureWebsiteInvoiceNumber,
   listActiveQuoteRequests,
   listPaidQuoteHistory,
   saveQuoteRequest,
@@ -186,11 +188,7 @@ function safeRefundLines(
   if (!Array.isArray(rawLines)) return { lines: [], error: "Add at least one refund amount." };
 
   const remaining = remainingRefundByBucket(quote);
-  const totals: Record<QuoteAccountingBucket, number> = {
-    mini: 0,
-    metals: 0,
-    engineering: 0,
-  };
+  const totals = emptyAccountingTotals();
 
   for (const rawLine of rawLines) {
     const line = rawLine as { bucket?: unknown; amountExVat?: unknown };
@@ -749,6 +747,7 @@ export async function PATCH(req: Request) {
     extraChargesExVat?: number | string | null;
     emailCustomer?: boolean;
     markPaid?: boolean;
+    saveNoEmail?: boolean;
     includeVat?: boolean | string | number;
     refund?: {
       reason?: string;
@@ -818,6 +817,24 @@ export async function PATCH(req: Request) {
       ];
     }
 
+    if (body.saveNoEmail && !body.emailCustomer) {
+      const incompleteLine = next.items.find(
+        (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
+      );
+      if (incompleteLine) {
+        return NextResponse.json(
+          { error: "Add a price to every invoice line before saving it for payment." },
+          { status: 400 }
+        );
+      }
+
+      next = await ensureWebsiteInvoiceNumber(next);
+      const savedAt = new Date().toISOString();
+      next.status = "invoice_sent";
+      next.quotedAt = next.quotedAt || savedAt;
+      next.invoiceSentAt = next.invoiceSentAt || savedAt;
+    }
+
     let customerEmailSent = false;
     if (body.emailCustomer) {
       const incompleteLine = next.items.find(
@@ -830,16 +847,14 @@ export async function PATCH(req: Request) {
         );
       }
 
-      if (!next.websiteInvoiceNumber) {
-        next = { ...next, websiteInvoiceNumber: await allocateWebsiteInvoiceNumber() };
-      }
+      next = await ensureWebsiteInvoiceNumber(next);
 
       const savedDraft = await saveQuoteRequest(next);
-      const isUpdatedInvoice = Boolean(savedDraft.customerEmailSentAt || savedDraft.invoiceSentAt);
+      const isUpdatedInvoice = Boolean(savedDraft.customerEmailSentAt);
       const replyTo = (await ownerQuoteRecipientsForRuntime(savedDraft))[0];
       const email = await sendQuoteEmail({
         to: savedDraft.customer.email,
-        subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${savedDraft.websiteInvoiceNumber || savedDraft.id}`,
+        subject: `${isUpdatedInvoice ? "Updated " : ""}M-Machine invoice ${websiteInvoiceDisplay(savedDraft)}`,
         html: await buildCustomerInvoiceEmailForRuntime(savedDraft),
         replyTo,
         fromName: CUSTOMER_INVOICE_FROM_NAME,
@@ -881,9 +896,7 @@ export async function PATCH(req: Request) {
         );
       }
       const paidAt = new Date().toISOString();
-      if (!next.websiteInvoiceNumber) {
-        next = { ...next, websiteInvoiceNumber: await allocateWebsiteInvoiceNumber() };
-      }
+      next = await ensureWebsiteInvoiceNumber(next);
       next.status = "paid";
       next.paidAt = paidAt;
     }

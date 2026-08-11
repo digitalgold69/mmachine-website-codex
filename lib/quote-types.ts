@@ -55,7 +55,7 @@ export type QuoteCustomer = {
 
 export type QuoteStatus = "new" | "reviewing" | "invoice_sent" | "paid" | "closed";
 
-export type QuoteAccountingBucket = "mini" | "metals" | "engineering";
+export type QuoteAccountingBucket = "mini" | "metals" | "engineering" | "featured" | "carriage";
 
 export type QuoteRefundLine = {
   bucket: QuoteAccountingBucket;
@@ -87,5 +87,6 @@ export type QuoteRequest = {
   ownerEmailSentAt?: string | null;
   includeVat?: boolean;
   websiteInvoiceNumber?: string | null;
+  websiteInvoiceCount?: number | null;
   refunds?: QuoteRefund[];
 };

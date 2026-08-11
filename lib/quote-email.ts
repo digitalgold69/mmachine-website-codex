@@ -2,7 +2,11 @@ import { SendEmailCommand, SESv2Client, type SendEmailCommandInput } from "@aws-
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 import { teamNotificationRecipientsForRoute, type NotificationRoute } from "./auth";
 import { getCloudflareEnv } from "./cloudflare";
-import { quoteIncludesVat, quoteTotals as accountingQuoteTotals } from "./order-accounting";
+import {
+  quoteIncludesVat,
+  quoteTotals as accountingQuoteTotals,
+  websiteInvoiceDisplay,
+} from "./order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 
@@ -364,10 +368,10 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
   const totals = quoteTotals(quote);
   const includeVat = quoteIncludesVat(quote);
   const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
-  const isUpdatedInvoice = Boolean(quote.customerEmailSentAt || quote.invoiceSentAt);
+  const isUpdatedInvoice = Boolean(quote.customerEmailSentAt);
   const title = isUpdatedInvoice ? "Updated invoice" : "Order invoice";
   const invoiceDate = quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt || new Date().toISOString();
-  const invoiceRef = quote.websiteInvoiceNumber || quote.id;
+  const invoiceRef = websiteInvoiceDisplay(quote);
   const basePriceLabel = includeVat ? "ex VAT" : "";
   return `
     <div style="margin:0;background:#fbf8f1;padding:18px 0;font-family:Inter,Arial,sans-serif;color:#2c2c2a">

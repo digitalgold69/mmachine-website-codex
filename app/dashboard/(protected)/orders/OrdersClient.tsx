@@ -10,7 +10,7 @@ import {
   quoteTotals,
   refundNetExVat,
   remainingRefundByBucket,
-  roundAccounting,
+  websiteInvoiceDisplay,
 } from "@/lib/order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
 import type { QuoteAccountingBucket, QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
@@ -90,11 +90,10 @@ function blankRefundDraft(): RefundDraft {
   return {
     open: false,
     reason: "",
-    amounts: {
-      mini: "",
-      metals: "",
-      engineering: "",
-    },
+    amounts: ACCOUNTING_BUCKETS.reduce((amounts, bucket) => {
+      amounts[bucket] = "";
+      return amounts;
+    }, {} as Record<QuoteAccountingBucket, string>),
   };
 }
 
@@ -571,7 +570,7 @@ function OrderCard({
           {quote.paidAt
             ? `Paid ${formatDateTime(quote.paidAt)}`
             : quote.invoiceSentAt
-              ? `Sent ${formatDateTime(quote.invoiceSentAt)}`
+              ? `${quote.customerEmailSentAt ? "Sent" : "Saved"} ${formatDateTime(quote.invoiceSentAt)}`
               : "Not invoiced"}
         </div>
         {(showDelete || showMarkPaid) && (
@@ -1109,7 +1108,7 @@ export default function OrdersClient({
 
   async function patchQuote(
     quote: QuoteRequest,
-    options: { emailCustomer?: boolean; markPaid?: boolean; label: string }
+    options: { emailCustomer?: boolean; markPaid?: boolean; saveNoEmail?: boolean; label: string }
   ) {
     setSavingAction(`${quote.id}:${options.label}`);
     setMessage("");
@@ -1122,6 +1121,7 @@ export default function OrdersClient({
           ...quote,
           emailCustomer: Boolean(options.emailCustomer),
           markPaid: Boolean(options.markPaid),
+          saveNoEmail: Boolean(options.saveNoEmail),
         }),
       });
       const data = await res.json() as { error?: string; quote?: QuoteRequest };
@@ -1137,10 +1137,12 @@ export default function OrdersClient({
         setMessage(`Deleted ${updated.id}.`);
         return;
       }
-      const wasPreviouslySent = Boolean(quote.customerEmailSentAt || quote.invoiceSentAt);
+      const wasPreviouslySent = Boolean(quote.customerEmailSentAt);
       const text = options.markPaid
         ? "Order marked as paid."
-        : options.emailCustomer
+        : options.saveNoEmail
+          ? "Invoice saved without email and moved to pending payment."
+          : options.emailCustomer
           ? wasPreviouslySent
             ? "Updated invoice emailed to customer."
             : "Invoice emailed to customer and marked as invoice sent."
@@ -1166,6 +1168,11 @@ export default function OrdersClient({
   async function saveDraft(emailCustomer = false) {
     if (!draft) return;
     await patchQuote(draft, { emailCustomer, label: emailCustomer ? "email" : "save" });
+  }
+
+  async function saveNoEmail() {
+    if (!draft) return;
+    await patchQuote(draft, { saveNoEmail: true, label: "save-no-email" });
   }
 
   async function markPaid(quote: QuoteRequest) {
@@ -1208,11 +1215,10 @@ export default function OrdersClient({
     setRefundDraft((current) => ({
       ...current,
       open: true,
-      amounts: {
-        mini: remaining.mini > 0 ? remaining.mini.toFixed(2) : "",
-        metals: remaining.metals > 0 ? remaining.metals.toFixed(2) : "",
-        engineering: remaining.engineering > 0 ? remaining.engineering.toFixed(2) : "",
-      },
+      amounts: ACCOUNTING_BUCKETS.reduce((amounts, bucket) => {
+        amounts[bucket] = remaining[bucket] > 0 ? remaining[bucket].toFixed(2) : "";
+        return amounts;
+      }, {} as Record<QuoteAccountingBucket, string>),
     }));
   }
 
@@ -1264,7 +1270,8 @@ export default function OrdersClient({
 
   const draftTotals = draft ? totals(draft) : null;
   const hasDraftPoaItems = Boolean(draftTotals?.hasPoaItems);
-  const draftInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt || draft.invoiceSentAt) : false;
+  const draftCustomerInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt) : false;
+  const draftInvoiceWasSaved = draft ? Boolean(draft.invoiceSentAt) : false;
   const invoiceReady = draft
     ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
     : false;
@@ -1317,7 +1324,7 @@ export default function OrdersClient({
           onSelect={selectQuote}
           onMarkPaid={markPaid}
           onDelete={setPendingDelete}
-          dateLabel="Invoice sent"
+          dateLabel="Invoice saved"
           dateForQuote={(quote) => quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt}
         />
 
@@ -1510,7 +1517,7 @@ export default function OrdersClient({
                       {draft.customer.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
-                      {draft.websiteInvoiceNumber && <span>Invoice {draft.websiteInvoiceNumber}</span>}
+                      {draft.websiteInvoiceNumber && <span>Invoice {websiteInvoiceDisplay(draft)}</span>}
                       <span>{draft.id}</span>
                       <span>Submitted {formatDateTime(draft.submittedAt)}</span>
                       <span>{draft.customer.email}</span>
@@ -1537,10 +1544,11 @@ export default function OrdersClient({
                     </button>
                   </div>
                 </div>
-                {draftInvoiceWasSent && (
+                {(draftCustomerInvoiceWasSent || draftInvoiceWasSaved) && (
                   <div className="mt-3 rounded-lg bg-cream-dark px-3 py-2 text-xs font-semibold text-racing">
-                    Customer invoice last emailed {formatDateTime(draft.customerEmailSentAt || draft.invoiceSentAt)}.
-                    Edits can be sent with the updated invoice button.
+                    {draftCustomerInvoiceWasSent
+                      ? `Customer invoice last emailed ${formatDateTime(draft.customerEmailSentAt)}. Edits can be sent with the updated invoice button.`
+                      : `Invoice saved without email ${formatDateTime(draft.invoiceSentAt)}.`}
                   </div>
                 )}
               </div>
@@ -1709,7 +1717,7 @@ export default function OrdersClient({
                                     className="input"
                                   />
                                 ) : (
-                                  <div className="rounded-md border border-racing/10 bg-cream-dark px-3 py-2 text-sm text-racing">
+                                  <div className="truncate whitespace-nowrap rounded-md border border-racing/10 bg-cream-dark px-2 py-2 text-center text-[11px] font-semibold leading-5 text-racing">
                                     {item.unit || "each"}
                                   </div>
                                 )}
@@ -1929,7 +1937,7 @@ export default function OrdersClient({
                           <span>Invoice</span>
                           <strong className="text-right text-racing">
                             {draft.websiteInvoiceNumber
-                              ? draft.websiteInvoiceNumber
+                              ? websiteInvoiceDisplay(draft)
                               : draft.invoiceSentAt
                                 ? formatDateTime(draft.invoiceSentAt)
                                 : "Not sent"}
@@ -1937,7 +1945,7 @@ export default function OrdersClient({
                         </div>
                         {draft.websiteInvoiceNumber && draft.invoiceSentAt && (
                           <div className="flex justify-between gap-3">
-                            <span>Sent</span>
+                            <span>{draft.customerEmailSentAt ? "Sent" : "Saved"}</span>
                             <strong className="text-right text-racing">{formatDateTime(draft.invoiceSentAt)}</strong>
                           </div>
                         )}
@@ -1960,11 +1968,6 @@ export default function OrdersClient({
                         />
                         <span>
                           <span className="block text-sm font-semibold text-racing">Include VAT</span>
-                          <span className="block text-xs leading-5 text-ink-muted">
-                            {quoteIncludesVat(draft)
-                              ? "VAT will be added to this invoice and exported as T1."
-                              : "No VAT will be applied and the export will use T0."}
-                          </span>
                         </span>
                       </label>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -2027,7 +2030,7 @@ export default function OrdersClient({
                             <div className="text-xs text-ink-muted">
                               {draftRefunds.length > 0
                                 ? `${draftRefunds.length} recorded`
-                                : "No refunds recorded"}
+                                : "No refunds yet"}
                             </div>
                           </div>
                           {draftHasRefundCapacity && (
@@ -2046,15 +2049,19 @@ export default function OrdersClient({
                           <div className="mb-3 space-y-2">
                             {draftRefunds.map((refund) => {
                               const net = refundNetExVat(refund);
-                              const vat = quoteIncludesVat(draft) ? roundAccounting(net * 0.2) : 0;
                               return (
-                                <div key={refund.id} className="rounded-md bg-cream-dark px-3 py-2 text-xs">
-                                  <div className="flex justify-between gap-3 font-semibold text-racing">
-                                    <span>{formatDateTime(refund.createdAt)}</span>
-                                    <span>-{money(net)}{quoteIncludesVat(draft) ? ` ex VAT / -${money(net + vat)} inc VAT` : ""}</span>
+                                <div key={refund.id} className="rounded-md bg-cream-dark p-3 text-xs">
+                                  <div className="flex items-start justify-between gap-3 font-semibold text-racing">
+                                    <span>Refund recorded<br /><span className="font-normal text-ink-muted">{formatDateTime(refund.createdAt)}</span></span>
+                                    <span className="text-right text-sm">-{money(net)}</span>
                                   </div>
-                                  <div className="mt-1 text-ink-muted">
-                                    {refund.lines.map((line) => `${ACCOUNTING_BUCKET_LABELS[line.bucket]} ${money(line.amountExVat)}`).join(" / ")}
+                                  <div className="mt-2 grid gap-1">
+                                    {refund.lines.map((line) => (
+                                      <div key={`${refund.id}-${line.bucket}`} className="flex justify-between gap-3 text-ink-muted">
+                                        <span>{ACCOUNTING_BUCKET_LABELS[line.bucket]}</span>
+                                        <span>-{money(line.amountExVat)}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                   {refund.reason && <div className="mt-1 text-ink-muted">{refund.reason}</div>}
                                 </div>
@@ -2071,6 +2078,9 @@ export default function OrdersClient({
 
                         {refundDraft.open && draftRefundRemaining && (
                           <div className="space-y-3 border-t border-racing/10 pt-3">
+                            <p className="text-xs leading-5 text-ink-muted">
+                              Enter refund amounts against the part of the invoice being refunded.
+                            </p>
                             <div className="grid gap-2">
                               {ACCOUNTING_BUCKETS.map((bucket) => {
                                 const remaining = draftRefundRemaining[bucket];
@@ -2078,20 +2088,22 @@ export default function OrdersClient({
                                 return (
                                   <div key={bucket}>
                                     <label className="label" htmlFor={`refund-${bucket}`}>
-                                      {ACCOUNTING_BUCKET_LABELS[bucket]} refund
-                                      <span className="ml-2 font-normal text-ink-muted">remaining {money(remaining)}</span>
+                                      {ACCOUNTING_BUCKET_LABELS[bucket]}
                                     </label>
-                                    <input
-                                      id={`refund-${bucket}`}
-                                      type="number"
-                                      min="0"
-                                      max={remaining}
-                                      step="0.01"
-                                      value={refundDraft.amounts[bucket]}
-                                      onChange={(event) => setRefundAmount(bucket, event.target.value)}
-                                      className="input text-right"
-                                      placeholder="0.00"
-                                    />
+                                    <div className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-2">
+                                      <span className="text-xs text-ink-muted">Remaining {money(remaining)}</span>
+                                      <input
+                                        id={`refund-${bucket}`}
+                                        type="number"
+                                        min="0"
+                                        max={remaining}
+                                        step="0.01"
+                                        value={refundDraft.amounts[bucket]}
+                                        onChange={(event) => setRefundAmount(bucket, event.target.value)}
+                                        className="input text-right"
+                                        placeholder="0.00"
+                                      />
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -2200,11 +2212,11 @@ export default function OrdersClient({
                   )}
                   <button
                     type="button"
-                    disabled={isSaving}
-                    onClick={() => saveDraft(false)}
+                    disabled={isSaving || !invoiceReady}
+                    onClick={saveNoEmail}
                     className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {savingAction === `${draft.id}:save` ? "Saving..." : "Save draft"}
+                    {savingAction === `${draft.id}:save-no-email` ? "Saving..." : "Save, No Email"}
                   </button>
                   <button
                     type="button"
@@ -2214,7 +2226,7 @@ export default function OrdersClient({
                   >
                     {savingAction === `${draft.id}:email`
                       ? "Sending..."
-                      : draftInvoiceWasSent
+                      : draftCustomerInvoiceWasSent
                         ? "Send updated invoice"
                         : "Email invoice to buyer"}
                   </button>

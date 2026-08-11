@@ -4,7 +4,12 @@ import { isLoggedIn } from "@/lib/auth";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { listFeaturedWork } from "@/lib/featured";
-import { accountingBucketForCatalogue, quoteRefunds, roundAccounting } from "@/lib/order-accounting";
+import {
+  accountingBucketForCatalogue,
+  emptyAccountingTotals,
+  quoteRefunds,
+  roundAccounting,
+} from "@/lib/order-accounting";
 import { getBestPaidMonth, listDashboardQuoteRequests, type BestPaidMonth } from "@/lib/quotes";
 import { quoteTotals } from "@/lib/quote-email";
 import type { QuoteItem, QuoteRequest } from "@/lib/quote-types";
@@ -416,7 +421,7 @@ function itemLabel(item: QuoteItem) {
 }
 
 function emptyAccountingBuckets() {
-  return { mini: 0, metals: 0, engineering: 0 };
+  return emptyAccountingTotals();
 }
 
 function refundTotalsByBucket(quote: QuoteRequest) {

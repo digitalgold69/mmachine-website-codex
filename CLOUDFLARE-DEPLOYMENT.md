@@ -137,6 +137,7 @@ npx wrangler d1 execute mmachine-runtime --remote --file migrations/0005_team_au
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0006_team_notification_preferences.sql
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0007_team_two_factor_requirement.sql
 npx wrangler d1 execute mmachine-runtime --remote --file migrations/0008_quote_accounting_exports.sql
+npx wrangler d1 execute mmachine-runtime --remote --file migrations/0009_invoice_ref_ranges.sql
 ```
 
 ## GitHub Auto Deploy

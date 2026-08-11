@@ -7,18 +7,33 @@ import type {
 } from "@/lib/quote-types";
 
 export const VAT_RATE = 0.2;
-export const ACCOUNTING_BUCKETS: QuoteAccountingBucket[] = ["mini", "metals", "engineering"];
+
+export const PRODUCT_ACCOUNTING_BUCKETS: QuoteAccountingBucket[] = [
+  "mini",
+  "metals",
+  "engineering",
+  "featured",
+];
+
+export const ACCOUNTING_BUCKETS: QuoteAccountingBucket[] = [
+  ...PRODUCT_ACCOUNTING_BUCKETS,
+  "carriage",
+];
 
 export const ACCOUNTING_NOMINALS: Record<QuoteAccountingBucket, number> = {
   mini: 4000,
   metals: 4001,
+  carriage: 4002,
   engineering: 4005,
+  featured: 4009,
 };
 
 export const ACCOUNTING_BUCKET_LABELS: Record<QuoteAccountingBucket, string> = {
   mini: "Mini panels",
   metals: "Metals",
+  carriage: "Carriage",
   engineering: "Engineering",
+  featured: "Featured work",
 };
 
 export type AccountingGroup = {
@@ -48,7 +63,7 @@ function finiteNumber(value: unknown, fallback = 0) {
 }
 
 export function roundAccounting(value: number) {
-  return Math.round((value + Number.EPSILON) * 10000) / 10000;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function positiveAmount(value: unknown) {
@@ -62,6 +77,7 @@ export function quoteIncludesVat(quote: Pick<QuoteRequest, "includeVat">) {
 export function accountingBucketForCatalogue(catalogue: QuoteCatalogue): QuoteAccountingBucket {
   if (catalogue === "mini") return "mini";
   if (catalogue === "metals") return "metals";
+  if (catalogue === "featured") return "featured";
   return "engineering";
 }
 
@@ -71,22 +87,21 @@ export function lineExVat(item: QuoteItem) {
     : 0;
 }
 
-function emptyBucketTotals() {
-  return {
-    mini: 0,
-    metals: 0,
-    engineering: 0,
-  } satisfies Record<QuoteAccountingBucket, number>;
+export function emptyAccountingTotals() {
+  return ACCOUNTING_BUCKETS.reduce((totals, bucket) => {
+    totals[bucket] = 0;
+    return totals;
+  }, {} as Record<QuoteAccountingBucket, number>);
 }
 
-function quoteItemBuckets(quote: QuoteRequest) {
+function productItemBuckets(quote: QuoteRequest) {
   const buckets = new Set<QuoteAccountingBucket>();
   for (const item of quote.items) buckets.add(accountingBucketForCatalogue(item.catalogue));
-  return [...buckets];
+  return [...buckets].filter((bucket) => PRODUCT_ACCOUNTING_BUCKETS.includes(bucket));
 }
 
 export function quoteGoodsByBucket(quote: QuoteRequest) {
-  const totals = emptyBucketTotals();
+  const totals = emptyAccountingTotals();
   for (const item of quote.items) {
     totals[accountingBucketForCatalogue(item.catalogue)] += lineExVat(item);
   }
@@ -118,39 +133,39 @@ export function quoteRefundExVat(quote: Pick<QuoteRequest, "refunds">) {
   return roundAccounting(quoteRefunds(quote).reduce((sum, refund) => sum + refundNetExVat(refund), 0));
 }
 
-export function quoteAccountingGroups(quote: QuoteRequest): AccountingGroup[] {
+export function quoteProductAccountingGroups(quote: QuoteRequest): AccountingGroup[] {
   const goodsByBucket = quoteGoodsByBucket(quote);
-  const itemBuckets = quoteItemBuckets(quote);
-  const goodsBuckets = ACCOUNTING_BUCKETS.filter((bucket) => goodsByBucket[bucket] > 0);
-  const activeBuckets = goodsBuckets.length > 0
-    ? goodsBuckets
+  const productBuckets = PRODUCT_ACCOUNTING_BUCKETS.filter((bucket) => goodsByBucket[bucket] > 0);
+  const itemBuckets = productItemBuckets(quote);
+  const activeBuckets = productBuckets.length > 0
+    ? productBuckets
     : itemBuckets.length > 0
       ? itemBuckets
       : ["engineering" as const];
 
-  const totalGoods = roundAccounting(ACCOUNTING_BUCKETS.reduce((sum, bucket) => sum + goodsByBucket[bucket], 0));
-  const totalCharges = roundAccounting((quote.carriageExVat ?? 0) + (quote.extraChargesExVat ?? 0));
-  const chargesByBucket = emptyBucketTotals();
+  const totalGoods = roundAccounting(PRODUCT_ACCOUNTING_BUCKETS.reduce((sum, bucket) => sum + goodsByBucket[bucket], 0));
+  const totalExtraCharges = positiveAmount(quote.extraChargesExVat ?? 0);
+  const extraByBucket = emptyAccountingTotals();
 
-  if (totalCharges !== 0) {
+  if (totalExtraCharges !== 0) {
     if (totalGoods > 0) {
       let allocated = 0;
       activeBuckets.forEach((bucket, index) => {
         const amount = index === activeBuckets.length - 1
-          ? roundAccounting(totalCharges - allocated)
-          : roundAccounting(totalCharges * (goodsByBucket[bucket] / totalGoods));
-        chargesByBucket[bucket] = amount;
+          ? roundAccounting(totalExtraCharges - allocated)
+          : roundAccounting(totalExtraCharges * (goodsByBucket[bucket] / totalGoods));
+        extraByBucket[bucket] = amount;
         allocated = roundAccounting(allocated + amount);
       });
     } else {
-      chargesByBucket[activeBuckets[0]] = totalCharges;
+      extraByBucket[activeBuckets[0]] = totalExtraCharges;
     }
   }
 
-  return ACCOUNTING_BUCKETS
+  return PRODUCT_ACCOUNTING_BUCKETS
     .map((bucket) => {
       const goodsExVat = roundAccounting(goodsByBucket[bucket]);
-      const chargesExVat = roundAccounting(chargesByBucket[bucket]);
+      const chargesExVat = roundAccounting(extraByBucket[bucket]);
       return {
         bucket,
         nominal: ACCOUNTING_NOMINALS[bucket],
@@ -160,6 +175,56 @@ export function quoteAccountingGroups(quote: QuoteRequest): AccountingGroup[] {
       };
     })
     .filter((group) => group.netExVat !== 0);
+}
+
+export function quoteAccountingGroups(quote: QuoteRequest): AccountingGroup[] {
+  const groups = quoteProductAccountingGroups(quote);
+  const carriageExVat = positiveAmount(quote.carriageExVat ?? 0);
+  if (carriageExVat > 0) {
+    groups.push({
+      bucket: "carriage",
+      nominal: ACCOUNTING_NOMINALS.carriage,
+      goodsExVat: 0,
+      chargesExVat: carriageExVat,
+      netExVat: carriageExVat,
+    });
+  }
+  return groups;
+}
+
+export function requiredWebsiteInvoiceCount(quote: QuoteRequest) {
+  return Math.max(1, quoteProductAccountingGroups(quote).length);
+}
+
+function invoiceNumberValue(ref: string | null | undefined) {
+  const match = String(ref || "").match(/^W(\d+)$/i);
+  return match ? Number(match[1]) : null;
+}
+
+function invoiceRefAt(quote: QuoteRequest, offset: number) {
+  const base = invoiceNumberValue(quote.websiteInvoiceNumber);
+  if (!base) return quote.websiteInvoiceNumber || quote.id;
+  return `W${base + Math.max(0, offset)}`;
+}
+
+function storedInvoiceCount(quote: Pick<QuoteRequest, "websiteInvoiceCount">) {
+  return Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || 1));
+}
+
+export function websiteInvoiceDisplay(quote: QuoteRequest) {
+  if (!quote.websiteInvoiceNumber) return quote.id;
+  const count = Math.max(storedInvoiceCount(quote), requiredWebsiteInvoiceCount(quote));
+  if (count <= 1) return quote.websiteInvoiceNumber;
+  return `${quote.websiteInvoiceNumber}-${invoiceRefAt(quote, count - 1)}`;
+}
+
+export function websiteInvoiceRefForBucket(quote: QuoteRequest, bucket: QuoteAccountingBucket) {
+  const productGroups = quoteProductAccountingGroups(quote);
+  if (bucket === "carriage") {
+    return invoiceRefAt(quote, Math.max(0, productGroups.length - 1));
+  }
+  const productIndex = productGroups.findIndex((group) => group.bucket === bucket);
+  return invoiceRefAt(quote, productIndex >= 0 ? productIndex : 0);
 }
 
 export function quoteGrossExVat(quote: QuoteRequest) {
@@ -180,8 +245,8 @@ export function quoteTotalIncVat(quote: QuoteRequest) {
 
 export function quoteTotals(quote: QuoteRequest) {
   const goodsExVat = roundAccounting(quote.items.reduce((sum, item) => sum + lineExVat(item), 0));
-  const carriageExVat = roundAccounting(quote.carriageExVat ?? 0);
-  const extraChargesExVat = roundAccounting(quote.extraChargesExVat ?? 0);
+  const carriageExVat = positiveAmount(quote.carriageExVat ?? 0);
+  const extraChargesExVat = positiveAmount(quote.extraChargesExVat ?? 0);
   const subtotalExVat = roundAccounting(goodsExVat + carriageExVat + extraChargesExVat);
   const refundsExVat = quoteRefundExVat(quote);
   const totalExVat = roundAccounting(subtotalExVat - refundsExVat);
@@ -202,7 +267,7 @@ export function quoteTotals(quote: QuoteRequest) {
 }
 
 export function remainingRefundByBucket(quote: QuoteRequest) {
-  const remaining = emptyBucketTotals();
+  const remaining = emptyAccountingTotals();
   for (const group of quoteAccountingGroups(quote)) remaining[group.bucket] = group.netExVat;
 
   for (const refund of quoteRefunds(quote)) {
@@ -219,10 +284,6 @@ export function accountingDetailsName(quote: QuoteRequest) {
   return (quote.customer.company || quote.customer.name || "Website customer").trim();
 }
 
-function taxForNet(quote: QuoteRequest, net: number) {
-  return quoteIncludesVat(quote) ? roundAccounting(net * VAT_RATE) : 0;
-}
-
 function taxCode(quote: QuoteRequest): "T1" | "T0" {
   return quoteIncludesVat(quote) ? "T1" : "T0";
 }
@@ -231,56 +292,54 @@ function exportDate(value: string | null | undefined) {
   return value ? new Date(value) : new Date();
 }
 
-function invoiceRef(quote: QuoteRequest) {
-  return quote.websiteInvoiceNumber || quote.id;
+function applyTaxRemainder(quote: QuoteRequest, rows: SageExportRow[]) {
+  if (rows.length === 0 || !quoteIncludesVat(quote)) return rows;
+  const totalTax = roundAccounting(rows.reduce((sum, row) => sum + row.Net, 0) * VAT_RATE);
+  let allocatedTax = 0;
+  return rows.map((row, index) => {
+    const tax = index === rows.length - 1
+      ? roundAccounting(totalTax - allocatedTax)
+      : roundAccounting(row.Net * VAT_RATE);
+    allocatedTax = roundAccounting(allocatedTax + tax);
+    return { ...row, Tax: tax };
+  });
 }
 
 export function sageSaleRowsForQuote(quote: QuoteRequest): SageExportRow[] {
   const date = exportDate(quote.paidAt || quote.updatedAt);
   const details = accountingDetailsName(quote);
-  const ref = invoiceRef(quote);
-  const groups = quoteAccountingGroups(quote);
-  const totalTax = taxForNet(quote, groups.reduce((sum, group) => sum + group.netExVat, 0));
-  let allocatedTax = 0;
+  const rows = quoteAccountingGroups(quote).map((group) => ({
+    Type: "SI" as const,
+    Account: "WEB" as const,
+    Nominal: group.nominal,
+    Dept: 0 as const,
+    Details: details,
+    Date: date,
+    Ref: websiteInvoiceRefForBucket(quote, group.bucket),
+    Net: roundAccounting(group.netExVat),
+    Tax: 0,
+    "T/C": taxCode(quote),
+  }));
 
-  return groups.map((group, index) => {
-    const tax = index === groups.length - 1
-      ? roundAccounting(totalTax - allocatedTax)
-      : taxForNet(quote, group.netExVat);
-    allocatedTax = roundAccounting(allocatedTax + tax);
-    return {
-      Type: "SI",
-      Account: "WEB",
-      Nominal: group.nominal,
-      Dept: 0,
-      Details: details,
-      Date: date,
-      Ref: ref,
-      Net: roundAccounting(group.netExVat),
-      Tax: tax,
-      "T/C": taxCode(quote),
-    };
-  });
+  return applyTaxRemainder(quote, rows);
 }
 
 export function sageRefundRowsForQuote(quote: QuoteRequest, refunds = quoteRefunds(quote)): SageExportRow[] {
   const details = accountingDetailsName(quote);
-  const ref = invoiceRef(quote);
-  return refunds.flatMap((refund) =>
-    refund.lines.map((line) => {
-      const net = -positiveAmount(line.amountExVat);
-      return {
-        Type: "SI" as const,
-        Account: "WEB" as const,
-        Nominal: ACCOUNTING_NOMINALS[line.bucket],
-        Dept: 0 as const,
-        Details: details,
-        Date: exportDate(refund.createdAt),
-        Ref: ref,
-        Net: roundAccounting(net),
-        Tax: taxForNet(quote, net),
-        "T/C": taxCode(quote),
-      };
-    })
+  const rows = refunds.flatMap((refund) =>
+    refund.lines.map((line) => ({
+      Type: "SI" as const,
+      Account: "WEB" as const,
+      Nominal: ACCOUNTING_NOMINALS[line.bucket],
+      Dept: 0 as const,
+      Details: details,
+      Date: exportDate(refund.createdAt),
+      Ref: websiteInvoiceRefForBucket(quote, line.bucket),
+      Net: roundAccounting(-positiveAmount(line.amountExVat)),
+      Tax: 0,
+      "T/C": taxCode(quote),
+    }))
   );
+
+  return applyTaxRemainder(quote, rows);
 }
