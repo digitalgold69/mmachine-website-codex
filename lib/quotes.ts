@@ -238,14 +238,11 @@ export type PaidHistoryResult = {
   monthStats: Record<string, { salesValue: number; salesCount: number }>;
 };
 
-export type PaidHistoryOrderType = "all" | "mini" | "metals" | "engineering" | "custom";
+export type PaidHistoryOrderType = "all" | "mini" | "metals" | "custom" | "featured";
 
 function quoteMatchesPaidHistoryOrderType(quote: QuoteRequest, orderType: PaidHistoryOrderType = "all") {
   if (orderType === "all") return true;
-  return quote.items.some((item) => {
-    if (orderType === "engineering") return item.catalogue === "featured";
-    return item.catalogue === orderType;
-  });
+  return quote.items.some((item) => item.catalogue === orderType);
 }
 
 export async function listActiveQuoteRequests(): Promise<QuoteRequest[]> {

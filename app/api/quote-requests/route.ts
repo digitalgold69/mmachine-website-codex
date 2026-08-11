@@ -543,8 +543,8 @@ export async function GET(request: Request) {
       const orderType =
         orderTypeParam === "mini" ||
         orderTypeParam === "metals" ||
-        orderTypeParam === "engineering" ||
-        orderTypeParam === "custom"
+        orderTypeParam === "custom" ||
+        orderTypeParam === "featured"
           ? orderTypeParam
           : "all";
       const bounds = /^\d{4}-\d{2}$/.test(month)

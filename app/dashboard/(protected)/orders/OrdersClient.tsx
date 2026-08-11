@@ -21,7 +21,7 @@ const TZ = "Europe/London";
 
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
 type AddLineCatalogue = "mini" | "metals";
-type OrderRequestFilter = "all" | "mini" | "metals" | "engineering" | "custom";
+type OrderRequestFilter = "all" | "mini" | "metals" | "custom" | "featured";
 
 type CatalogueSearchProduct = {
   id: string;
@@ -84,8 +84,8 @@ const ORDER_REQUEST_FILTERS: { value: OrderRequestFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "mini", label: "Mini panels" },
   { value: "metals", label: "Metals" },
-  { value: "engineering", label: "Engineering" },
-  { value: "custom", label: "Custom work" },
+  { value: "custom", label: "Custom Engineering" },
+  { value: "featured", label: "Featured Work" },
 ];
 
 const BLANK_MANUAL_LINE: ManualLineDraft = {
@@ -335,10 +335,7 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
 
 function quoteMatchesOrderRequestFilter(quote: QuoteRequest, filter: OrderRequestFilter) {
   if (filter === "all") return true;
-  return quote.items.some((item) => {
-    if (filter === "engineering") return item.catalogue === "featured";
-    return item.catalogue === filter;
-  });
+  return quote.items.some((item) => item.catalogue === filter);
 }
 
 function customFiles(quote: QuoteRequest) {
@@ -2069,6 +2066,12 @@ export default function OrdersClient({
                           <div className="flex justify-between gap-3 text-red-700">
                             <span>{baseTotalLabel(draft, "Refunds")}</span>
                             <strong>-{totalsReadyText(draftTotals.refunds, hasDraftPoaItems)}</strong>
+                          </div>
+                        )}
+                        {draftTotals && draftTotals.carriage > 0 && (
+                          <div className="flex justify-between gap-3">
+                            <span>{baseTotalLabel(draft, "Carriage")}</span>
+                            <strong>{money(draftTotals.carriage)}</strong>
                           </div>
                         )}
                         {quoteIncludesVat(draft) ? (

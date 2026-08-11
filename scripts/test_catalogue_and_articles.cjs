@@ -51,7 +51,8 @@ async function main() {
   assert.match(miniPage, /\/api\/mini-product-images/, "Mini catalogue must load uploaded product photos");
   assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
   assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");
-  assert.match(miniPage, /style=\{\{ width: "58px" \}\}/, "Mini catalogue desktop photo column should stay compact between code and description");
+  assert.match(miniPage, /<col className="w-\[58px\]" \/>/, "Mini catalogue desktop photo column should stay compact between code and description");
+  assert.match(miniPage, /xl:pl-28/, "Mini catalogue desktop descriptions should leave enough space for the photo column to sit between code and description");
   assert.match(miniPage, /text-center">Photo/, "Mini catalogue desktop photo column should be centred");
   assert.match(miniPage, /Inc VAT:[\s\S]*<strong className="text-racing">\{money\(p\.priceIncVat\)\}<\/strong>/, "Mobile mini cards must keep inc VAT beside the part number");
 
