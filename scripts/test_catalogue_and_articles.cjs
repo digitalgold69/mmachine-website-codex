@@ -43,6 +43,17 @@ async function main() {
   assert.match(miniPage, /target="_blank"[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mini section PDF links should open in a new tab");
   assert.match(miniPage, /sm:hidden[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mobile section PDF links should stack beside the section number");
   assert.match(miniPage, /hidden font-semibold[\s\S]*sm:inline[\s\S]*Download \{currentSection\.code\} Section PDF/, "Desktop section PDF links should stay inline with the description");
+  assert.doesNotMatch(miniPage, /More filters/, "Mini catalogue filters must be visible without a More filters toggle");
+  assert.doesNotMatch(miniPage, /Mark \/ year/, "Mini catalogue year filter should not use the old mark label");
+  assert.match(miniPage, /YEAR_OPTIONS = Array\.from\(\{ length: 42 \}/, "Mini catalogue year dropdown must cover 1959-2000");
+  assert.match(miniPage, /markDigitFromCode/, "Mini catalogue year filtering must use the part number digit rule");
+  assert.match(miniPage, /HYDROLASTIC_DIGITS/, "Mini catalogue must support Hydrolastic-only filtering");
+  assert.match(miniPage, /\/api\/mini-product-images/, "Mini catalogue must load uploaded product photos");
+  assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
+
+  const navbar = read("components/Navbar.tsx");
+  assert.match(navbar, /Custom Engineering Work/, "Header navigation should use the fuller custom engineering wording where space allows");
+  assert.match(navbar, /Custom Engineering/, "Header navigation should keep a shorter desktop custom engineering label available");
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");

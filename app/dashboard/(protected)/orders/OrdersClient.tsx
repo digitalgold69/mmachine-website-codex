@@ -21,6 +21,7 @@ const TZ = "Europe/London";
 
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
 type AddLineCatalogue = "mini" | "metals";
+type OrderRequestFilter = "all" | "mini" | "metals" | "engineering" | "custom";
 
 type CatalogueSearchProduct = {
   id: string;
@@ -77,6 +78,14 @@ const TIME_FILTERS: { value: TimeFilter; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
   { value: "month", label: "This month" },
   { value: "year", label: "This year" },
+];
+
+const ORDER_REQUEST_FILTERS: { value: OrderRequestFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "mini", label: "Mini panels" },
+  { value: "metals", label: "Metals" },
+  { value: "engineering", label: "Engineering" },
+  { value: "custom", label: "Custom work" },
 ];
 
 const BLANK_MANUAL_LINE: ManualLineDraft = {
@@ -322,6 +331,14 @@ function quoteKind(quote: QuoteRequest): QuoteKind {
   if (kinds.has("featured")) return "featured";
   if (kinds.has("metals")) return "metals";
   return "mini";
+}
+
+function quoteMatchesOrderRequestFilter(quote: QuoteRequest, filter: OrderRequestFilter) {
+  if (filter === "all") return true;
+  return quote.items.some((item) => {
+    if (filter === "engineering") return item.catalogue === "featured";
+    return item.catalogue === filter;
+  });
 }
 
 function customFiles(quote: QuoteRequest) {
@@ -637,6 +654,7 @@ export default function OrdersClient({
   const [query, setQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [monthFilter, setMonthFilter] = useState(initialMonth);
+  const [orderRequestFilter, setOrderRequestFilter] = useState<OrderRequestFilter>("all");
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [page, setPage] = useState(1);
@@ -675,6 +693,30 @@ export default function OrdersClient({
   const pendingPaymentQuotes = useMemo(
     () => sortedQuotes.filter(isPendingPaymentQuote),
     [sortedQuotes]
+  );
+
+  const activeRequestQuotes = useMemo(
+    () => [...openRequestQuotes, ...pendingPaymentQuotes],
+    [openRequestQuotes, pendingPaymentQuotes]
+  );
+
+  const orderRequestFilterCounts = useMemo(() => {
+    return ORDER_REQUEST_FILTERS.reduce((counts, filter) => {
+      counts[filter.value] = activeRequestQuotes.filter((quote) =>
+        quoteMatchesOrderRequestFilter(quote, filter.value)
+      ).length;
+      return counts;
+    }, {} as Record<OrderRequestFilter, number>);
+  }, [activeRequestQuotes]);
+
+  const filteredOpenRequestQuotes = useMemo(
+    () => openRequestQuotes.filter((quote) => quoteMatchesOrderRequestFilter(quote, orderRequestFilter)),
+    [openRequestQuotes, orderRequestFilter]
+  );
+
+  const filteredPendingPaymentQuotes = useMemo(
+    () => pendingPaymentQuotes.filter((quote) => quoteMatchesOrderRequestFilter(quote, orderRequestFilter)),
+    [pendingPaymentQuotes, orderRequestFilter]
   );
 
   const selected = useMemo(
@@ -1305,9 +1347,40 @@ export default function OrdersClient({
       )}
 
       <div className="space-y-5">
+        <div className="rounded-xl border border-racing/10 bg-white p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="px-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              Order type
+            </div>
+            {ORDER_REQUEST_FILTERS.map((filter) => {
+              const active = orderRequestFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => setOrderRequestFilter(filter.value)}
+                  aria-pressed={active}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    active
+                      ? "bg-racing text-cream"
+                      : "text-racing hover:bg-cream-dark"
+                  }`}
+                >
+                  <span>{filter.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] leading-none ${
+                    active ? "bg-cream/15 text-cream" : "bg-cream-dark text-ink-muted"
+                  }`}>
+                    {orderRequestFilterCounts[filter.value] || 0}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <OrderCardSection
           title="New order requests"
-          quotes={openRequestQuotes}
+          quotes={filteredOpenRequestQuotes}
           empty="No new order requests waiting."
           selectedId={selectedId}
           savingAction={savingAction}
@@ -1321,7 +1394,7 @@ export default function OrdersClient({
 
         <OrderCardSection
           title="Pending payment"
-          quotes={pendingPaymentQuotes}
+          quotes={filteredPendingPaymentQuotes}
           empty="No sent invoices are awaiting payment."
           selectedId={selectedId}
           savingAction={savingAction}

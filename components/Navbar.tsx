@@ -9,7 +9,16 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/catalogue/mini", label: "Mini Panels" },
   { href: "/catalogue/metals", label: "Metals" },
-  { href: "/custom-engineering", label: "Custom Work" },
+  {
+    href: "/custom-engineering",
+    label: "Custom Engineering Work",
+    desktopLabel: (
+      <>
+        <span className="hidden 2xl:inline">Custom Engineering Work</span>
+        <span className="2xl:hidden">Custom Engineering</span>
+      </>
+    ),
+  },
   { href: "/featured", label: "Featured Work" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
@@ -46,7 +55,7 @@ export default function Navbar() {
                       : "text-cream hover:bg-racing-light"
                   }`}
                 >
-                  {link.label}
+                  {link.desktopLabel || link.label}
                 </Link>
               );
             })}

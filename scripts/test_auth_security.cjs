@@ -16,6 +16,9 @@ const dashboardLiveUpdates = read("app/dashboard/(protected)/DashboardLiveUpdate
 const teamClient = read("app/dashboard/(protected)/team/TeamClient.tsx");
 const dashboardLayout = read("app/dashboard/(protected)/layout.tsx");
 const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
+const productsClient = read("app/dashboard/(protected)/products/page.tsx");
+const miniProductImagesRoute = read("app/api/mini-product-images/route.ts");
+const miniProductImageRoute = read("app/api/mini-product-images/[productId]/route.ts");
 const loginForm = read("app/dashboard/login/LoginForm.tsx");
 const acceptInvitationForm = read("app/dashboard/accept-invitation/[token]/AcceptInvitationForm.tsx");
 const resetPasswordForm = read("app/dashboard/reset-password/[token]/ResetPasswordForm.tsx");
@@ -24,6 +27,7 @@ const middleware = read("middleware.ts");
 const migration = read("migrations/0005_team_auth.sql");
 const notificationMigration = read("migrations/0006_team_notification_preferences.sql");
 const twoFactorMigration = read("migrations/0007_team_two_factor_requirement.sql");
+const miniProductImagesMigration = read("migrations/0010_mini_product_images.sql");
 
 for (const file of [
   "lib/auth.ts",
@@ -47,6 +51,7 @@ assert.match(migration, /auth_password_resets/, "auth reset table migration must
 assert.match(migration, /auth_audit_log/, "auth audit table migration must exist");
 assert.match(notificationMigration, /auth_notification_preferences/, "team notification preference migration must exist");
 assert.match(twoFactorMigration, /require_two_factor_setup/, "team 2FA requirement migration must exist");
+assert.match(miniProductImagesMigration, /mini_product_images/, "mini product image migration must exist");
 
 assert.match(authRoute, /verifyLoginPassword/, "login must use DB-backed password verification");
 assert.match(authRoute, /verifyTotpCode/, "login must support TOTP verification");
@@ -75,6 +80,14 @@ assert.match(dashboardLiveUpdates, /router\.refresh\(\)/, "dashboard overview sh
 assert.match(dashboardLayout, /<DashboardLiveUpdates \/>/, "protected dashboard layout must mount the live quote updater");
 assert.match(ordersClient, /mmachine:quote-requests-updated/, "orders tab must merge live quote request updates");
 assert.match(ordersClient, /mergeQuoteUpdates/, "orders tab must add newly seen quote cards without a manual refresh");
+assert.match(ordersClient, /ORDER_REQUEST_FILTERS/, "orders tab must expose order-type submenu filters");
+assert.match(ordersClient, /quoteMatchesOrderRequestFilter/, "orders tab filters must match mixed orders by included item type");
+assert.match(productsClient, /optimiseProductImage/, "mini panel dashboard photos must be optimised before upload");
+assert.match(productsClient, /\/api\/mini-product-images/, "dashboard products tab must use the mini product image API");
+assert.match(miniProductImagesRoute, /export async function GET/, "mini product image listing should be public for the catalogue");
+assert.match(miniProductImagesRoute, /export async function POST[\s\S]+requireLogin/, "mini product image upload must require dashboard login");
+assert.match(miniProductImagesRoute, /export async function DELETE[\s\S]+requireLogin/, "mini product image removal must require dashboard login");
+assert.match(miniProductImageRoute, /cache-control/, "mini product image assets must be cacheable");
 const saveNoEmailStart = quoteRequestRoute.indexOf("if (body.saveNoEmail && !body.emailCustomer)");
 const customerEmailStart = quoteRequestRoute.indexOf("let customerEmailSent = false");
 assert.ok(saveNoEmailStart >= 0 && customerEmailStart > saveNoEmailStart, "save-no-email must be handled before customer email sending");
