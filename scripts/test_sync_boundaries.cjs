@@ -63,13 +63,18 @@ const setupScript = fs.readFileSync(
 
 assert.match(
   setupScript,
-  /Assert-NoNonGeneratedGitChanges/,
-  "owner daily sync wrapper must stop before publishing non-generated website changes"
+  /Unstage-NonGeneratedGitChanges/,
+  "owner daily sync wrapper must unstage non-generated website changes without blocking catalogue sync"
 );
 assert.match(
   setupScript,
   /Daily sync post-refresh/,
-  "owner daily sync wrapper must validate changed paths after regenerating catalogue outputs"
+  "owner daily sync wrapper must inspect changed paths after regenerating catalogue outputs"
+);
+assert.match(
+  setupScript,
+  /will be left unstaged and will not be published by daily sync/,
+  "owner daily sync wrapper must log unexpected website-code changes instead of silently publishing them"
 );
 assert.match(
   setupScript,

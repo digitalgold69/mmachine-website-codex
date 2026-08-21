@@ -379,11 +379,10 @@ function Assert-NoNonGeneratedGitChanges {
         }
 
         if ($unexpected.Count -gt 0) {
-            throw (
-                "$Context found non-generated repository changes. " +
-                "Commit or discard these before running setup/sync: " +
-                ($unexpected -join "; ")
-            )
+            Write-Host (
+                "  $Context found local website-code changes. They will not be " +
+                "included in catalogue sync commits: " + ($unexpected -join "; ")
+            ) -ForegroundColor Yellow
         }
     } finally {
         Pop-Location
@@ -805,11 +804,29 @@ function Assert-NoNonGeneratedGitChanges {
     }
 
     if (`$unexpected.Count -gt 0) {
-        Write-Log "`$Context found non-generated repository changes. Daily sync stopped before publishing."
+        Write-Log "`$Context found non-generated repository changes. They will be left unstaged and will not be published by daily sync."
         foreach (`$line in `$unexpected) {
             Write-Log "  unexpected: `$line"
         }
-        exit 1
+    }
+}
+
+function Unstage-NonGeneratedGitChanges {
+    `$unexpected = @()
+    foreach (`$path in @(git diff --cached --name-only 2>`$null)) {
+        if (`$path -and -not (Test-IsGeneratedGitOutput -Path `$path)) {
+            `$unexpected += `$path
+        }
+    }
+
+    if (`$unexpected.Count -gt 0) {
+        Write-Log "Unstaging non-generated files so daily sync only publishes catalogue outputs."
+        foreach (`$path in `$unexpected) {
+            Write-Log "  unstaged: `$path"
+        }
+        git reset -- `$unexpected 2>&1 | ForEach-Object {
+            Add-Content -Path `$Log -Value ([string]`$_) -Encoding UTF8
+        }
     }
 }
 
@@ -889,6 +906,7 @@ Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autosta
 Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
 Assert-NoNonGeneratedGitChanges "Daily sync post-refresh"
 Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts lib/featured-data.ts lib/catalogue-versions.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue public/featured }
+Unstage-NonGeneratedGitChanges
 Assert-NoNonGeneratedGitChanges "Daily sync pre-commit"
 
 git diff --cached --quiet >> `$Log 2>&1
