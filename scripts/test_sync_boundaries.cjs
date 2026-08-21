@@ -56,4 +56,25 @@ for (const relativePath of generatedScriptSources) {
   }
 }
 
+const setupScript = fs.readFileSync(
+  path.join(projectRoot, "scripts/setup/Setup-Owner-Machine.ps1"),
+  "utf8"
+);
+
+assert.match(
+  setupScript,
+  /Assert-NoNonGeneratedGitChanges/,
+  "owner daily sync wrapper must stop before publishing non-generated website changes"
+);
+assert.match(
+  setupScript,
+  /Daily sync post-refresh/,
+  "owner daily sync wrapper must validate changed paths after regenerating catalogue outputs"
+);
+assert.match(
+  setupScript,
+  /git add lib\/mini-data\.ts lib\/metals-data\.ts lib\/featured-data\.ts lib\/catalogue-versions\.ts/,
+  "owner daily sync wrapper must stage every generated catalogue data file explicitly"
+);
+
 console.log("ok - daily sync boundaries are limited to documented generated catalogue outputs");

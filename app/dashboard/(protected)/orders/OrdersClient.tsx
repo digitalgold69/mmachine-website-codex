@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ACCOUNTING_BUCKET_LABELS,
@@ -910,6 +911,25 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   );
 }
 
+function InvoicePrintPortal({ quote, paymentSettings }: { quote: QuoteRequest; paymentSettings: PaymentSettings }) {
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const element = document.createElement("div");
+    element.className = "invoice-print-root";
+    document.body.appendChild(element);
+    setContainer(element);
+
+    return () => {
+      element.remove();
+    };
+  }, []);
+
+  if (!container) return null;
+
+  return createPortal(<InvoicePrintSheet quote={quote} paymentSettings={paymentSettings} />, container);
+}
+
 export default function OrdersClient({
   initialQuotes,
   initialError,
@@ -1361,7 +1381,17 @@ export default function OrdersClient({
   }
 
   function printInvoice() {
-    window.print();
+    document.body.classList.add("printing-invoice");
+
+    const cleanup = () => {
+      document.body.classList.remove("printing-invoice");
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
+    window.requestAnimationFrame(() => {
+      window.print();
+    });
   }
 
   function addCatalogueLine(product: CatalogueSearchProduct) {
@@ -1658,6 +1688,10 @@ export default function OrdersClient({
         </div>
       )}
 
+      {draft && selected && (
+        <InvoicePrintPortal quote={draft} paymentSettings={paymentSettings} />
+      )}
+
       <div className="space-y-5">
         <div className="rounded-xl border border-racing/10 bg-white p-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1899,7 +1933,6 @@ export default function OrdersClient({
               if (event.target === event.currentTarget) closeInvoice();
             }}
           >
-            <InvoicePrintSheet quote={draft} paymentSettings={paymentSettings} />
             <div
               ref={modalRef}
               role="dialog"

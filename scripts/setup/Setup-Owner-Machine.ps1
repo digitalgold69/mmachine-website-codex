@@ -321,21 +321,84 @@ function Invoke-GitCloneWithToken {
     }
 }
 
-function Reset-GeneratedGitOutputs {
-    param([string]$RepositoryPath)
-
-    $generatedPaths = @(
+function Get-GeneratedGitOutputPaths {
+    return @(
         "lib/mini-data.ts",
         "lib/metals-data.ts",
+        "lib/featured-data.ts",
         "lib/catalogue-versions.ts",
         "data-source/.metal-codes.json",
         "data-source/.metal-links.json",
         "data-source/.metal-catalogue-codes.json",
-        "public/catalogue"
+        "public/catalogue",
+        "public/featured"
+    )
+}
+
+function Get-GitStatusPath {
+    param([string]$StatusLine)
+    if ([string]::IsNullOrWhiteSpace($StatusLine) -or $StatusLine.Length -lt 4) {
+        return ""
+    }
+
+    $path = $StatusLine.Substring(3).Trim()
+    if ($path -match " -> ") {
+        $path = ($path -split " -> ")[-1].Trim()
+    }
+    return ($path.Trim('"') -replace "\\", "/")
+}
+
+function Test-IsGeneratedGitOutput {
+    param([string]$Path)
+    $normal = ($Path -replace "\\", "/").Trim('"')
+    foreach ($generatedPath in Get-GeneratedGitOutputPaths) {
+        if ($normal -eq $generatedPath -or $normal.StartsWith("$generatedPath/")) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Assert-NoNonGeneratedGitChanges {
+    param(
+        [string]$RepositoryPath,
+        [string]$Context
     )
 
     Push-Location $RepositoryPath
     try {
+        $unexpected = @()
+        foreach ($line in @(git status --porcelain 2>$null)) {
+            $path = Get-GitStatusPath -StatusLine $line
+            if ($path -and -not (Test-IsGeneratedGitOutput -Path $path)) {
+                if ($line.StartsWith("?? ")) {
+                    continue
+                }
+                $unexpected += $line
+            }
+        }
+
+        if ($unexpected.Count -gt 0) {
+            throw (
+                "$Context found non-generated repository changes. " +
+                "Commit or discard these before running setup/sync: " +
+                ($unexpected -join "; ")
+            )
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+function Reset-GeneratedGitOutputs {
+    param([string]$RepositoryPath)
+
+    $generatedPaths = Get-GeneratedGitOutputPaths
+
+    Push-Location $RepositoryPath
+    try {
+        Assert-NoNonGeneratedGitChanges -RepositoryPath $RepositoryPath -Context "Daily sync preflight"
+
         $statusLines = @(git status --porcelain 2>$null)
         $unmergedLines = @(
             $statusLines | Where-Object {
@@ -344,6 +407,20 @@ function Reset-GeneratedGitOutputs {
         )
 
         if ($unmergedLines.Count -gt 0) {
+            $nonGeneratedUnmerged = @(
+                $unmergedLines | Where-Object {
+                    $path = Get-GitStatusPath -StatusLine $_
+                    $path -and -not (Test-IsGeneratedGitOutput -Path $path)
+                }
+            )
+            if ($nonGeneratedUnmerged.Count -gt 0) {
+                throw (
+                    "Unfinished Git conflict touches normal website code. " +
+                    "Resolve it manually before running setup/sync: " +
+                    ($nonGeneratedUnmerged -join "; ")
+                )
+            }
+
             Write-Host (
                 "  Existing repo has an unfinished Git conflict - " +
                 "recovering tracked repo files"
@@ -368,6 +445,8 @@ function Reset-GeneratedGitOutputs {
         if ($LASTEXITCODE -ne 0) {
             throw "Could not reset generated website outputs."
         }
+
+        Assert-NoNonGeneratedGitChanges -RepositoryPath $RepositoryPath -Context "Daily sync pre-pull"
     } finally {
         Pop-Location
     }
@@ -673,18 +752,72 @@ function Invoke-LoggedCommand {
     }
 }
 
-function Reset-GeneratedGitOutputs {
-    `$generatedPaths = @(
+function Get-GeneratedGitOutputPaths {
+    return @(
         "lib/mini-data.ts",
         "lib/metals-data.ts",
+        "lib/featured-data.ts",
         "lib/catalogue-versions.ts",
         "data-source/.metal-codes.json",
         "data-source/.metal-links.json",
         "data-source/.metal-catalogue-codes.json",
-        "public/catalogue"
+        "public/catalogue",
+        "public/featured"
     )
+}
+
+function Get-GitStatusPath {
+    param([string]`$StatusLine)
+    if ([string]::IsNullOrWhiteSpace(`$StatusLine) -or `$StatusLine.Length -lt 4) {
+        return ""
+    }
+
+    `$path = `$StatusLine.Substring(3).Trim()
+    if (`$path -match " -> ") {
+        `$path = (`$path -split " -> ")[-1].Trim()
+    }
+    return (`$path.Trim('"') -replace "\\", "/")
+}
+
+function Test-IsGeneratedGitOutput {
+    param([string]`$Path)
+    `$normal = (`$Path -replace "\\", "/").Trim('"')
+    foreach (`$generatedPath in Get-GeneratedGitOutputPaths) {
+        if (`$normal -eq `$generatedPath -or `$normal.StartsWith("`$generatedPath/")) {
+            return `$true
+        }
+    }
+    return `$false
+}
+
+function Assert-NoNonGeneratedGitChanges {
+    param([string]`$Context)
+
+    `$unexpected = @()
+    foreach (`$line in @(git status --porcelain 2>`$null)) {
+        `$path = Get-GitStatusPath -StatusLine `$line
+        if (`$path -and -not (Test-IsGeneratedGitOutput -Path `$path)) {
+            if (`$line.StartsWith("?? ")) {
+                continue
+            }
+            `$unexpected += `$line
+        }
+    }
+
+    if (`$unexpected.Count -gt 0) {
+        Write-Log "`$Context found non-generated repository changes. Daily sync stopped before publishing."
+        foreach (`$line in `$unexpected) {
+            Write-Log "  unexpected: `$line"
+        }
+        exit 1
+    }
+}
+
+function Reset-GeneratedGitOutputs {
+    `$generatedPaths = Get-GeneratedGitOutputPaths
 
     Write-Log "Preparing repository before pull"
+    Assert-NoNonGeneratedGitChanges "Daily sync preflight"
     `$statusLines = @(git status --porcelain 2>`$null)
     `$unmergedLines = @(
         `$statusLines | Where-Object {
@@ -693,6 +826,20 @@ function Reset-GeneratedGitOutputs {
     )
 
     if (`$unmergedLines.Count -gt 0) {
+        `$nonGeneratedUnmerged = @(
+            `$unmergedLines | Where-Object {
+                `$path = Get-GitStatusPath -StatusLine `$_
+                `$path -and -not (Test-IsGeneratedGitOutput -Path `$path)
+            }
+        )
+        if (`$nonGeneratedUnmerged.Count -gt 0) {
+            Write-Log "Unfinished Git conflict touches normal website code. Resolve it manually before running daily sync."
+            foreach (`$line in `$nonGeneratedUnmerged) {
+                Write-Log "  conflict: `$line"
+            }
+            exit 1
+        }
+
         Write-Log (
             "Unfinished Git conflict found; recovering tracked repo files. " +
             "Master Excel files are not touched."
@@ -727,6 +874,8 @@ function Reset-GeneratedGitOutputs {
         Write-Log "Could not reset regenerated website outputs"
         exit `$LASTEXITCODE
     }
+
+    Assert-NoNonGeneratedGitChanges "Daily sync pre-pull"
 }
 
 Set-Location `$InstallPath
@@ -738,7 +887,9 @@ Add-Content -Path `$Log -Value "=============================================="
 Reset-GeneratedGitOutputs
 Invoke-LoggedCommand "Pulling latest website code" { git pull --rebase --autostash }
 Invoke-LoggedCommand "Refreshing website data, catalogues, invoices, and PDFs" { npm run daily-sync }
-Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts lib/catalogue-versions.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue }
+Assert-NoNonGeneratedGitChanges "Daily sync post-refresh"
+Invoke-LoggedCommand "Staging generated website files" { git add lib/mini-data.ts lib/metals-data.ts lib/featured-data.ts lib/catalogue-versions.ts data-source/.metal-codes.json data-source/.metal-links.json data-source/.metal-catalogue-codes.json public/catalogue public/featured }
+Assert-NoNonGeneratedGitChanges "Daily sync pre-commit"
 
 git diff --cached --quiet >> `$Log 2>&1
 `$diffExit = `$LASTEXITCODE
