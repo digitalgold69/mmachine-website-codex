@@ -316,6 +316,7 @@ const metricGauge = calculateMetalOrderItem(
 assert.equal(metricGauge.ok, true);
 assert.equal(metricGauge.unit, "length");
 assertClose(metricGauge.unitPriceExVat, 12, "metric gauge plate complete 500mm length");
+assert.equal(metricGauge.metalDimensions.display, "Sold as pre-cut 500mm lengths (priced from 250mm catalogue rate)");
 
 const imperialGauge = calculateMetalOrderItem(
   {
@@ -334,6 +335,26 @@ const imperialGauge = calculateMetalOrderItem(
 );
 assert.equal(imperialGauge.ok, true);
 assertClose(imperialGauge.unitPriceExVat, 12.9, "imperial gauge plate complete 18in length");
+assert.equal(imperialGauge.metalDimensions.display, 'Sold as pre-cut 18" lengths (priced from 9" catalogue rate)');
+
+const imperialGaugeStockLength = calculateMetalOrderItem(
+  {
+    id: "imperial-gauge-stock-length",
+    category: "gauge_plate",
+    form: "Flat",
+    metal: "Gauge Plate",
+    spec: "Imperial",
+    size: "5/16in",
+    unit: '24"',
+    stockSize: '24"',
+    priceExVat: 65.77,
+  },
+  {},
+  1
+);
+assert.equal(imperialGaugeStockLength.ok, true);
+assertClose(imperialGaugeStockLength.unitPriceExVat, 65.77, "gauge plate stock length equal to unit should not be doubled");
+assert.equal(imperialGaugeStockLength.metalDimensions.display, 'Sold as pre-cut 24" lengths');
 
 const silverSteel = calculateMetalOrderItem(
   {

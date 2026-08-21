@@ -333,11 +333,11 @@ function isCatalogueUnit(unit: string) {
 
 function fixedLengthForGaugePlate(unitLengthMm: number | null, stockSize: string, unit: string | undefined) {
   const stockLength = parseStockLength(stockSize);
-  if (stockLength && (!unitLengthMm || stockLength > unitLengthMm)) return stockLength;
+  if (stockLength) return stockLength;
   const rawUnit = normalise(unit).toLowerCase();
   if (/250\s*mm/.test(rawUnit)) return 500;
   if (/9\s*"/.test(rawUnit) || /9\s*inch/.test(rawUnit) || /9\s*in\b/.test(rawUnit)) return 18 * MM_PER_INCH;
-  return unitLengthMm ? unitLengthMm * 2 : null;
+  return unitLengthMm;
 }
 
 export function getMetalOrderConfig(product: MetalPricingProduct): MetalOrderConfig {
@@ -435,8 +435,17 @@ export function formatMm(value: number) {
 
 function formatFixedLength(mm: number) {
   const inches = mm / MM_PER_INCH;
-  if (Math.abs(inches - Math.round(inches)) < 0.05) return `${Math.round(inches)} in`;
+  if (Math.abs(inches - Math.round(inches)) < 0.05) return `${Math.round(inches)}"`;
   return formatMm(mm);
+}
+
+function fixedLengthDisplay(config: Extract<MetalOrderConfig, { mode: "fixed" }>) {
+  if (config.fixedKind === "silver-steel") return 'Sold as pre-cut 13" Lengths';
+  const saleLength = formatFixedLength(config.fixedLengthMm);
+  const pricedFrom = Math.abs(config.fixedLengthMm - config.unitLengthMm) > 0.001
+    ? ` (priced from ${formatFixedLength(config.unitLengthMm)} catalogue rate)`
+    : "";
+  return `Sold as pre-cut ${saleLength} lengths${pricedFrom}`;
 }
 
 function cleanDimension(value: unknown) {
@@ -544,9 +553,7 @@ export function calculateMetalOrderItem(
   if (config.mode === "fixed") {
     const multiplier = config.fixedLengthMm / config.unitLengthMm;
     const unitPriceExVat = priceExVat === null ? null : moneyPrecision(priceExVat * multiplier);
-    const display = config.fixedKind === "silver-steel"
-      ? 'Sold as pre-cut 13" Lengths'
-      : `Complete ${formatFixedLength(config.fixedLengthMm)} length`;
+    const display = fixedLengthDisplay(config);
     return {
       ok: true,
       keySuffix: `fixed-${Math.round(config.fixedLengthMm * 10)}`,
