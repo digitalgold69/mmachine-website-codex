@@ -683,7 +683,7 @@ function OrderCard({
                 onChange={(event) => setCardPaymentMethod(event.target.value as QuotePaymentMethod)}
                 disabled={isSaving}
                 aria-label={`Payment method for ${displayRef}`}
-                className="input min-h-0 h-9 px-2 py-1 text-xs font-semibold text-racing disabled:cursor-not-allowed disabled:opacity-70"
+                className="h-8 min-h-0 rounded-md border border-racing/20 bg-white px-1.5 py-0 text-[10px] font-semibold leading-none text-racing shadow-sm disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {PAYMENT_METHOD_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
