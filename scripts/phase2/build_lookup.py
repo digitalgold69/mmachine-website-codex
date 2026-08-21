@@ -86,6 +86,7 @@ def parse_master():
             size  = s(ws.cell(row_idx, 4).value)
             priceEx = n(ws.cell(row_idx, 5).value)
             unit  = s(ws.cell(row_idx, 6).value)
+            stock_size = s(ws.cell(row_idx, 12).value)
 
             if not any((column_a, metal_cell, spec, size, priceEx is not None, unit)):
                 current_grade = ""
@@ -130,6 +131,7 @@ def parse_master():
                 "size": size,
                 "priceEx": priceEx,
                 "unit": unit,
+                "stockSize": stock_size,
                 "sourceSheet": sheet_name,
                 "sourceRow": row_idx,
             })
@@ -145,8 +147,11 @@ def make_key(metal, spec, size, shape=""):
     ])
 
 def build_lookup_rows():
-    """Pure in-memory build. Returns a list of 12-tuples.
+    """Pure in-memory build. Returns a list of 13-tuples.
     (Key, Shape, Metal, Spec, Size, £ ex VAT, Unit, Source Sheet, Source Row, Code).
+
+    The final tuple value carries Metals.xlsx column L, used by the website
+    for max continuous length and sheet size checks.
 
     Used by wire_catalogue.py, wire_invoice.py, regen_website_data.py.
     Codes are assigned via metal_codes.assign_codes() and persisted to
@@ -197,7 +202,7 @@ def build_lookup_rows():
         code = code_map.get(ckey, "")
         out.append((k, r["shape"], r["metal"], r["spec"], r["size"],
                     r["priceEx"], r["unit"], r["sourceSheet"], r["sourceRow"],
-                    code, r["grade"], r["linkId"]))
+                    code, r["grade"], r["linkId"], r["stockSize"]))
     return out, collisions
 
 def main():

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { OrderButton } from "@/components/QuoteCart";
 import type { MetalProduct } from "@/lib/metals-data";
 import { metalsCatalogueUrl } from "@/lib/catalogue-versions";
+import type { MetalShapeFilter } from "@/lib/metals-filters";
 
 const PAGE_SIZE = 120;
 
@@ -20,13 +21,16 @@ export default function MetalsCatalogueClient({
   initialCount,
   total,
   categories,
+  shapeFiltersByCategory,
 }: {
   initialProducts: MetalProduct[];
   initialCount: number;
   total: number;
   categories: Category[];
+  shapeFiltersByCategory: Record<string, MetalShapeFilter[]>;
 }) {
   const [cat, setCat] = useState("all");
+  const [shape, setShape] = useState("all");
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState(initialProducts);
   const [matchCount, setMatchCount] = useState(initialCount);
@@ -34,11 +38,13 @@ export default function MetalsCatalogueClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const firstRun = useRef(true);
-  const activeQuery = `${cat}\n${search.trim()}`;
+  const activeQuery = `${cat}\n${shape}\n${search.trim()}`;
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
 
   const categoryLabel = categories.find((category) => category.key === cat)?.label ?? cat;
+  const shapeOptions = cat === "all" ? [] : shapeFiltersByCategory[cat] || [];
+  const selectedShapeLabel = shapeOptions.find((option) => option.key === shape)?.label || "";
 
   useEffect(() => {
     if (firstRun.current) {
@@ -54,6 +60,7 @@ export default function MetalsCatalogueClient({
         const params = new URLSearchParams({
           catalogue: "metals",
           category: cat,
+          shape,
           q: search.trim(),
           offset: "0",
           limit: String(PAGE_SIZE),
@@ -76,7 +83,7 @@ export default function MetalsCatalogueClient({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [cat, search]);
+  }, [cat, shape, search]);
 
   async function loadMore() {
     const requestQuery = activeQuery;
@@ -86,6 +93,7 @@ export default function MetalsCatalogueClient({
       const params = new URLSearchParams({
         catalogue: "metals",
         category: cat,
+        shape,
         q: search.trim(),
         offset: String(products.length),
         limit: String(PAGE_SIZE),
@@ -105,6 +113,11 @@ export default function MetalsCatalogueClient({
 
   function selectCategory(key: string) {
     setCat(key);
+    setShape("all");
+  }
+
+  function selectShape(key: string) {
+    setShape(key);
   }
 
   return (
@@ -151,6 +164,43 @@ export default function MetalsCatalogueClient({
             </button>
           ))}
         </div>
+        {shapeOptions.length > 1 && (
+          <div className="mb-3 rounded-md border border-racing/10 bg-cream-dark/70 px-2.5 py-2" aria-label="Filter by metal shape">
+            <div className="mb-1.5 flex items-center gap-2">
+              <div className="text-[10px] font-semibold uppercase leading-none tracking-wider text-ink-muted">Shape</div>
+              <div className="h-px flex-1 bg-racing/10" />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => selectShape("all")}
+                aria-pressed={shape === "all"}
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold leading-none transition-colors ${
+                  shape === "all"
+                    ? "border-racing bg-racing text-cream"
+                    : "border-racing/10 bg-white text-racing hover:border-gold"
+                }`}
+              >
+                All shapes
+              </button>
+              {shapeOptions.map((option) => (
+                <button
+                  type="button"
+                  key={option.key}
+                  onClick={() => selectShape(option.key)}
+                  aria-pressed={shape === option.key}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold leading-none transition-colors ${
+                    shape === option.key
+                      ? "border-racing bg-racing text-cream"
+                      : "border-racing/10 bg-white text-racing hover:border-gold"
+                  }`}
+                >
+                  {option.label} <span className={shape === option.key ? "text-cream/70" : "text-ink-muted"}>{option.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <label htmlFor="metals-search" className="sr-only">Search the metals catalogue</label>
         <input
           id="metals-search"
@@ -172,6 +222,7 @@ export default function MetalsCatalogueClient({
               <strong className="text-racing">{matchCount}</strong> matching lines
               {matchCount !== total && ` (filtered from ${total})`}
               {cat !== "all" && ` in ${categoryLabel}`}
+              {shape !== "all" && selectedShapeLabel && ` / ${selectedShapeLabel}`}
             </>
           )}
         </p>
@@ -272,6 +323,7 @@ function quoteItem(product: MetalProduct) {
     metal: product.metal,
     spec: product.spec,
     size: product.size,
+    stockSize: product.stockSize,
     unit: product.unit,
     unitPriceExVat: product.priceExVat,
     unitPriceIncVat: product.priceIncVat,

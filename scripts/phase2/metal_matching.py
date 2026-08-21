@@ -339,6 +339,7 @@ class MetalMatcher:
                 "code": row[9] if len(row) > 9 else "",
                 "grade": row[10] if len(row) > 10 else "",
                 "linkId": row[11] if len(row) > 11 else "",
+                "stockSize": row[12] if len(row) > 12 else "",
             }
             record["family"] = material_family(
                 record["metal"], record["grade"], record["spec"]

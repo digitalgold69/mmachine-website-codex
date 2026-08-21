@@ -27,54 +27,12 @@ type ProductPreviewImage = MiniProductImage & {
   code: string;
 };
 
-const BODY_TYPES = ["All", "Saloon", "Traveller", "Van", "Pick-Up", "Cooper", "Elf/Hornet", "Clubman", "Clubman Estate"];
-const YEAR_OPTIONS = Array.from({ length: 42 }, (_, index) => String(1959 + index));
-const HYDROLASTIC_DIGITS = new Set(["6", "7", "8"]);
-
-function markDigitFromCode(code: string) {
-  const digits = code.replace(/\D/g, "");
-  return digits[1] || "";
-}
-
-function markDigitsForYear(year: string, hydrolasticOnly: boolean) {
-  const value = Number(year);
-  if (!Number.isInteger(value)) return [];
-
-  const ranges = hydrolasticOnly
-    ? [
-        { from: 1959, to: 1967, digit: "6" },
-        { from: 1967, to: 1969, digit: "7" },
-        { from: 1969, to: 1976, digit: "8" },
-      ]
-    : [
-        { from: 1959, to: 1967, digit: "1" },
-        { from: 1967, to: 1969, digit: "2" },
-        { from: 1969, to: 1976, digit: "3" },
-        { from: 1976, to: 1984, digit: "4" },
-        { from: 1984, to: 2000, digit: "5" },
-      ];
-
-  return [...new Set(ranges
-    .filter((range) => value >= range.from && value <= range.to)
-    .map((range) => range.digit))];
-}
-
-function partMatchesYear(code: string, year: string, hydrolasticOnly: boolean) {
-  const digit = markDigitFromCode(code);
-  if (!year) return hydrolasticOnly ? HYDROLASTIC_DIGITS.has(digit) : true;
-  const matches = markDigitsForYear(year, hydrolasticOnly);
-  return matches.includes(digit);
-}
-
 const money = (value: number | null) =>
   value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
 
 export default function MiniCataloguePage() {
   const [section, setSection] = useState("all");
   const [search, setSearch] = useState("");
-  const [bodyFilter, setBodyFilter] = useState("All");
-  const [yearFilter, setYearFilter] = useState("");
-  const [hydrolasticOnly, setHydrolasticOnly] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [productImages, setProductImages] = useState<Record<string, MiniProductImage>>({});
   const [previewImage, setPreviewImage] = useState<ProductPreviewImage | null>(null);
@@ -104,10 +62,6 @@ export default function MiniCataloguePage() {
   const filtered = useMemo(() => {
     let list = products;
     if (section !== "all") list = list.filter((p) => p.section === section);
-    if (bodyFilter !== "All") list = list.filter((p) => p.bodyType === bodyFilter);
-    if (yearFilter || hydrolasticOnly) {
-      list = list.filter((p) => partMatchesYear(p.code, yearFilter, hydrolasticOnly));
-    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -118,15 +72,13 @@ export default function MiniCataloguePage() {
       );
     }
     return list;
-  }, [section, search, bodyFilter, yearFilter, hydrolasticOnly]);
+  }, [section, search]);
 
   const sectionCounts = useMemo(() => {
     const query = search.trim().toLowerCase();
     const counts: Record<string, number> = { all: 0 };
 
     for (const product of products) {
-      if (bodyFilter !== "All" && product.bodyType !== bodyFilter) continue;
-      if ((yearFilter || hydrolasticOnly) && !partMatchesYear(product.code, yearFilter, hydrolasticOnly)) continue;
       if (query && ![product.code, product.name, product.fits].join(" ").toLowerCase().includes(query)) continue;
 
       counts.all += 1;
@@ -134,7 +86,7 @@ export default function MiniCataloguePage() {
     }
 
     return counts;
-  }, [search, bodyFilter, yearFilter, hydrolasticOnly]);
+  }, [search]);
 
   const shown = filtered.slice(0, displayLimit);
   const currentSection = getSection(section);
@@ -165,57 +117,7 @@ export default function MiniCataloguePage() {
       <Mini3DViewer selectedSection={section} onSelect={chooseSection} />
 
       <div className="mt-6 rounded-xl border border-racing/10 bg-white p-3 sm:p-4">
-        <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="space-y-3 rounded-lg bg-cream-dark/60 p-3">
-            <div>
-              <label className="label" htmlFor="mini-panel-body">Body type</label>
-              <select
-                id="mini-panel-body"
-                className="input min-h-0 py-2 text-sm"
-                value={bodyFilter}
-                onChange={(e) => { setBodyFilter(e.target.value); setDisplayLimit(50); }}
-              >
-                {BODY_TYPES.map((body) => <option key={body}>{body}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="mini-panel-year">Year</label>
-              <select
-                id="mini-panel-year"
-                className="input min-h-0 py-2 text-sm"
-                value={yearFilter}
-                onChange={(e) => { setYearFilter(e.target.value); setDisplayLimit(50); }}
-              >
-                <option value="">Any year</option>
-                {YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
-              </select>
-            </div>
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-racing/10 bg-white px-3 py-2 text-sm font-semibold text-racing">
-              <input
-                type="checkbox"
-                checked={hydrolasticOnly}
-                onChange={(e) => { setHydrolasticOnly(e.target.checked); setDisplayLimit(50); }}
-                className="h-4 w-4 accent-racing"
-              />
-              <span>Hydrolastic</span>
-            </label>
-            {(bodyFilter !== "All" || yearFilter || hydrolasticOnly) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBodyFilter("All");
-                  setYearFilter("");
-                  setHydrolasticOnly(false);
-                  setDisplayLimit(50);
-                }}
-                className="w-full rounded-md border border-racing/20 bg-white px-3 py-2 text-xs font-semibold text-racing hover:bg-cream"
-              >
-                Reset filters
-              </button>
-            )}
-          </div>
-
-          <div className="min-w-0 space-y-3">
+        <div className="min-w-0 space-y-3">
             <label htmlFor="mini-panel-search" className="sr-only">
               Search the Classic Mini panels catalogue
             </label>
@@ -271,7 +173,6 @@ export default function MiniCataloguePage() {
                 })}
               </div>
             </div>
-          </div>
         </div>
       </div>
 

@@ -164,6 +164,14 @@ const metalsQuote = {
       unit: "sheet",
       unitPriceExVat: 12,
       unitPriceIncVat: 14.4,
+      metalDimensions: {
+        mode: "sheet",
+        lengthMm: 884,
+        widthMm: 30,
+        display: "884mm x 30mm",
+        pricedFromUnit: "Sq. ft (300 mm sq.)",
+        stockSize: "2500 x 1250",
+      },
     },
   ],
 };
@@ -286,6 +294,10 @@ assert.match(miniOwnerHtml, /\u00a375\.00/);
 assert.doesNotMatch(miniOwnerHtml, /Unit each/);
 assert.doesNotMatch(miniOwnerHtml, /Mini parts/);
 
+const metalsOwnerHtml = buildOwnerQuoteEmail(metalsQuote);
+assert.match(metalsOwnerHtml, /884mm x 30mm/);
+assert.match(metalsOwnerHtml, /Ref MS-SHEET/);
+
 const enquiryHtml = buildOwnerEnquiryEmail({
   name: "Bob Enquirer",
   email: "bob@example.test",
@@ -323,8 +335,19 @@ assert.doesNotMatch(customerHtml, />Each ex VAT</);
 assert.doesNotMatch(customerHtml, /Line ex VAT/);
 assert.doesNotMatch(customerHtml, /Drawing status/);
 assert.match(customerHtml, /Please approve before fabrication/);
+assert.match(customerHtml, /Cutting charge/);
+assert.doesNotMatch(customerHtml, /Extra charges/);
 assert.match(customerHtml, /Total inc VAT/);
 assert.match(customerHtml, /GB123456789/);
+
+const metalsCustomerHtml = buildCustomerInvoiceEmail({
+  ...metalsQuote,
+  websiteInvoiceNumber: "W5555",
+  websiteInvoiceCount: 1,
+  extraChargesExVat: 0,
+});
+assert.match(metalsCustomerHtml, /884mm x 30mm/);
+assert.doesNotMatch(metalsCustomerHtml, /Cutting charge/);
 
 const singleMiniCustomerHtml = buildCustomerInvoiceEmail(singleMiniQuote);
 assert.match(singleMiniCustomerHtml, /Collection/);

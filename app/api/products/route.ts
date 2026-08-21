@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
+import { metalShapeKey } from "@/lib/metals-filters";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,12 +13,14 @@ export async function GET(request: Request) {
 
   if (catalogue === "metals") {
     const category = searchParams.get("category");
+    const shape = searchParams.get("shape");
     let list = metals;
     if (category && category !== "all") list = list.filter((product) => product.category === category);
+    if (shape && shape !== "all") list = list.filter((product) => metalShapeKey(product.form) === shape);
     if (search?.trim()) {
       const query = search.trim().toLowerCase();
       list = list.filter((product) =>
-        [product.form, product.metal, product.spec, product.size, product.unit, product.code, product.sourceSheet]
+        [product.form, product.metal, product.spec, product.size, product.unit, product.code, product.stockSize, product.sourceSheet]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()

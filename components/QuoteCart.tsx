@@ -12,6 +12,15 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  calculateMetalOrderItem,
+  formatMetalDimensionForUnit,
+  getMetalOrderConfig,
+  metalDimensionUnitLabel,
+  METAL_DIMENSION_DISCLAIMER,
+  normaliseMetalDimensionUnit,
+} from "@/lib/metal-pricing";
+import type { MetalDimensionUnit } from "@/lib/metal-pricing";
 import type { QuoteItem } from "@/lib/quote-types";
 
 type PendingItem = Omit<QuoteItem, "qty">;
@@ -25,6 +34,7 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "mmachine-quote-cart";
 const MINI_VEHICLE_MODELS = ["Saloon", "Van", "Traveller", "Pickup"];
+const VAT_MULTIPLIER = 1.2;
 
 const money = (value: number | null) =>
   value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
@@ -40,6 +50,32 @@ export function useQuoteCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useQuoteCart must be used inside QuoteCartProvider");
   return ctx;
+}
+
+function DimensionUnitToggle({
+  value,
+  onChange,
+}: {
+  value: MetalDimensionUnit;
+  onChange: (unit: MetalDimensionUnit) => void;
+}) {
+  return (
+    <div className="inline-flex shrink-0 rounded-md border border-racing/15 bg-white p-0.5 text-[11px] font-semibold uppercase tracking-wide">
+      {(["metric", "imperial"] as const).map((unit) => (
+        <button
+          key={unit}
+          type="button"
+          onClick={() => onChange(unit)}
+          aria-pressed={value === unit}
+          className={`rounded px-2 py-1 transition ${
+            value === unit ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
+          }`}
+        >
+          {unit}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function OrderButton({
@@ -67,6 +103,9 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [pending, setPending] = useState<PendingItem | null>(null);
   const [pendingQty, setPendingQty] = useState(1);
+  const [pendingLengthMm, setPendingLengthMm] = useState("");
+  const [pendingWidthMm, setPendingWidthMm] = useState("");
+  const [pendingDimensionUnit, setPendingDimensionUnit] = useState<MetalDimensionUnit>("metric");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [arrangeOwnDelivery, setArrangeOwnDelivery] = useState(false);
@@ -103,6 +142,48 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
       ),
     [items]
   );
+  const pendingMetalConfig = useMemo(
+    () => (pending?.catalogue === "metals" ? getMetalOrderConfig(pending) : null),
+    [pending]
+  );
+  const pendingMetalCalculates =
+    pendingMetalConfig?.mode === "length" ||
+    pendingMetalConfig?.mode === "sheet" ||
+    pendingMetalConfig?.mode === "fixed";
+  const pendingMetalCalculation = useMemo(() => {
+    if (!pending || pending.catalogue !== "metals" || !pendingMetalConfig || !pendingMetalCalculates) {
+      return null;
+    }
+    return calculateMetalOrderItem(
+      pending,
+      {
+        inputUnit: pendingDimensionUnit,
+        inputLength: pendingLengthMm,
+        inputWidth: pendingWidthMm,
+      },
+      pendingQty
+    );
+  }, [pending, pendingDimensionUnit, pendingLengthMm, pendingMetalConfig, pendingMetalCalculates, pendingQty, pendingWidthMm]);
+  const pendingNeedsDimensions = pendingMetalConfig?.mode === "length" || pendingMetalConfig?.mode === "sheet";
+  const pendingCanAdd =
+    !pending ||
+    pending.catalogue !== "metals" ||
+    pendingMetalConfig?.mode === "manual" ||
+    pendingMetalConfig?.mode === "catalogue" ||
+    Boolean(pendingMetalCalculation?.ok);
+  const pendingPreviewUnitPrice =
+    pendingMetalCalculation?.ok ? pendingMetalCalculation.unitPriceExVat : pending?.unitPriceExVat ?? null;
+  const pendingPreviewUnit =
+    pendingMetalCalculation?.ok ? pendingMetalCalculation.unit : pending?.unit;
+  const pendingCatalogueUnitPrice = pending?.unitPriceExVat ?? null;
+  const pendingCatalogueUnit = pending?.unit;
+  const pendingPreviewLineExVat =
+    typeof pendingPreviewUnitPrice === "number" ? pendingPreviewUnitPrice * pendingQty : null;
+  const pendingPreviewLineIncVat =
+    typeof pendingPreviewLineExVat === "number" ? pendingPreviewLineExVat * VAT_MULTIPLIER : null;
+  const subtotalIncVat = subtotal * VAT_MULTIPLIER;
+  const pendingDimensionUnitText = metalDimensionUnitLabel(pendingDimensionUnit);
+  const pendingDimensionStep = pendingDimensionUnit === "imperial" ? "0.001" : "0.1";
 
   useEffect(() => {
     if (!pending && !drawerOpen) return;
@@ -154,21 +235,67 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   function beginAdd(item: PendingItem) {
     setPending(item);
     setPendingQty(1);
+    setPendingLengthMm("");
+    setPendingWidthMm("");
+    setPendingDimensionUnit("metric");
+    setMessage("");
   }
 
   function confirmPending() {
     if (!pending) return;
+    let itemToAdd = pending;
+    if (pending.catalogue === "metals" && pendingMetalCalculates) {
+      const calculation = calculateMetalOrderItem(
+        pending,
+        {
+          inputUnit: pendingDimensionUnit,
+          inputLength: pendingLengthMm,
+          inputWidth: pendingWidthMm,
+        },
+        pendingQty
+      );
+      if (!calculation.ok) {
+        setMessage(calculation.error);
+        return;
+      }
+      itemToAdd = {
+        ...pending,
+        key: `${pending.key}-${calculation.keySuffix}`,
+        unit: calculation.unit,
+        unitPriceExVat: calculation.unitPriceExVat,
+        unitPriceIncVat: calculation.unitPriceIncVat,
+        metalDimensions: calculation.metalDimensions,
+      };
+    }
     setItems((current) => {
-      const existing = current.findIndex((item) => item.key === pending.key);
+      const existing = current.findIndex((item) => item.key === itemToAdd.key);
       if (existing >= 0) {
         return current.map((item, index) =>
           index === existing ? { ...item, qty: item.qty + pendingQty } : item
         );
       }
-      return [...current, { ...pending, qty: pendingQty }];
+      return [...current, { ...itemToAdd, qty: pendingQty }];
     });
     setPending(null);
     setMessage("");
+  }
+
+  function changePendingDimensionUnit(nextUnit: MetalDimensionUnit) {
+    const normalised = normaliseMetalDimensionUnit(nextUnit);
+    if (normalised === pendingDimensionUnit) return;
+
+    const convert = (value: string) => {
+      if (!value) return "";
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return value;
+      const mm = pendingDimensionUnit === "imperial" ? numeric * 25.4 : numeric;
+      const converted = normalised === "imperial" ? mm / 25.4 : mm;
+      return Number(converted.toFixed(normalised === "imperial" ? 4 : 2)).toString();
+    };
+
+    setPendingLengthMm((value) => convert(value));
+    setPendingWidthMm((value) => convert(value));
+    setPendingDimensionUnit(normalised);
   }
 
   function closeDrawer() {
@@ -277,51 +404,167 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-to-order-title"
-            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+            className="w-full max-w-[420px] rounded-lg bg-white p-4 text-[14px] leading-snug shadow-xl"
           >
-            <div className="mb-4">
-              <div className="text-xs uppercase tracking-wider text-ink-muted">Add to quote</div>
-              <h2 id="add-to-order-title" className="mt-1 text-lg font-semibold text-racing">{itemLabel(pending)}</h2>
-              <p className="mt-1 text-sm text-ink-muted">
-                {money(pending.unitPriceExVat)} ex VAT
-                {pending.unit ? ` / ${pending.unit}` : ""}
+            <div className="mb-3">
+              <div className="text-[11px] uppercase tracking-wider text-ink-muted">Add to quote</div>
+              <h2 id="add-to-order-title" className="mt-1 text-base font-semibold leading-tight text-racing">{itemLabel(pending)}</h2>
+              <p className="mt-1 text-[13px] text-ink-muted">
+                {money(pendingCatalogueUnitPrice)}
+                {pendingCatalogueUnit ? ` / ${pendingCatalogueUnit}` : ""}
               </p>
             </div>
-            <div className="mb-5 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingQty((qty) => Math.max(1, qty - 1))}
-                className="h-10 w-10 rounded-md border border-racing/20 text-lg text-racing"
-                aria-label="Reduce quantity"
-              >
-                -
-              </button>
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={pendingQty}
-                onChange={(e) => setPendingQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
-                className="input h-10 w-24 text-center"
-                aria-label="Quantity"
-              />
-              <button
-                type="button"
-                onClick={() => setPendingQty((qty) => Math.min(999, qty + 1))}
-                className="h-10 w-10 rounded-md border border-racing/20 text-lg text-racing"
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
+            {pending.catalogue === "metals" && (
+              <div className="mb-3 rounded-lg border border-racing/10 bg-cream-dark p-2.5 text-[13px] leading-snug">
+                <p className="mb-2 text-[11px] leading-4 text-ink-muted">{METAL_DIMENSION_DISCLAIMER}</p>
+                {pendingMetalConfig?.mode === "length" && (
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <label className="label !mb-0 !text-[12px]" htmlFor="metal-length">Required length ({pendingDimensionUnitText})</label>
+                      <DimensionUnitToggle value={pendingDimensionUnit} onChange={changePendingDimensionUnit} />
+                    </div>
+                    <input
+                      id="metal-length"
+                      type="number"
+                      min={1}
+                      step={pendingDimensionStep}
+                      value={pendingLengthMm}
+                      onChange={(event) => setPendingLengthMm(event.target.value)}
+                      className="input bg-white !px-3 !py-2 !text-[14px]"
+                      placeholder={pendingDimensionUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
+                    />
+                    {typeof pendingMetalConfig.maxLengthMm === "number" && (
+                      <div className="mt-1 text-xs text-ink-muted">
+                        Maximum single length {formatMetalDimensionForUnit(pendingMetalConfig.maxLengthMm, pendingDimensionUnit)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {pendingMetalConfig?.mode === "sheet" && (
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-3 sm:col-span-2">
+                      <div className="label !mb-0 !text-[12px]">Required dimensions</div>
+                      <DimensionUnitToggle value={pendingDimensionUnit} onChange={changePendingDimensionUnit} />
+                    </div>
+                    <div>
+                      <label className="label !mb-1 !text-[12px]" htmlFor="metal-length">Length ({pendingDimensionUnitText})</label>
+                      <input
+                        id="metal-length"
+                        type="number"
+                        min={1}
+                        step={pendingDimensionStep}
+                        value={pendingLengthMm}
+                        onChange={(event) => setPendingLengthMm(event.target.value)}
+                        className="input bg-white !px-3 !py-2 !text-[14px]"
+                        placeholder={pendingDimensionUnit === "imperial" ? "e.g. 34.8" : "e.g. 884"}
+                      />
+                    </div>
+                    <div>
+                      <label className="label !mb-1 !text-[12px]" htmlFor="metal-width">Width ({pendingDimensionUnitText})</label>
+                      <input
+                        id="metal-width"
+                        type="number"
+                        min={1}
+                        step={pendingDimensionStep}
+                        value={pendingWidthMm}
+                        onChange={(event) => setPendingWidthMm(event.target.value)}
+                        className="input bg-white !px-3 !py-2 !text-[14px]"
+                        placeholder={pendingDimensionUnit === "imperial" ? "e.g. 1.2" : "e.g. 30"}
+                      />
+                    </div>
+                    {typeof pendingMetalConfig.maxLengthMm === "number" && typeof pendingMetalConfig.maxWidthMm === "number" && (
+                      <div className="text-[11px] text-ink-muted sm:col-span-2">
+                        Maximum sheet size {formatMetalDimensionForUnit(pendingMetalConfig.maxLengthMm, pendingDimensionUnit)} x {formatMetalDimensionForUnit(pendingMetalConfig.maxWidthMm, pendingDimensionUnit)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {pendingMetalConfig?.mode === "fixed" && (
+                  <div className="rounded-md bg-white px-3 py-1.5 text-racing">
+                    {pendingMetalCalculation?.ok
+                      ? pendingMetalCalculation.metalDimensions.display
+                      : "Sold in complete stock lengths."}
+                  </div>
+                )}
+                {pendingMetalConfig?.mode === "catalogue" && (
+                  <div className="rounded-md bg-white px-3 py-1.5 text-racing">
+                    {pendingMetalConfig.unitLabel ? `Sold as ${pendingMetalConfig.unitLabel}` : "Sold as a catalogue unit."}
+                  </div>
+                )}
+                {pendingMetalConfig?.mode === "manual" && (
+                  <div className="rounded-md bg-white px-3 py-1.5 text-ink-muted">
+                    {pendingMetalConfig.reason}
+                  </div>
+                )}
+                {pendingNeedsDimensions && pendingMetalCalculation && (
+                  pendingMetalCalculation.ok ? (
+                    <div className="mt-2.5 rounded-md bg-white px-3 py-1.5 text-racing">
+                      {pendingMetalCalculation.metalDimensions.display}:{" "}
+                      <strong>
+                        {money(pendingMetalCalculation.unitPriceExVat)}
+                        {typeof pendingMetalCalculation.unitPriceExVat === "number" ? " ex VAT each" : ""}
+                      </strong>
+                    </div>
+                  ) : (
+                    <div role="alert" className="mt-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+                      {pendingMetalCalculation.error}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+            <div className="mb-4">
+              <div className="label !mb-1.5 !text-[12px]">QTY</div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingQty((qty) => Math.max(1, qty - 1))}
+                  className="h-9 w-9 rounded-md border border-racing/20 text-base text-racing"
+                  aria-label="Reduce quantity"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={pendingQty}
+                  onChange={(e) => setPendingQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
+                  className="input h-9 w-20 text-center !px-2 !py-1.5 !text-[14px]"
+                  aria-label="Quantity"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPendingQty((qty) => Math.min(999, qty + 1))}
+                  className="h-9 w-9 rounded-md border border-racing/20 text-base text-racing"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+              <div className="mt-2.5 flex items-center justify-between gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-1.5 text-[13px]">
+                <span className="font-semibold text-ink-muted">Total Incl VAT</span>
+                <strong className="text-racing">{money(pendingPreviewLineIncVat)}</strong>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setPending(null)} className="btn-secondary py-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPending(null);
+                  setMessage("");
+                }}
+                className="btn-secondary px-4 py-2 text-sm"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={confirmPending} className="btn-primary py-2">
+              <button type="button" onClick={confirmPending} disabled={!pendingCanAdd} className="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60">
                 Add to cart
               </button>
             </div>
+            {message && pending.catalogue === "metals" && (
+              <div role="alert" className="mt-2.5 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[12px] text-red-800">{message}</div>
+            )}
           </div>
         </div>
       )}
@@ -388,6 +631,11 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                           <div className="mt-1 text-xs text-ink-muted">
                             {item.code || item.shape} {item.unit ? `- ${item.unit}` : ""}
                           </div>
+                          {item.metalDimensions?.display && (
+                            <div className="mt-1 text-xs font-semibold text-racing">
+                              {item.metalDimensions.display}
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -519,8 +767,14 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm text-ink-muted">
-                    {hasPoaItems ? "Known subtotal ex VAT" : "Guide subtotal ex VAT"}:{" "}
-                    <strong className="text-racing">{"\u00a3"}{subtotal.toFixed(2)}</strong>
+                    <div>
+                      {hasPoaItems ? "Known subtotal ex VAT" : "Guide subtotal ex VAT"}:{" "}
+                      <strong className="text-racing">{"\u00a3"}{subtotal.toFixed(2)}</strong>
+                    </div>
+                    <div className="mt-0.5 text-xs">
+                      {hasPoaItems ? "Known subtotal incl VAT" : "Guide subtotal incl VAT"}:{" "}
+                      <strong className="text-racing">{"\u00a3"}{subtotalIncVat.toFixed(2)}</strong>
+                    </div>
                     {hasPoaItems && (
                       <span className="mt-1 block text-xs">POA items will be confirmed before invoicing.</span>
                     )}

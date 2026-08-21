@@ -43,11 +43,8 @@ async function main() {
   assert.match(miniPage, /target="_blank"[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mini section PDF links should open in a new tab");
   assert.match(miniPage, /sm:hidden[\s\S]*Download \{currentSection\.code\} Section PDF/, "Mobile section PDF links should stack beside the section number");
   assert.match(miniPage, /hidden font-semibold[\s\S]*sm:inline[\s\S]*Download \{currentSection\.code\} Section PDF/, "Desktop section PDF links should stay inline with the description");
-  assert.doesNotMatch(miniPage, /More filters/, "Mini catalogue filters must be visible without a More filters toggle");
-  assert.doesNotMatch(miniPage, /Mark \/ year/, "Mini catalogue year filter should not use the old mark label");
-  assert.match(miniPage, /YEAR_OPTIONS = Array\.from\(\{ length: 42 \}/, "Mini catalogue year dropdown must cover 1959-2000");
-  assert.match(miniPage, /markDigitFromCode/, "Mini catalogue year filtering must use the part number digit rule");
-  assert.match(miniPage, /HYDROLASTIC_DIGITS/, "Mini catalogue must support Hydrolastic-only filtering");
+  assert.doesNotMatch(miniPage, /More filters/, "Mini catalogue should not use the old More filters toggle");
+  assert.doesNotMatch(miniPage, /Mark \/ year|YEAR_OPTIONS|markDigitFromCode|HYDROLASTIC_DIGITS|mini-panel-body|mini-panel-year/, "Mini catalogue should not hide parts behind year, body type or Hydrolastic filters");
   assert.match(miniPage, /\/api\/mini-product-images/, "Mini catalogue must load uploaded product photos");
   assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
   assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");

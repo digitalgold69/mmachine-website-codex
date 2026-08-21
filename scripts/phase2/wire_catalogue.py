@@ -65,6 +65,7 @@ def build_indexes(rows):
         keys[key] = {
             "shape": shape, "metal": metal, "spec": spec, "size": size,
             "priceEx": priceEx, "unit": unit, "src": f"{srcSheet}!{srcRow}",
+            "stockSize": row[12] if len(row) > 12 else "",
         }
     return keys
 
@@ -80,7 +81,7 @@ def build_pricelookup_xml(rows):
             Source Sheet | Source Row | Code
     """
     headers = ["Key", "Shape", "Metal", "Spec", "Size", "£ ex VAT", "Unit",
-               "Source Sheet", "Source Row", "Code", "Grade", "Stable Link ID"]
+               "Source Sheet", "Source Row", "Code", "Grade", "Stable Link ID", "Stock length"]
     n_rows = len(rows) + 1
     last_col = col_letter(len(headers))
 
@@ -99,7 +100,7 @@ def build_pricelookup_xml(rows):
         '<col min="6" max="6" width="10" customWidth="1"/>',
         '<col min="7" max="9" width="16" customWidth="1"/>',
         '<col min="10" max="10" width="32" customWidth="1"/>',
-        '<col min="11" max="12" width="42" customWidth="1"/>',
+        '<col min="11" max="13" width="42" customWidth="1"/>',
         '</cols>',
         '<sheetData>',
     ]
@@ -111,8 +112,8 @@ def build_pricelookup_xml(rows):
 
     for ri, row in enumerate(rows, start=2):
         parts.append(f'<row r="{ri}">')
-        # row tuple length: 10 (Key, Shape, Metal, Spec, Size, £, Unit, Sheet, SrcRow, Code)
-        for ci, val in enumerate(row[:12], 1):
+        # Includes the stable matching data plus Metals.xlsx column L stock length.
+        for ci, val in enumerate(row[:13], 1):
             ref = f"{col_letter(ci)}{ri}"
             if val is None or val == "":
                 continue

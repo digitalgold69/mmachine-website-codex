@@ -36,6 +36,7 @@ import type {
 } from "@/lib/quote-types";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
+import { calculateMetalOrderItem, getMetalOrderConfig } from "@/lib/metal-pricing";
 import { checkRateLimit } from "@/lib/request-limits";
 import { readCompletedFileToken } from "@/lib/quote-upload-token";
 import { normaliseQuoteDelivery } from "@/lib/quote-delivery";
@@ -76,6 +77,32 @@ function normaliseMiniVehicleModel(value: unknown) {
   return MINI_VEHICLE_MODELS.find((model) => model.toLowerCase() === raw.toLowerCase()) || "";
 }
 
+function safeMetalDimensions(raw: unknown): QuoteItem["metalDimensions"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const source = raw as NonNullable<QuoteItem["metalDimensions"]>;
+  const mode = source.mode === "sheet" || source.mode === "fixed" || source.mode === "length"
+    ? source.mode
+    : null;
+  const display = asString(source.display, 120);
+  if (!mode || !display) return undefined;
+  const lengthMm = asNumberOrNull(source.lengthMm);
+  const widthMm = asNumberOrNull(source.widthMm);
+  const inputUnit = source.inputUnit === "imperial" ? "imperial" : source.inputUnit === "metric" ? "metric" : undefined;
+  const inputLength = asNumberOrNull(source.inputLength);
+  const inputWidth = asNumberOrNull(source.inputWidth);
+  return {
+    mode,
+    ...(lengthMm !== null ? { lengthMm } : {}),
+    ...(widthMm !== null ? { widthMm } : {}),
+    ...(inputUnit ? { inputUnit } : {}),
+    ...(inputLength !== null ? { inputLength } : {}),
+    ...(inputWidth !== null ? { inputWidth } : {}),
+    display,
+    pricedFromUnit: asString(source.pricedFromUnit, 120),
+    stockSize: asString(source.stockSize, 120),
+  };
+}
+
 function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
   const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
   const catalogue = raw.catalogue === "custom"
@@ -98,10 +125,12 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
     metal: asString(raw.metal, 120),
     spec: asString(raw.spec, 120),
     size: asString(raw.size, 240),
+    stockSize: asString(raw.stockSize, 120),
     unit: asString(raw.unit, 120),
     qty,
     unitPriceExVat: asNumberOrNull(raw.unitPriceExVat),
     unitPriceIncVat: asNumberOrNull(raw.unitPriceIncVat),
+    metalDimensions: safeMetalDimensions(raw.metalDimensions),
     custom: raw.custom,
   };
 }
@@ -133,7 +162,7 @@ function safePublicItem(
   if (raw.catalogue === "metals") {
     const product = metalsById.get(productId);
     if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
-    return {
+    const baseItem: QuoteItem = {
       key: `metals-${product.id}`,
       catalogue: "metals",
       productId: product.id,
@@ -145,11 +174,26 @@ function safePublicItem(
       metal: product.metal,
       spec: product.spec,
       size: product.size,
+      stockSize: product.stockSize,
       unit: product.unit,
       qty,
       unitPriceExVat: product.priceExVat,
       unitPriceIncVat: product.priceIncVat,
     };
+    const config = getMetalOrderConfig(product);
+    if (config.mode === "length" || config.mode === "sheet" || config.mode === "fixed") {
+      const calculated = calculateMetalOrderItem(product, raw.metalDimensions || {}, qty);
+      if (!calculated.ok) throw new Error(calculated.error);
+      return {
+        ...baseItem,
+        key: `${baseItem.key}-${calculated.keySuffix}`,
+        unit: calculated.unit,
+        unitPriceExVat: calculated.unitPriceExVat,
+        unitPriceIncVat: calculated.unitPriceIncVat,
+        metalDimensions: calculated.metalDimensions,
+      };
+    }
+    return baseItem;
   }
 
   if (raw.catalogue === "featured") {

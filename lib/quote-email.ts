@@ -92,7 +92,7 @@ const invoiceItemName = (item: QuoteItem) => item.catalogue === "custom" ? "Cust
 
 function itemReference(item: QuoteItem) {
   if (item.catalogue === "custom") return "Custom";
-  if (item.catalogue === "metals") return item.shape || item.code || "Metal";
+  if (item.catalogue === "metals") return item.code || item.shape || "Metal";
   return item.code || (item.catalogue === "featured" ? "Featured Work" : "");
 }
 
@@ -183,6 +183,7 @@ function ownerLineMeta(item: QuoteItem) {
   const parts = [`Qty ${escapeHtml(item.qty)}`];
   const reference = itemReference(item);
   if (reference) parts.push(`Ref ${escapeHtml(reference)}`);
+  if (item.metalDimensions?.display) parts.push(escapeHtml(item.metalDimensions.display));
   if (item.catalogue === "mini") {
     parts.push(escapeHtml(money(lineExVat(item))));
   } else if (item.unit) {
@@ -311,7 +312,11 @@ function invoiceLineCards(items: QuoteItem[], includeVat: boolean, env: EmailEnv
   return items
     .map((item) => {
       const line = lineExVat(item);
-      const subtitle = [itemReference(item), item.catalogue === "mini" ? "" : item.unit].filter(Boolean).join(" / ");
+      const subtitle = [
+        itemReference(item),
+        item.metalDimensions?.display,
+        item.catalogue === "mini" ? "" : item.unit,
+      ].filter(Boolean).join(" / ");
       const priceRows = item.qty > 1
         ? `
               <tr>
@@ -424,7 +429,11 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
             <tbody>
               <tr><td style="padding:6px 0;color:#6b5a46">Goods${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.goodsExVat))}</td></tr>
               <tr><td style="padding:6px 0;color:#6b5a46">Carriage${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.carriageExVat))}</td></tr>
-              <tr><td style="padding:6px 0;color:#6b5a46">Extra charges${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.extraChargesExVat))}</td></tr>
+              ${
+                totals.extraChargesExVat > 0
+                  ? `<tr><td style="padding:6px 0;color:#6b5a46">Cutting charge${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">${escapeHtml(money(totals.extraChargesExVat))}</td></tr>`
+                  : ""
+              }
               ${
                 totals.refundsExVat > 0
                   ? `<tr><td style="padding:6px 0;color:#6b5a46">Refunds${basePriceLabel ? ` ${basePriceLabel}` : ""}</td><td style="padding:6px 0;text-align:right;font-weight:700">-${escapeHtml(money(totals.refundsExVat))}</td></tr>`

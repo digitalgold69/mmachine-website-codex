@@ -415,9 +415,11 @@ def build_metals_products():
             confidence = result.confidence
 
             price_ex = None
+            stock_size = ""
             poa = False
             if matched_key:
                 master_price = keys[matched_key]["priceEx"]
+                stock_size = keys[matched_key].get("stockSize", "")
                 if isinstance(master_price, (int, float)):
                     price_ex = master_price
                 else:
@@ -464,6 +466,7 @@ def build_metals_products():
                 "unit": unit,
                 "spec": spec,
                 "size": size,
+                "stockSize": stock_size,
                 "notes": "",
                 "sourceSheet": sheet_name,
             })
@@ -704,6 +707,7 @@ export type MetalProduct = {{
   unit: string;
   spec: string;
   size: string;
+  stockSize: string;
   notes: string;
   sourceSheet: string;
   // legacy compat — prefer priceExVat / priceIncVat

@@ -25,7 +25,7 @@ export const ACCOUNTING_NOMINALS: Record<QuoteAccountingBucket, number> = {
   metals: 4001,
   carriage: 4002,
   engineering: 4005,
-  featured: 4009,
+  featured: 4010,
 };
 
 export const ACCOUNTING_BUCKET_LABELS: Record<QuoteAccountingBucket, string> = {
@@ -137,29 +137,14 @@ export function quoteProductAccountingGroups(quote: QuoteRequest): AccountingGro
   const goodsByBucket = quoteGoodsByBucket(quote);
   const productBuckets = PRODUCT_ACCOUNTING_BUCKETS.filter((bucket) => goodsByBucket[bucket] > 0);
   const itemBuckets = productItemBuckets(quote);
-  const activeBuckets = productBuckets.length > 0
-    ? productBuckets
-    : itemBuckets.length > 0
-      ? itemBuckets
-      : ["engineering" as const];
-
-  const totalGoods = roundAccounting(PRODUCT_ACCOUNTING_BUCKETS.reduce((sum, bucket) => sum + goodsByBucket[bucket], 0));
   const totalExtraCharges = positiveAmount(quote.extraChargesExVat ?? 0);
   const extraByBucket = emptyAccountingTotals();
 
   if (totalExtraCharges !== 0) {
-    if (totalGoods > 0) {
-      let allocated = 0;
-      activeBuckets.forEach((bucket, index) => {
-        const amount = index === activeBuckets.length - 1
-          ? roundAccounting(totalExtraCharges - allocated)
-          : roundAccounting(totalExtraCharges * (goodsByBucket[bucket] / totalGoods));
-        extraByBucket[bucket] = amount;
-        allocated = roundAccounting(allocated + amount);
-      });
-    } else {
-      extraByBucket[activeBuckets[0]] = totalExtraCharges;
-    }
+    const targetBucket = goodsByBucket.metals > 0 || itemBuckets.includes("metals")
+      ? "metals"
+      : productBuckets[0] || itemBuckets[0] || "engineering";
+    extraByBucket[targetBucket] = totalExtraCharges;
   }
 
   return PRODUCT_ACCOUNTING_BUCKETS

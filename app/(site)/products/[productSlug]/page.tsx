@@ -224,6 +224,7 @@ function quoteItem(item: SeoProduct) {
     metal: p.metal,
     spec: p.spec,
     size: p.size,
+    stockSize: p.stockSize,
     unit: p.unit,
     unitPriceExVat: p.priceExVat,
     unitPriceIncVat: p.priceIncVat,

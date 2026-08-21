@@ -34,10 +34,22 @@ export type QuoteItem = {
   metal?: string;
   spec?: string;
   size?: string;
+  stockSize?: string;
   unit?: string;
   qty: number;
   unitPriceExVat: number | null;
   unitPriceIncVat: number | null;
+  metalDimensions?: {
+    mode: "length" | "sheet" | "fixed";
+    lengthMm?: number;
+    widthMm?: number;
+    inputUnit?: "metric" | "imperial";
+    inputLength?: number;
+    inputWidth?: number;
+    display: string;
+    pricedFromUnit?: string;
+    stockSize?: string;
+  };
   custom?: CustomQuoteDetails;
 };
 

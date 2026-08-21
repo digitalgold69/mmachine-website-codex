@@ -35,6 +35,7 @@ type CatalogueSearchProduct = {
   spec?: string;
   size?: string;
   unit?: string;
+  stockSize?: string;
   sourceSheet?: string;
   description?: string;
   priceExVat: number | null;
@@ -199,6 +200,10 @@ function invoiceLineSubtitle(item: QuoteItem) {
   return item.code || "Mini panel";
 }
 
+function invoiceLineDimension(item: QuoteItem) {
+  return item.catalogue === "metals" ? item.metalDimensions?.display || "" : "";
+}
+
 function totalsReadyText(value: number | null | undefined, hasPoaItems: boolean) {
   return hasPoaItems ? "Add prices" : money(value);
 }
@@ -273,7 +278,7 @@ function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLin
 
 function catalogueResultSubtitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
   if (catalogue === "metals") {
-    return [product.code, product.unit, product.sourceSheet].filter(Boolean).join(" / ");
+    return [product.code, product.unit, product.stockSize, product.sourceSheet].filter(Boolean).join(" / ");
   }
   return [product.code, product.fits, product.section ? `Section ${product.section}` : ""].filter(Boolean).join(" / ");
 }
@@ -293,6 +298,7 @@ function quoteItemFromCatalogueProduct(product: CatalogueSearchProduct, catalogu
       metal: product.metal,
       spec: product.spec,
       size: product.size,
+      stockSize: product.stockSize,
       unit: product.unit || "each",
       qty: 1,
       unitPriceExVat,
@@ -1776,7 +1782,14 @@ export default function OrdersClient({
                                 ) : (
                                   <div className="rounded-md border border-racing/10 bg-white px-3 py-2">
                                     <div className="font-semibold leading-5 text-racing">{invoiceItemTitle(item)}</div>
-                                    <div className="mt-1 text-xs text-ink-muted">{invoiceLineSubtitle(item)}</div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                                      <span>{invoiceLineSubtitle(item)}</span>
+                                      {invoiceLineDimension(item) && (
+                                        <span className="rounded-full bg-cream-dark px-2 py-0.5 font-semibold text-racing">
+                                          {invoiceLineDimension(item)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -2057,7 +2070,7 @@ export default function OrdersClient({
                           />
                         </div>
                         <div>
-                          <label className="label" htmlFor="extra-charges">{baseTotalLabel(draft, "Extra charges")}</label>
+                          <label className="label" htmlFor="extra-charges">{baseTotalLabel(draft, "Cut Charge")}</label>
                           <input
                             id="extra-charges"
                             type="number"
@@ -2085,6 +2098,12 @@ export default function OrdersClient({
                           <div className="flex justify-between gap-3">
                             <span>{baseTotalLabel(draft, "Carriage")}</span>
                             <strong>{money(draftTotals.carriage)}</strong>
+                          </div>
+                        )}
+                        {draftTotals && draftTotals.extra > 0 && (
+                          <div className="flex justify-between gap-3">
+                            <span>{baseTotalLabel(draft, "Cut Charge")}</span>
+                            <strong>{money(draftTotals.extra)}</strong>
                           </div>
                         )}
                         {quoteIncludesVat(draft) ? (
