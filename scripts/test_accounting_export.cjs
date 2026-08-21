@@ -27,6 +27,7 @@ const quote = {
   paidAt: "2026-08-02T10:00:00.000Z",
   status: "paid",
   includeVat: true,
+  paymentMethod: "bacs",
   customer: {
     name: "Alice Buyer",
     email: "alice@example.test",
@@ -88,6 +89,7 @@ assert.deepEqual(saleRows.map((row) => row.Nominal).sort(), [
 ].sort());
 assert.equal(saleRows.every((row) => row.Type === "SI" && row.Account === "WEB" && row.Dept === 0), true);
 assert.equal(saleRows.every((row) => row.Details === "Alice Works"), true);
+assert.equal(saleRows.every((row) => row["Payment Method"] === "BACS"), true);
 assert.deepEqual(
   saleRows.map((row) => [row.Nominal, row.Ref]),
   [
@@ -109,6 +111,7 @@ const noVatRows = sageSaleRowsForQuote({ ...quote, includeVat: false, websiteInv
 assert.equal(noVatRows.every((row) => row["T/C"] === "T0"), true);
 assert.equal(noVatRows.every((row) => row.Tax === 0), true);
 assert.equal(quoteTotals({ ...quote, includeVat: false }).totalIncVat, 650);
+assert.equal(sageSaleRowsForQuote({ ...quote, paymentMethod: null })[0]["Payment Method"], "Card");
 
 const refundedQuote = {
   ...quote,
@@ -132,6 +135,7 @@ assert.deepEqual(refundRows.map((row) => row.Ref), ["W2000", "W2001"]);
 assert.equal(new Set(refundRows.map((row) => row.Ref)).size, refundRows.length);
 assert.equal(refundRows.some((row) => saleRows.some((saleRow) => saleRow.Ref === row.Ref)), false);
 assert.deepEqual(refundRows.map((row) => row.Net).sort((a, b) => a - b), [-50, -10]);
+assert.equal(refundRows.every((row) => row["Payment Method"] === "BACS"), true);
 assert.equal(roundAccounting(refundRows.reduce((sum, row) => sum + row.Tax, 0)), -12);
 assert.equal(quoteTotals(refundedQuote).totalExVat, 590);
 assert.equal(quoteTotals(refundedQuote).totalIncVat, 708);

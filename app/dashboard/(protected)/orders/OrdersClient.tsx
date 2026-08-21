@@ -13,7 +13,14 @@ import {
   websiteInvoiceDisplay,
 } from "@/lib/order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
-import type { QuoteAccountingBucket, QuoteItem, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import type { PaymentSettings } from "@/lib/payment-settings";
+import type {
+  QuoteAccountingBucket,
+  QuoteItem,
+  QuotePaymentMethod,
+  QuoteRequest,
+  QuoteStatus,
+} from "@/lib/quote-types";
 
 const GBP = "\u00a3";
 const PAGE_SIZE = 8;
@@ -22,6 +29,8 @@ const TZ = "Europe/London";
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
 type AddLineCatalogue = "mini" | "metals";
 type OrderRequestFilter = "all" | "mini" | "metals" | "custom" | "featured";
+
+type PaymentSettingsDraft = PaymentSettings;
 
 type CatalogueSearchProduct = {
   id: string;
@@ -87,6 +96,12 @@ const ORDER_REQUEST_FILTERS: { value: OrderRequestFilter; label: string }[] = [
   { value: "metals", label: "Metals" },
   { value: "custom", label: "Custom Engineering" },
   { value: "featured", label: "Featured Work" },
+];
+
+const PAYMENT_METHOD_OPTIONS: { value: QuotePaymentMethod; label: string }[] = [
+  { value: "card", label: "Card" },
+  { value: "bacs", label: "BACS" },
+  { value: "cash", label: "Cash" },
 ];
 
 const BLANK_MANUAL_LINE: ManualLineDraft = {
@@ -229,6 +244,30 @@ function refundCardText(quote: QuoteRequest, quoteTotal: ReturnType<typeof total
 
 function quoteDisplayRef(quote: QuoteRequest) {
   return quote.websiteInvoiceNumber ? websiteInvoiceDisplay(quote) : "Invoice pending";
+}
+
+function paymentMethodLabel(value: QuotePaymentMethod | null | undefined) {
+  return PAYMENT_METHOD_OPTIONS.find((option) => option.value === value)?.label || "Card";
+}
+
+function paymentSettingsRows(settings: PaymentSettings) {
+  return [
+    { label: "Account type", value: settings.accountType },
+    { label: "Account name", value: settings.accountName },
+    { label: "Sort code", value: settings.sortCode },
+    { label: "Account number", value: settings.accountNumber },
+  ].filter((row) => compactText(row.value));
+}
+
+function safePaymentLink(value: string | null | undefined) {
+  const trimmed = compactText(value);
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 function defaultAddLineCatalogue(quote: QuoteRequest): AddLineCatalogue {
@@ -627,9 +666,9 @@ function OrderCard({
             {showMarkPaid && (
               <button
                 type="button"
-                onClick={() => onMarkPaid(quote)}
+                onClick={() => onSelect(quote.id)}
                 disabled={isSaving}
-                aria-label={`Mark order ${displayRef} as paid`}
+                aria-label={`Open invoice ${displayRef} to mark it paid`}
                 className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
@@ -642,18 +681,219 @@ function OrderCard({
   );
 }
 
+function PaymentSettingsModal({
+  draft,
+  saving,
+  error,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  draft: PaymentSettingsDraft;
+  saving: boolean;
+  error: string;
+  onChange: (patch: Partial<PaymentSettingsDraft>) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-racing-dark/60 px-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="payment-settings-title" className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="payment-settings-title" className="font-display text-2xl text-racing">Payment methods</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-muted">
+              These BACS details are used on future customer invoice emails.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} disabled={saving} className="btn-secondary px-3 py-2 text-sm disabled:opacity-60">
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="payment-account-type">Account type</label>
+            <input
+              id="payment-account-type"
+              value={draft.accountType}
+              onChange={(event) => onChange({ accountType: event.target.value })}
+              className="input"
+              placeholder="Business"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="payment-account-name">Account name</label>
+            <input
+              id="payment-account-name"
+              value={draft.accountName}
+              onChange={(event) => onChange({ accountName: event.target.value })}
+              className="input"
+              placeholder="Craftgrange Limited"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="payment-sort-code">Sort code</label>
+            <input
+              id="payment-sort-code"
+              value={draft.sortCode}
+              onChange={(event) => onChange({ sortCode: event.target.value })}
+              className="input"
+              placeholder="00-00-00"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="payment-account-number">Account number</label>
+            <input
+              id="payment-account-number"
+              value={draft.accountNumber}
+              onChange={(event) => onChange({ accountNumber: event.target.value })}
+              className="input"
+              placeholder="00000000"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={saving} className="btn-secondary px-4 py-2 text-sm disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="button" onClick={onSave} disabled={saving} className="btn-primary px-4 py-2 text-sm disabled:opacity-60">
+            {saving ? "Saving..." : "Save settings"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; paymentSettings: PaymentSettings }) {
+  const quoteTotal = totals(quote);
+  const includeVat = quoteIncludesVat(quote);
+  const bacs = paymentSettingsRows(paymentSettings);
+  const paymentLink = safePaymentLink(quote.paymentLink);
+  return (
+    <div className="invoice-print-sheet">
+      <div className="mb-6 flex items-start justify-between gap-6 border-b border-racing/20 pb-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">M-Machine</div>
+          <h1 className="mt-1 font-display text-3xl text-racing">Invoice {quoteDisplayRef(quote)}</h1>
+          <p className="mt-1 text-sm text-ink-muted">Submitted {formatDateTime(quote.submittedAt)}</p>
+        </div>
+        <div className="text-right text-sm text-ink-muted">
+          <strong className="block text-racing">Craftgrange Limited</strong>
+          Unit 6 Forge Way<br />
+          Cleveland Trading Estate<br />
+          Darlington, DL1 2PJ
+        </div>
+      </div>
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-racing/10 p-3">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
+          <div className="font-semibold text-racing">{quote.customer.name}</div>
+          {quote.customer.company && <div>{quote.customer.company}</div>}
+          <div>{quote.customer.email}</div>
+          <div>{quote.customer.phone}</div>
+        </section>
+        <section className="rounded-lg border border-racing/10 p-3">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Delivery</h2>
+          <div className="whitespace-pre-wrap">
+            {quoteDeliveryAddress(quote.customer) ||
+              (quoteCustomerWillArrangeDelivery(quote.customer)
+                ? "Customer will arrange delivery / collection."
+                : "Delivery address was not supplied.")}
+          </div>
+        </section>
+      </div>
+
+      <table className="mb-5 w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-cream-dark text-left text-xs uppercase tracking-wider text-ink-muted">
+            <th className="px-3 py-2">Qty</th>
+            <th className="px-3 py-2">Item</th>
+            <th className="px-3 py-2">Unit</th>
+            <th className="px-3 py-2 text-right">{priceLabel(quote)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quote.items.map((item) => (
+            <tr key={item.key} className="border-b border-racing/10 align-top">
+              <td className="px-3 py-2 font-semibold text-racing">{item.qty}</td>
+              <td className="px-3 py-2">
+                <div className="font-semibold text-racing">{invoiceItemTitle(item)}</div>
+                <div className="text-xs text-ink-muted">
+                  {[invoiceLineSubtitle(item), invoiceLineDimension(item)].filter(Boolean).join(" / ")}
+                </div>
+              </td>
+              <td className="px-3 py-2">{item.unit || "each"}</td>
+              <td className="px-3 py-2 text-right font-semibold">{invoiceMoney(lineExVat(item))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="ml-auto mb-6 max-w-sm rounded-lg bg-cream-dark p-3 text-sm">
+        <div className="flex justify-between gap-3"><span>{baseTotalLabel(quote, "Goods")}</span><strong>{money(quoteTotal.goods)}</strong></div>
+        {quoteTotal.carriage > 0 && <div className="flex justify-between gap-3"><span>{baseTotalLabel(quote, "Carriage")}</span><strong>{money(quoteTotal.carriage)}</strong></div>}
+        {quoteTotal.extra > 0 && <div className="flex justify-between gap-3"><span>{baseTotalLabel(quote, "Cut Charge")}</span><strong>{money(quoteTotal.extra)}</strong></div>}
+        {quoteTotal.refunds > 0 && <div className="flex justify-between gap-3 text-red-700"><span>{baseTotalLabel(quote, "Refunds")}</span><strong>-{money(quoteTotal.refunds)}</strong></div>}
+        {includeVat ? (
+          <>
+            <div className="flex justify-between gap-3"><span>VAT</span><strong>{money(quoteTotal.vat)}</strong></div>
+            <div className="mt-2 flex justify-between gap-3 border-t border-racing/20 pt-2 text-racing"><span>Total inc VAT</span><strong>{money(quoteTotal.totalInc)}</strong></div>
+          </>
+        ) : (
+          <>
+            <div className="flex justify-between gap-3"><span>VAT</span><strong>Not applied</strong></div>
+            <div className="mt-2 flex justify-between gap-3 border-t border-racing/20 pt-2 text-racing"><span>Total</span><strong>{money(quoteTotal.totalInc)}</strong></div>
+          </>
+        )}
+      </div>
+
+      <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
+        <h2 className="mb-2 font-semibold text-racing">Payment methods</h2>
+        <div><strong>Card over the phone:</strong> Call 01325 381302 to pay by card.</div>
+        {bacs.length > 0 && (
+          <div className="mt-2">
+            <strong>BACS:</strong>
+            <div className="mt-1 grid gap-1">
+              {bacs.map((row) => (
+                <div key={row.label} className="flex gap-2">
+                  <span className="min-w-28 text-ink-muted">{row.label}</span>
+                  <span className="font-semibold text-racing">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {paymentLink && <div className="mt-2"><strong>Pay online:</strong> {paymentLink}</div>}
+        <div className="mt-2"><strong>Cash on collection:</strong> Call to arrange cash payment on collection.</div>
+      </section>
+    </div>
+  );
+}
+
 export default function OrdersClient({
   initialQuotes,
   initialError,
   initialMonth = "",
   initialHistoryCount,
   initialMonthStats,
+  initialPaymentSettings,
 }: {
   initialQuotes: QuoteRequest[];
   initialError: string;
   initialMonth?: string;
   initialHistoryCount: number;
   initialMonthStats: Record<string, { salesValue: number; salesCount: number }>;
+  initialPaymentSettings: PaymentSettings;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -687,6 +927,11 @@ export default function OrdersClient({
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(initialPaymentSettings);
+  const [paymentSettingsDraft, setPaymentSettingsDraft] = useState<PaymentSettingsDraft>(initialPaymentSettings);
+  const [paymentSettingsOpen, setPaymentSettingsOpen] = useState(false);
+  const [paymentSettingsSaving, setPaymentSettingsSaving] = useState(false);
+  const [paymentSettingsError, setPaymentSettingsError] = useState("");
   const historyRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -1055,6 +1300,40 @@ export default function OrdersClient({
     });
   }
 
+  function openPaymentSettings() {
+    setPaymentSettingsDraft(paymentSettings);
+    setPaymentSettingsError("");
+    setPaymentSettingsOpen(true);
+  }
+
+  async function savePaymentSettings() {
+    setPaymentSettingsSaving(true);
+    setPaymentSettingsError("");
+    try {
+      const response = await fetch("/api/payment-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paymentSettingsDraft),
+      });
+      const data = await response.json() as { error?: string; settings?: PaymentSettings };
+      if (!response.ok || !data.settings) {
+        throw new Error(data.error || "Payment settings could not be saved.");
+      }
+      setPaymentSettings(data.settings);
+      setPaymentSettingsDraft(data.settings);
+      setPaymentSettingsOpen(false);
+      setMessage("Payment method settings saved.");
+    } catch (error) {
+      setPaymentSettingsError((error as Error).message || "Payment settings could not be saved.");
+    } finally {
+      setPaymentSettingsSaving(false);
+    }
+  }
+
+  function printInvoice() {
+    window.print();
+  }
+
   function addCatalogueLine(product: CatalogueSearchProduct) {
     if (!draft) return;
     const item = quoteItemFromCatalogueProduct(product, addLineCatalogue);
@@ -1351,31 +1630,40 @@ export default function OrdersClient({
 
       <div className="space-y-5">
         <div className="rounded-xl border border-racing/10 bg-white p-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="px-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              Order type
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="px-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Order type
+              </div>
+              {ORDER_REQUEST_FILTERS.map((filter) => {
+                const active = orderRequestFilter === filter.value;
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => {
+                      setOrderRequestFilter(filter.value);
+                      setPage(1);
+                    }}
+                    aria-pressed={active}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? "bg-racing text-cream"
+                        : "text-racing hover:bg-cream-dark"
+                    }`}
+                  >
+                    <span>{filter.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            {ORDER_REQUEST_FILTERS.map((filter) => {
-              const active = orderRequestFilter === filter.value;
-              return (
-                <button
-                  key={filter.value}
-                  type="button"
-                  onClick={() => {
-                    setOrderRequestFilter(filter.value);
-                    setPage(1);
-                  }}
-                  aria-pressed={active}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                    active
-                      ? "bg-racing text-cream"
-                      : "text-racing hover:bg-cream-dark"
-                  }`}
-                >
-                  <span>{filter.label}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={openPaymentSettings}
+              className="btn-secondary px-3 py-2 text-sm"
+            >
+              Payment settings
+            </button>
           </div>
         </div>
 
@@ -1581,6 +1869,7 @@ export default function OrdersClient({
               if (event.target === event.currentTarget) closeInvoice();
             }}
           >
+            <InvoicePrintSheet quote={draft} paymentSettings={paymentSettings} />
             <div
               ref={modalRef}
               role="dialog"
@@ -2042,6 +2331,14 @@ export default function OrdersClient({
                             {draft.paidAt ? formatDateTime(draft.paidAt) : "Awaiting"}
                           </strong>
                         </div>
+                        {draft.paidAt && (
+                          <div className="flex justify-between gap-3">
+                            <span>Paid by</span>
+                            <strong className="text-right text-racing">
+                              {paymentMethodLabel(draft.paymentMethod)}
+                            </strong>
+                          </div>
+                        )}
                       </div>
                     </section>
 
@@ -2119,6 +2416,24 @@ export default function OrdersClient({
                           </>
                         )}
                       </div>
+                    </section>
+
+                    <section className="rounded-lg border border-racing/10 p-3">
+                      <div className="mb-2">
+                        <div className="text-sm font-semibold text-racing">Payment methods</div>
+                        <p className="mt-1 text-xs leading-5 text-ink-muted">
+                          Card, BACS and cash are shown on the invoice email. Add a link only when online payment is available.
+                        </p>
+                      </div>
+                      <label className="label" htmlFor="payment-link">Payment link</label>
+                      <input
+                        id="payment-link"
+                        type="url"
+                        value={draft.paymentLink || ""}
+                        onChange={(event) => patchDraft({ paymentLink: event.target.value })}
+                        className="input text-sm"
+                        placeholder="https://..."
+                      />
                     </section>
 
                     {isPaidQuote(draft) && (
@@ -2288,47 +2603,75 @@ export default function OrdersClient({
               </div>
 
               <div className="shrink-0 border-t border-racing/10 px-4 py-3 sm:px-5">
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                  {draft.status !== "paid" && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {draft.status !== "paid" && (
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => setPendingDelete(draft)}
+                        className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Delete job
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={isSaving}
-                      onClick={() => setPendingDelete(draft)}
-                      className="mr-auto rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Delete job
-                    </button>
-                  )}
-                  {draft.status !== "paid" && (
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => markPaid(draft)}
+                      onClick={printInvoice}
                       className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {savingAction === `${draft.id}:paid` ? "Saving..." : "Mark Paid"}
+                      Print
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={isSaving || !invoiceReady}
-                    onClick={saveNoEmail}
-                    className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {savingAction === `${draft.id}:save-no-email` ? "Saving..." : "Save, No Email"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving || !invoiceReady}
-                    onClick={() => saveDraft(true)}
-                    className="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {savingAction === `${draft.id}:email`
-                      ? "Sending..."
-                      : draftCustomerInvoiceWasSent
-                        ? "Send updated invoice"
-                        : "Email invoice to buyer"}
-                  </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-end justify-end gap-3">
+                    {draft.status !== "paid" && (
+                      <div className="flex items-end gap-2">
+                        <div className="w-32">
+                          <label className="label !mb-1 text-[11px]" htmlFor="payment-method">Paid by</label>
+                          <select
+                            id="payment-method"
+                            value={draft.paymentMethod || "card"}
+                            onChange={(event) => patchDraft({ paymentMethod: event.target.value as QuotePaymentMethod })}
+                            className="input min-h-0 py-2 text-sm"
+                          >
+                            {PAYMENT_METHOD_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => markPaid({ ...draft, paymentMethod: draft.paymentMethod || "card" })}
+                          className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {savingAction === `${draft.id}:paid` ? "Saving..." : "Mark Paid"}
+                        </button>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isSaving || !invoiceReady}
+                      onClick={saveNoEmail}
+                      className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingAction === `${draft.id}:save-no-email` ? "Saving..." : "Save, No Email"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSaving || !invoiceReady}
+                      onClick={() => saveDraft(true)}
+                      className="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingAction === `${draft.id}:email`
+                        ? "Sending..."
+                        : draftCustomerInvoiceWasSent
+                          ? "Send updated invoice"
+                          : "Email invoice to buyer"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2362,6 +2705,19 @@ export default function OrdersClient({
               </div>
             </div>
           </div>
+        )}
+
+        {paymentSettingsOpen && (
+          <PaymentSettingsModal
+            draft={paymentSettingsDraft}
+            saving={paymentSettingsSaving}
+            error={paymentSettingsError}
+            onChange={(patch) => setPaymentSettingsDraft((current) => ({ ...current, ...patch }))}
+            onClose={() => {
+              if (!paymentSettingsSaving) setPaymentSettingsOpen(false);
+            }}
+            onSave={savePaymentSettings}
+          />
         )}
       </div>
     </div>

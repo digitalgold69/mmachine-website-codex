@@ -5,7 +5,7 @@ import {
   requiredRefundInvoiceCount,
   requiredWebsiteInvoiceCount,
 } from "@/lib/order-accounting";
-import type { QuoteItem, QuoteRefund, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
+import type { QuoteItem, QuotePaymentMethod, QuoteRefund, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
 
 type QuoteRow = {
@@ -22,6 +22,8 @@ type QuoteRow = {
   quoted_at: string | null;
   invoice_sent_at: string | null;
   paid_at: string | null;
+  payment_link?: string | null;
+  payment_method?: string | null;
   paid_month_uk: string | null;
   total_ex_vat: number | null;
   customer_email_sent_at: string | null;
@@ -50,6 +52,8 @@ async function ensureQuoteAccountingSchemaInner() {
     `ALTER TABLE quote_requests ADD COLUMN website_invoice_number TEXT`,
     `ALTER TABLE quote_requests ADD COLUMN website_invoice_count INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE quote_requests ADD COLUMN refunds TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE quote_requests ADD COLUMN payment_link TEXT`,
+    `ALTER TABLE quote_requests ADD COLUMN payment_method TEXT`,
     `CREATE UNIQUE INDEX IF NOT EXISTS quote_requests_website_invoice_number_idx
       ON quote_requests(website_invoice_number)`,
     `CREATE TABLE IF NOT EXISTS accounting_sequences (
@@ -134,6 +138,10 @@ function boolFromDb(value: unknown, fallback = true) {
   return value === 1 || value === true || value === "1";
 }
 
+function paymentMethodFromDb(value: unknown): QuotePaymentMethod | null {
+  return value === "card" || value === "bacs" || value === "cash" ? value : null;
+}
+
 function intFromDb(value: unknown, fallback = 1) {
   const parsed = Math.floor(Number(value));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -154,6 +162,8 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     quotedAt: row.quoted_at,
     invoiceSentAt: row.invoice_sent_at || row.customer_email_sent_at || row.quoted_at,
     paidAt: row.paid_at,
+    paymentLink: row.payment_link || "",
+    paymentMethod: paymentMethodFromDb(row.payment_method),
     customerEmailSentAt: row.customer_email_sent_at,
     ownerEmailSentAt: row.owner_email_sent_at,
     includeVat: boolFromDb(row.include_vat, true),
@@ -618,6 +628,8 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         quoted_at,
         invoice_sent_at,
         paid_at,
+        payment_link,
+        payment_method,
         paid_month_uk,
         total_ex_vat,
         customer_email_sent_at,
@@ -626,7 +638,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         website_invoice_number,
         website_invoice_count,
         refunds
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       on conflict(id) do update set
         submitted_at = excluded.submitted_at,
         updated_at = excluded.updated_at,
@@ -640,6 +652,8 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         quoted_at = excluded.quoted_at,
         invoice_sent_at = excluded.invoice_sent_at,
         paid_at = excluded.paid_at,
+        payment_link = excluded.payment_link,
+        payment_method = excluded.payment_method,
         paid_month_uk = excluded.paid_month_uk,
         total_ex_vat = excluded.total_ex_vat,
         customer_email_sent_at = excluded.customer_email_sent_at,
@@ -664,6 +678,8 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       quote.quotedAt ?? null,
       quote.invoiceSentAt ?? null,
       quote.paidAt ?? null,
+      quote.paymentLink || null,
+      quote.paymentMethod ?? null,
       paidMonthUk,
       totalExVat,
       quote.customerEmailSentAt ?? null,

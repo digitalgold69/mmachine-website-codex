@@ -30,6 +30,7 @@ import type {
   QuoteAccountingBucket,
   QuoteFile,
   QuoteItem,
+  QuotePaymentMethod,
   QuoteRefundLine,
   QuoteRequest,
   QuoteStatus,
@@ -70,6 +71,21 @@ function asBoolean(value: unknown, fallback: boolean) {
   if (value === "true" || value === "1" || value === 1) return true;
   if (value === "false" || value === "0" || value === 0) return false;
   return fallback;
+}
+
+function safePaymentMethod(value: unknown, fallback: QuotePaymentMethod = "card"): QuotePaymentMethod {
+  return value === "bacs" || value === "cash" || value === "card" ? value : fallback;
+}
+
+function safePaymentLink(value: unknown) {
+  const raw = asString(value, 1200);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 function normaliseMiniVehicleModel(value: unknown) {
@@ -799,6 +815,8 @@ export async function PATCH(req: Request) {
     customerMessage?: string;
     carriageExVat?: number | string | null;
     extraChargesExVat?: number | string | null;
+    paymentLink?: string | null;
+    paymentMethod?: QuotePaymentMethod;
     emailCustomer?: boolean;
     markPaid?: boolean;
     saveNoEmail?: boolean;
@@ -828,6 +846,10 @@ export async function PATCH(req: Request) {
       customerMessage: asString(body.customerMessage ?? current.customerMessage, 3000),
       carriageExVat: body.carriageExVat === undefined ? current.carriageExVat : asNumberOrNull(body.carriageExVat),
       extraChargesExVat: body.extraChargesExVat === undefined ? current.extraChargesExVat : asNumberOrNull(body.extraChargesExVat),
+      paymentLink: body.paymentLink === undefined ? current.paymentLink || "" : safePaymentLink(body.paymentLink),
+      paymentMethod: body.paymentMethod === undefined
+        ? current.paymentMethod ?? null
+        : safePaymentMethod(body.paymentMethod, current.paymentMethod || "card"),
       includeVat: asBoolean(body.includeVat, current.includeVat !== false),
       updatedAt: new Date().toISOString(),
     };
@@ -954,6 +976,7 @@ export async function PATCH(req: Request) {
       next = await ensureWebsiteInvoiceNumber(next);
       next.status = "paid";
       next.paidAt = paidAt;
+      next.paymentMethod = safePaymentMethod(body.paymentMethod, next.paymentMethod || "card");
     }
 
     if (next.websiteInvoiceNumber) {

@@ -66,6 +66,7 @@ export type QuoteCustomer = {
 };
 
 export type QuoteStatus = "new" | "reviewing" | "invoice_sent" | "paid" | "closed";
+export type QuotePaymentMethod = "card" | "bacs" | "cash";
 
 export type QuoteAccountingBucket = "mini" | "metals" | "engineering" | "featured" | "carriage";
 
@@ -97,6 +98,8 @@ export type QuoteRequest = {
   quotedAt?: string | null;
   invoiceSentAt?: string | null;
   paidAt?: string | null;
+  paymentLink?: string | null;
+  paymentMethod?: QuotePaymentMethod | null;
   customerEmailSentAt?: string | null;
   ownerEmailSentAt?: string | null;
   includeVat?: boolean;

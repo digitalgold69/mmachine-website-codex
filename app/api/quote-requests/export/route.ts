@@ -25,6 +25,7 @@ const HEADERS: Array<keyof SageExportRow> = [
   "Net",
   "Tax",
   "T/C",
+  "Payment Method",
 ];
 
 function dateKey(value: string | null) {
@@ -73,6 +74,7 @@ function buildWorkbook(rows: SageExportRow[]) {
     { wch: 12 },
     { wch: 12 },
     { wch: 8 },
+    { wch: 16 },
   ];
 
   for (let rowIndex = 2; rowIndex <= rows.length + 1; rowIndex += 1) {

@@ -38,6 +38,7 @@ const quote = {
   id: "Q-CF-TEST",
   websiteInvoiceNumber: "W4321",
   websiteInvoiceCount: 1,
+  paymentLink: "https://pay.example.test/invoice/W4321",
   submittedAt: "2026-07-27T12:00:00.000Z",
   updatedAt: "2026-07-27T12:00:00.000Z",
   status: "new",
@@ -95,6 +96,13 @@ const quote = {
   paidAt: null,
   customerEmailSentAt: null,
   ownerEmailSentAt: null,
+};
+
+const paymentSettings = {
+  accountType: "Business",
+  accountName: "Craftgrange Limited",
+  sortCode: "12-34-56",
+  accountNumber: "12345678",
 };
 
 const miniQuote = {
@@ -315,7 +323,7 @@ assert.match(enquiryHtml, /Mini rear panel/);
 assert.match(enquiryHtml, /RP-120/);
 assert.match(enquiryHtml, /https:\/\/example\.test\/products\/mini-rear-panel/);
 
-const customerHtml = buildCustomerInvoiceEmail(quote);
+const customerHtml = buildCustomerInvoiceEmail(quote, process.env, paymentSettings);
 assert.doesNotMatch(customerHtml, /<img\b/i);
 assert.doesNotMatch(customerHtml, /<link\b/i);
 assert.doesNotMatch(customerHtml, /<style\b/i);
@@ -338,6 +346,16 @@ assert.match(customerHtml, /Please approve before fabrication/);
 assert.match(customerHtml, /Cutting charge/);
 assert.doesNotMatch(customerHtml, /Extra charges/);
 assert.match(customerHtml, /Total inc VAT/);
+assert.match(customerHtml, /Payment methods/);
+assert.match(customerHtml, /Card over the phone/);
+assert.match(customerHtml, /01325 381302/);
+assert.match(customerHtml, /BACS/);
+assert.match(customerHtml, /Craftgrange Limited/);
+assert.match(customerHtml, /12-34-56/);
+assert.match(customerHtml, /Pay online/);
+assert.match(customerHtml, /https:\/\/pay\.example\.test\/invoice\/W4321/);
+assert.match(customerHtml, /Call to arrange cash payment on collection/);
+assert.doesNotMatch(customerHtml, /Please contact us on 01325 381302 to confirm the order and arrange payment/);
 assert.match(customerHtml, /GB123456789/);
 
 const metalsCustomerHtml = buildCustomerInvoiceEmail({
@@ -386,6 +404,6 @@ const updatedCustomerHtml = buildCustomerInvoiceEmail({
   customerEmailSentAt: "2026-07-27T14:00:00.000Z",
 });
 assert.match(updatedCustomerHtml, /Updated invoice/);
-assert.match(updatedCustomerHtml, /updated your invoice details/);
+assert.match(updatedCustomerHtml, /See your order summary below\./);
 
 console.log("ok - quote and enquiry email templates include routed recipients, focused dashboard links, and clean invoice details");

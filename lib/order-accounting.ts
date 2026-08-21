@@ -55,6 +55,7 @@ export type SageExportRow = {
   Net: number;
   Tax: number;
   "T/C": "T1" | "T0";
+  "Payment Method": "Card" | "BACS" | "Cash";
 };
 
 function finiteNumber(value: unknown, fallback = 0) {
@@ -285,6 +286,12 @@ function exportDate(value: string | null | undefined) {
   return value ? new Date(value) : new Date();
 }
 
+function exportPaymentMethod(quote: QuoteRequest): SageExportRow["Payment Method"] {
+  if (quote.paymentMethod === "bacs") return "BACS";
+  if (quote.paymentMethod === "cash") return "Cash";
+  return "Card";
+}
+
 function applyTaxRemainder(quote: QuoteRequest, rows: SageExportRow[]) {
   if (rows.length === 0 || !quoteIncludesVat(quote)) return rows;
   const totalTax = roundAccounting(rows.reduce((sum, row) => sum + row.Net, 0) * VAT_RATE);
@@ -301,6 +308,7 @@ function applyTaxRemainder(quote: QuoteRequest, rows: SageExportRow[]) {
 export function sageSaleRowsForQuote(quote: QuoteRequest): SageExportRow[] {
   const date = exportDate(quote.paidAt || quote.updatedAt);
   const details = accountingDetailsName(quote);
+  const paymentMethod = exportPaymentMethod(quote);
   const rows = quoteAccountingGroups(quote).map((group) => ({
     Type: "SI" as const,
     Account: "WEB" as const,
@@ -312,6 +320,7 @@ export function sageSaleRowsForQuote(quote: QuoteRequest): SageExportRow[] {
     Net: roundAccounting(group.netExVat),
     Tax: 0,
     "T/C": taxCode(quote),
+    "Payment Method": paymentMethod,
   }));
 
   return applyTaxRemainder(quote, rows);
@@ -319,6 +328,7 @@ export function sageSaleRowsForQuote(quote: QuoteRequest): SageExportRow[] {
 
 export function sageRefundRowsForQuote(quote: QuoteRequest, refunds = quoteRefunds(quote)): SageExportRow[] {
   const details = accountingDetailsName(quote);
+  const paymentMethod = exportPaymentMethod(quote);
   const rows = refunds.flatMap((refund) =>
     refund.lines.map((line, lineIndex) => ({
       Type: "SI" as const,
@@ -331,6 +341,7 @@ export function sageRefundRowsForQuote(quote: QuoteRequest, refunds = quoteRefun
       Net: roundAccounting(-positiveAmount(line.amountExVat)),
       Tax: 0,
       "T/C": taxCode(quote),
+      "Payment Method": paymentMethod,
     }))
   );
 

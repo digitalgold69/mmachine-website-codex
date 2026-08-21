@@ -15,46 +15,31 @@ import { guideUrl, guides } from "@/lib/articles";
 export const dynamic = "force-dynamic";
 
 const heroAvifSrcSet = [
-  "/home/mmachine-services-hero-640.avif 640w",
-  "/home/mmachine-services-hero-960.avif 960w",
-  "/home/mmachine-services-hero-1280.avif 1280w",
+  "/home/mmachine-services-hero-v5-640.avif 640w",
+  "/home/mmachine-services-hero-v5-960.avif 960w",
+  "/home/mmachine-services-hero-v5-1280.avif 1280w",
 ].join(", ");
 const heroWebpSrcSet = [
-  "/home/mmachine-services-hero-640.webp 640w",
-  "/home/mmachine-services-hero-960-v2.webp 960w",
-  "/home/mmachine-services-hero-1280.webp 1280w",
+  "/home/mmachine-services-hero-v5-640.webp 640w",
+  "/home/mmachine-services-hero-v5-960.webp 960w",
+  "/home/mmachine-services-hero-v5-1280.webp 1280w",
 ].join(", ");
 const heroJpegSrcSet = [
-  "/home/mmachine-services-hero-640.jpg 640w",
-  "/home/mmachine-services-hero-960.jpg 960w",
-  "/home/mmachine-services-hero-1280.jpg 1280w",
+  "/home/mmachine-services-hero-v5-640.jpg 640w",
+  "/home/mmachine-services-hero-v5-960.jpg 960w",
+  "/home/mmachine-services-hero-v5-1280.jpg 1280w",
 ].join(", ");
-const heroV3AvifSrcSet = [
-  "/home/mmachine-hero-v3-640.avif 640w",
-  "/home/mmachine-hero-v3-960.avif 960w",
-  "/home/mmachine-hero-v3-1280.avif 1280w",
-].join(", ");
-const heroV3JpegSrcSet = "/home/mmachine-hero-v3-1280.jpg 1280w";
 const currentHeroSlide: HomeHeroSlide = {
-  label: "current services hero",
-  alt: "Classic Mini panels, precision machining and engineering metals at M-Machine",
+  label: "M-Machine services hero",
+  alt: "M-Machine machining, Mini panel parts and engineering metals",
   avifSrcSet: heroAvifSrcSet,
   webpSrcSet: heroWebpSrcSet,
   jpegSrcSet: heroJpegSrcSet,
-  fallbackSrc: "/home/mmachine-services-hero-1280.jpg",
+  fallbackSrc: "/home/mmachine-services-hero-v5-1280.jpg",
   width: 1280,
   height: 853,
 };
-const comparisonHeroSlide: HomeHeroSlide = {
-  label: "CNC machined Mini panel hero option",
-  alt: "CNC machined Mini panel tooling in the M-Machine workshop",
-  avifSrcSet: heroV3AvifSrcSet,
-  jpegSrcSet: heroV3JpegSrcSet,
-  fallbackSrc: "/home/mmachine-hero-v3-1280.jpg",
-  width: 1280,
-  height: 853,
-};
-const heroSlides = [currentHeroSlide, comparisonHeroSlide];
+const heroSlides = [currentHeroSlide];
 const transparentPixel =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 

@@ -7,6 +7,7 @@ import {
   quoteTotals as accountingQuoteTotals,
   websiteInvoiceDisplay,
 } from "./order-accounting";
+import { getPaymentSettings, type PaymentSettings } from "./payment-settings";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
 import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
 
@@ -16,6 +17,14 @@ const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
 const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
 const DEFAULT_FROM_NAME = "New M Machine Order";
 export const CUSTOMER_INVOICE_FROM_NAME = "Your M Machine Order";
+const CARD_PAYMENT_PHONE = "01325 381302";
+
+const EMPTY_PAYMENT_SETTINGS: PaymentSettings = {
+  accountType: "",
+  accountName: "",
+  sortCode: "",
+  accountNumber: "",
+};
 
 type EmailEnv = Record<string, unknown>;
 type SesConfigValues = {
@@ -370,7 +379,78 @@ function customerDeliveryBlock(quote: QuoteRequest) {
   `;
 }
 
-export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = process.env) {
+function safePaymentLink(value: string | null | undefined) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function bacsRows(settings: PaymentSettings) {
+  return [
+    ["Account type", settings.accountType],
+    ["Account name", settings.accountName],
+    ["Sort code", settings.sortCode],
+    ["Account number", settings.accountNumber],
+  ].filter(([, value]) => String(value || "").trim());
+}
+
+function paymentMethodsBlock(quote: QuoteRequest, settings: PaymentSettings) {
+  const onlineLink = safePaymentLink(quote.paymentLink);
+  const rows = bacsRows(settings);
+  return `
+    <div style="margin:24px 0 0;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#fbf8f1">
+      <h2 style="margin:0 0 12px;color:#0f3d2e;font-size:18px">Payment methods</h2>
+
+      <div style="margin:0 0 12px">
+        <strong style="display:block;color:#0f3d2e">Card over the phone</strong>
+        <div style="margin-top:3px;color:#4d3f31;line-height:1.5">Call ${escapeHtml(CARD_PAYMENT_PHONE)} to pay by card.</div>
+      </div>
+
+      ${
+        rows.length
+          ? `<div style="margin:0 0 12px">
+              <strong style="display:block;color:#0f3d2e">BACS</strong>
+              <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;margin-top:5px;font-size:14px">
+                <tbody>
+                  ${rows
+                    .map(
+                      ([label, value]) =>
+                        `<tr><td style="padding:3px 10px 3px 0;color:#6b5a46;width:42%">${escapeHtml(label)}</td><td style="padding:3px 0;font-weight:700;color:#0f3d2e">${escapeHtml(value)}</td></tr>`
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>`
+          : ""
+      }
+
+      ${
+        onlineLink
+          ? `<div style="margin:0 0 12px">
+              <strong style="display:block;color:#0f3d2e">Pay online</strong>
+              <a href="${escapeHtml(onlineLink)}" style="display:inline-block;margin-top:7px;background:#0f3d2e;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700">Open payment link</a>
+            </div>`
+          : ""
+      }
+
+      <div>
+        <strong style="display:block;color:#0f3d2e">Cash on collection</strong>
+        <div style="margin-top:3px;color:#4d3f31;line-height:1.5">Call to arrange cash payment on collection.</div>
+      </div>
+    </div>
+  `;
+}
+
+export function buildCustomerInvoiceEmail(
+  quote: QuoteRequest,
+  env: EmailEnv = process.env,
+  paymentSettings: PaymentSettings = EMPTY_PAYMENT_SETTINGS
+) {
   const totals = quoteTotals(quote);
   const includeVat = quoteIncludesVat(quote);
   const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
@@ -393,7 +473,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
           <p style="margin:0 0 18px;line-height:1.55">
             ${
               isUpdatedInvoice
-                ? "We have updated your invoice details below. Payment is arranged manually with M-Machine."
+                ? "See your order summary below."
                 : "See your order summary below."
             }
           </p>
@@ -449,7 +529,7 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
             </tbody>
           </table>
 
-          <p style="margin:24px 0 0;line-height:1.55">Please contact us on 01325 381302 to confirm the order and arrange payment.</p>
+          ${paymentMethodsBlock(quote, paymentSettings)}
           <div style="margin:24px 0 0;padding-top:18px;border-top:1px solid #eadfca;font-size:12px;line-height:1.6;color:#6b5a46">
             <strong style="display:block;color:#0f3d2e">M-Machine / Craftgrange Limited</strong>
             Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br>
@@ -466,7 +546,16 @@ export function buildCustomerInvoiceEmail(quote: QuoteRequest, env: EmailEnv = p
 export const buildCustomerQuoteEmail = buildCustomerInvoiceEmail;
 
 export async function buildCustomerInvoiceEmailForRuntime(quote: QuoteRequest) {
-  return buildCustomerInvoiceEmail(quote, await emailRuntimeEnv());
+  const env = await emailRuntimeEnv();
+  let settings = EMPTY_PAYMENT_SETTINGS;
+  try {
+    settings = await getPaymentSettings();
+  } catch (err) {
+    console.warn("payment_settings_unavailable_for_invoice_email", {
+      error: err instanceof Error ? err.message : "unknown error",
+    });
+  }
+  return buildCustomerInvoiceEmail(quote, env, settings);
 }
 
 export function buildOwnerEnquiryEmail(enquiry: {

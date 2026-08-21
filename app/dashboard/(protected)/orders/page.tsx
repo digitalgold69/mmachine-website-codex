@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
+import { getPaymentSettings } from "@/lib/payment-settings";
 import { listActiveQuoteRequests, listPaidQuoteHistory } from "@/lib/quotes";
 import { ukMonthBounds } from "@/lib/uk-time";
 import type { QuoteRequest } from "@/lib/quote-types";
@@ -17,6 +18,12 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   let quotes: QuoteRequest[] = [];
   let historyCount = 0;
   let monthStats: Record<string, { salesValue: number; salesCount: number }> = {};
+  let paymentSettings = {
+    accountType: "",
+    accountName: "",
+    sortCode: "",
+    accountNumber: "",
+  };
   let error = "";
   const params = searchParams ? await searchParams : {};
   const monthParam = Array.isArray(params.month) ? params.month[0] : params.month;
@@ -40,6 +47,12 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     error = (err as Error).message;
   }
 
+  try {
+    paymentSettings = await getPaymentSettings();
+  } catch (err) {
+    console.error("payment_settings_load_failed", err);
+  }
+
   return (
     <OrdersClient
       initialQuotes={quotes}
@@ -47,6 +60,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       initialMonth={initialMonth}
       initialHistoryCount={historyCount}
       initialMonthStats={monthStats}
+      initialPaymentSettings={paymentSettings}
     />
   );
 }
