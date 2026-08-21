@@ -43,6 +43,12 @@ main setup script to the computer's local Windows temporary folder before it
 runs. The test PDF also uses the local temporary folder, and the permanent
 installation is created at `C:\mmachine`.
 
+For USB setup, copy the setup kit files from `scripts\setup` to the USB stick
+and run `Run Owner Setup.bat` from that folder. That launcher asks for the
+GitHub token in a masked dialog and then runs the main setup script as
+Administrator. The `daily-sync.*` and `manual-sync.vbs` files are generated on
+the owner's computer during setup and do not need to be copied.
+
 Setup verifies Python by running a real interpreter. It does not trust the
 Windows Microsoft Store `python.exe` App Execution Alias. Existing Python
 installations are discovered through the Python launcher, registry, standard
@@ -75,11 +81,40 @@ existing Partsbook link at `C:\mmachine\data-source\PartsbookBenji2014.xlsx`.
 
 ## Run the setup script
 
-Open PowerShell as Administrator, then run:
+Recommended USB method:
+
+1. Copy these files to a folder on the USB stick:
+
+   ```text
+   C:\mmachine\scripts\setup\Run Owner Setup.bat
+   C:\mmachine\scripts\setup\Run-Owner-Setup.ps1
+   C:\mmachine\scripts\setup\Setup-Owner-Machine.ps1
+   C:\mmachine\scripts\setup\Update GitHub Token.bat
+   C:\mmachine\scripts\setup\Update-GitHub-Token.ps1
+   C:\mmachine\scripts\setup\Fix-Daily-Sync-Window.ps1
+   C:\mmachine\scripts\setup\README.md
+   C:\mmachine\scripts\setup\CLOUDFLARE-ENV-VARS.md
+   ```
+
+2. On the owner's computer, open that USB folder.
+3. Double-click:
+
+   ```text
+   Run Owner Setup.bat
+   ```
+
+4. Paste the fresh GitHub token into the masked dialog.
+
+The setup can be run again on an existing installation. It refreshes
+`C:\mmachine`, recreates the desktop shortcuts and scheduled task, and
+regenerates the daily sync runner. It does not delete the owner's master Excel
+files in `M-Machine Master Files`.
+
+Direct PowerShell method, if needed:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
-cd C:\Users\Owner\Downloads
+cd C:\path\to\setup
 .\Setup-Owner-Machine.ps1 -RepoUrl "https://github.com/digitalgold69/mmachine-website-codex.git" -GitHubToken "YOUR_NEW_TOKEN"
 ```
 
@@ -103,3 +138,22 @@ For troubleshooting, the background runner is:
 ```text
 C:\mmachine\scripts\setup\daily-sync.ps1
 ```
+
+## Daily sync publishing boundary
+
+The scheduled sync pulls the latest GitHub code, regenerates catalogue data,
+customer files, and PDFs, then commits only the generated catalogue outputs:
+
+- `lib/mini-data.ts`
+- `lib/metals-data.ts`
+- `lib/featured-data.ts`
+- `lib/catalogue-versions.ts`
+- `data-source/.metal-codes.json`
+- `data-source/.metal-links.json`
+- `data-source/.metal-catalogue-codes.json`
+- `public/catalogue`
+- `public/featured`
+
+Unexpected website-code changes are logged and left unstaged. They are not
+included in the daily sync commit, but they also do not stop normal catalogue
+pricing/PDF updates from publishing.
