@@ -584,15 +584,23 @@ function OrderCard({
 }) {
   const quoteTotals = totals(quote);
   const cardSaving = savingAction.startsWith(`${quote.id}:`);
+  const [cardPaymentMethod, setCardPaymentMethod] = useState<QuotePaymentMethod>(quote.paymentMethod || "card");
   const itemQuantity = orderItemQuantity(quote);
   const displayRef = quoteDisplayRef(quote);
   const refundText = refundCardText(quote, quoteTotals);
+  const sentDateText = !quote.paidAt && quote.invoiceSentAt ? formatDateTime(dateValue || quote.invoiceSentAt) : "";
+  const bodyDateText = sentDateText ? "" : `${dateLabel}: ${formatDateTime(dateValue)}`;
+  const footerStatusText = quote.paidAt ? `Paid ${formatDateTime(quote.paidAt)}` : "";
   const customerLines = [
     quote.customer.name,
     quote.customer.company,
     quote.customer.email,
     quote.customer.phone,
   ].filter(Boolean);
+
+  useEffect(() => {
+    setCardPaymentMethod(quote.paymentMethod || "card");
+  }, [quote.id, quote.paymentMethod]);
 
   return (
     <article
@@ -610,7 +618,14 @@ function OrderCard({
       >
         <div className="flex items-center justify-between gap-2">
           <OrderTypePill quote={quote} />
-          <StatusPill status={quote.status} />
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <StatusPill status={quote.status} />
+            {sentDateText && (
+              <span className="text-right text-[11px] font-medium leading-4 text-ink-muted">
+                {sentDateText}
+              </span>
+            )}
+          </div>
         </div>
         <div title={displayRef} className="mt-2 max-w-full truncate text-lg font-semibold leading-6 text-racing">
           {displayRef}
@@ -622,9 +637,7 @@ function OrderCard({
             </div>
           ))}
         </div>
-        <div className="mt-2 text-xs text-ink-muted">
-          {dateLabel}: {formatDateTime(dateValue)}
-        </div>
+        {bodyDateText && <div className="mt-2 text-xs text-ink-muted">{bodyDateText}</div>}
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="text-xs text-ink-muted">
             {itemQuantity} {itemQuantity === 1 ? "item" : "items"}
@@ -642,16 +655,16 @@ function OrderCard({
           </div>
         </div>
       </button>
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-racing/10 pt-2.5">
-        <div className="min-w-0 text-xs text-ink-muted">
-          {quote.paidAt
-            ? `Paid ${formatDateTime(quote.paidAt)}`
-            : quote.invoiceSentAt
-              ? `${quote.customerEmailSentAt ? "Sent" : "Saved"} ${formatDateTime(quote.invoiceSentAt)}`
-              : "Not invoiced"}
-        </div>
-        {(showDelete || showMarkPaid) && (
-          <div className="flex shrink-0 items-center gap-2">
+      {(footerStatusText || showDelete || showMarkPaid) && (
+        <div className="mt-3 border-t border-racing/10 pt-2.5">
+          {showDelete || showMarkPaid ? (
+            <div
+              className={
+                showMarkPaid
+                  ? "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
+                  : "flex items-center justify-end"
+              }
+            >
             {showDelete && (
               <button
                 type="button"
@@ -663,20 +676,37 @@ function OrderCard({
                 Delete
               </button>
             )}
+            {showMarkPaid && !showDelete && <span aria-hidden="true" />}
+            {showMarkPaid && (
+              <select
+                value={cardPaymentMethod}
+                onChange={(event) => setCardPaymentMethod(event.target.value as QuotePaymentMethod)}
+                disabled={isSaving}
+                aria-label={`Payment method for ${displayRef}`}
+                className="input min-h-0 h-9 px-2 py-1 text-xs font-semibold text-racing disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {PAYMENT_METHOD_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
             {showMarkPaid && (
               <button
                 type="button"
-                onClick={() => onSelect(quote.id)}
+                onClick={() => onMarkPaid({ ...quote, paymentMethod: cardPaymentMethod })}
                 disabled={isSaving}
-                aria-label={`Open invoice ${displayRef} to mark it paid`}
+                aria-label={`Mark order ${displayRef} as paid`}
                 className="shrink-0 rounded-lg border border-racing px-3 py-2 text-xs font-semibold text-racing hover:bg-racing hover:text-cream disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {cardSaving && savingAction.endsWith(":paid") ? "Saving..." : "Mark Paid"}
               </button>
             )}
-          </div>
-        )}
-      </div>
+            </div>
+          ) : (
+            <div className="text-xs text-ink-muted">{footerStatusText}</div>
+          )}
+        </div>
+      )}
     </article>
   );
 }
@@ -2418,13 +2448,7 @@ export default function OrdersClient({
                       </div>
                     </section>
 
-                    <section className="rounded-lg border border-racing/10 p-3">
-                      <div className="mb-2">
-                        <div className="text-sm font-semibold text-racing">Payment methods</div>
-                        <p className="mt-1 text-xs leading-5 text-ink-muted">
-                          Card, BACS and cash are shown on the invoice email. Add a link only when online payment is available.
-                        </p>
-                      </div>
+                    <section>
                       <label className="label" htmlFor="payment-link">Payment link</label>
                       <input
                         id="payment-link"
