@@ -46,6 +46,7 @@ export type MetalOrderConfig =
       mode: "length";
       unitLengthMm?: number;
       maxLengthMm?: number;
+      defaultInputUnit?: MetalDimensionUnit;
       unitLabel: string;
       stockSize: string;
     }
@@ -63,7 +64,7 @@ export type MetalOrderConfig =
       unitLengthMm: number;
       unitLabel: string;
       stockSize: string;
-      fixedKind: "silver-steel" | "metric-gauge-plate" | "imperial-gauge-plate";
+      fixedKind: "silver-steel";
     }
   | {
       mode: "catalogue";
@@ -331,15 +332,6 @@ function isCatalogueUnit(unit: string) {
   return /\b(pack|box|set|pair|each)\b/i.test(unit);
 }
 
-function fixedLengthForGaugePlate(unitLengthMm: number | null, stockSize: string, unit: string | undefined) {
-  const stockLength = parseStockLength(stockSize);
-  if (stockLength) return stockLength;
-  const rawUnit = normalise(unit).toLowerCase();
-  if (/250\s*mm/.test(rawUnit)) return 500;
-  if (/9\s*"/.test(rawUnit) || /9\s*inch/.test(rawUnit) || /9\s*in\b/.test(rawUnit)) return 18 * MM_PER_INCH;
-  return unitLengthMm;
-}
-
 export function getMetalOrderConfig(product: MetalPricingProduct): MetalOrderConfig {
   const hasNumericPrice = productPriceExVat(product) !== null;
   const stockSize = normalise(product.stockSize);
@@ -367,8 +359,7 @@ export function getMetalOrderConfig(product: MetalPricingProduct): MetalOrderCon
 
   if (isGaugePlate(product)) {
     const unitLengthMm = parseUnitLengthMm(unit);
-    const fixedLengthMm = fixedLengthForGaugePlate(unitLengthMm, stockSize, unit);
-    if (!unitLengthMm || !fixedLengthMm) {
+    if (!unitLengthMm && hasNumericPrice) {
       return {
         mode: "catalogue",
         unitLabel: unit,
@@ -376,10 +367,10 @@ export function getMetalOrderConfig(product: MetalPricingProduct): MetalOrderCon
       };
     }
     return {
-      mode: "fixed",
-      fixedKind: Math.abs(fixedLengthMm - 500) < 2 ? "metric-gauge-plate" : "imperial-gauge-plate",
-      fixedLengthMm,
-      unitLengthMm,
+      mode: "length",
+      ...(unitLengthMm ? { unitLengthMm } : {}),
+      maxLengthMm: 18 * MM_PER_INCH,
+      defaultInputUnit: "imperial",
       unitLabel: unit,
       stockSize,
     };
@@ -431,21 +422,6 @@ export function formatMm(value: number) {
   const rounded = Math.round(value * 10) / 10;
   if (Math.abs(rounded - Math.round(rounded)) < 0.05) return `${Math.round(rounded).toLocaleString("en-GB")}mm`;
   return `${rounded.toLocaleString("en-GB", { maximumFractionDigits: 1 })}mm`;
-}
-
-function formatFixedLength(mm: number) {
-  const inches = mm / MM_PER_INCH;
-  if (Math.abs(inches - Math.round(inches)) < 0.05) return `${Math.round(inches)}"`;
-  return formatMm(mm);
-}
-
-function fixedLengthDisplay(config: Extract<MetalOrderConfig, { mode: "fixed" }>) {
-  if (config.fixedKind === "silver-steel") return 'Sold as pre-cut 13" Lengths';
-  const saleLength = formatFixedLength(config.fixedLengthMm);
-  const pricedFrom = Math.abs(config.fixedLengthMm - config.unitLengthMm) > 0.001
-    ? ` (priced from ${formatFixedLength(config.unitLengthMm)} catalogue rate)`
-    : "";
-  return `Sold as pre-cut ${saleLength} lengths${pricedFrom}`;
 }
 
 function cleanDimension(value: unknown) {
@@ -553,7 +529,7 @@ export function calculateMetalOrderItem(
   if (config.mode === "fixed") {
     const multiplier = config.fixedLengthMm / config.unitLengthMm;
     const unitPriceExVat = priceExVat === null ? null : moneyPrecision(priceExVat * multiplier);
-    const display = fixedLengthDisplay(config);
+    const display = 'Sold as pre-cut 13" Lengths';
     return {
       ok: true,
       keySuffix: `fixed-${Math.round(config.fixedLengthMm * 10)}`,

@@ -184,6 +184,20 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const subtotalIncVat = subtotal * VAT_MULTIPLIER;
   const pendingDimensionUnitText = metalDimensionUnitLabel(pendingDimensionUnit);
   const pendingDimensionStep = pendingDimensionUnit === "imperial" ? "0.001" : "0.1";
+  const pendingLengthMaxInput =
+    pendingMetalConfig?.mode === "length" && typeof pendingMetalConfig.maxLengthMm === "number"
+      ? pendingDimensionUnit === "imperial"
+        ? pendingMetalConfig.maxLengthMm / 25.4
+        : pendingMetalConfig.maxLengthMm
+      : undefined;
+  const pendingLengthPlaceholder =
+    pendingMetalConfig?.mode === "length" && pendingMetalConfig.defaultInputUnit === "imperial"
+      ? pendingDimensionUnit === "imperial"
+        ? "e.g. 9"
+        : "e.g. 250"
+      : pendingDimensionUnit === "imperial"
+        ? "e.g. 30"
+        : "e.g. 750";
 
   useEffect(() => {
     if (!pending && !drawerOpen) return;
@@ -233,11 +247,13 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   }, [drawerOpen, pending]);
 
   function beginAdd(item: PendingItem) {
+    const metalConfig = item.catalogue === "metals" ? getMetalOrderConfig(item) : null;
+    const defaultDimensionUnit = metalConfig?.mode === "length" ? metalConfig.defaultInputUnit : undefined;
     setPending(item);
     setPendingQty(1);
     setPendingLengthMm("");
     setPendingWidthMm("");
-    setPendingDimensionUnit("metric");
+    setPendingDimensionUnit(defaultDimensionUnit ?? "metric");
     setMessage("");
   }
 
@@ -427,11 +443,12 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                       id="metal-length"
                       type="number"
                       min={1}
+                      max={pendingLengthMaxInput}
                       step={pendingDimensionStep}
                       value={pendingLengthMm}
                       onChange={(event) => setPendingLengthMm(event.target.value)}
                       className="input bg-white !px-3 !py-2 !text-[14px]"
-                      placeholder={pendingDimensionUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
+                      placeholder={pendingLengthPlaceholder}
                     />
                     {typeof pendingMetalConfig.maxLengthMm === "number" && (
                       <div className="mt-1 text-xs text-ink-muted">

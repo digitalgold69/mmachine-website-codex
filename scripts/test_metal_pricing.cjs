@@ -298,44 +298,55 @@ const overNavalBrass25SqSheet = calculateMetalOrderItem(
 assert.equal(overNavalBrass25SqSheet.ok, false);
 assert.match(overNavalBrass25SqSheet.error, /Maximum sheet size/);
 
-const metricGauge = calculateMetalOrderItem(
-  {
-    id: "metric-gauge",
-    category: "gauge_plate",
-    form: "Flat",
-    metal: "Gauge Plate",
-    spec: "Metric",
-    size: "6mm",
-    unit: "Length (250mm)",
-    stockSize: "500mm x 2",
-    priceExVat: 6,
-  },
-  {},
-  1
-);
+const metricGaugeProduct = {
+  id: "metric-gauge",
+  category: "gauge_plate",
+  form: "Flat",
+  metal: "Gauge Plate",
+  spec: "Metric",
+  size: "6mm",
+  unit: "Length (250mm)",
+  stockSize: "500mm x 2",
+  priceExVat: 6,
+};
+const metricGaugeConfig = getMetalOrderConfig(metricGaugeProduct);
+assert.equal(metricGaugeConfig.mode, "length");
+assert.equal(metricGaugeConfig.defaultInputUnit, "imperial");
+assertClose(metricGaugeConfig.maxLengthMm, 457.2, "gauge plate maxes at 18in");
+const metricGauge = calculateMetalOrderItem(metricGaugeProduct, { inputUnit: "metric", inputLength: 250 }, 1);
 assert.equal(metricGauge.ok, true);
 assert.equal(metricGauge.unit, "length");
-assertClose(metricGauge.unitPriceExVat, 12, "metric gauge plate complete 500mm length");
-assert.equal(metricGauge.metalDimensions.display, "Sold as pre-cut 500mm lengths (priced from 250mm catalogue rate)");
+assertClose(metricGauge.unitPriceExVat, 6, "metric gauge plate uses exact 250mm catalogue rate");
+assert.equal(metricGauge.metalDimensions.display, "Length 250 mm");
 
-const imperialGauge = calculateMetalOrderItem(
-  {
-    id: "imperial-gauge",
-    category: "gauge_plate",
-    form: "Flat",
-    metal: "Gauge Plate",
-    spec: "Imperial",
-    size: "1/4in",
-    unit: 'Length (9")',
-    stockSize: '18" x 3',
-    priceExVat: 6.45,
-  },
-  {},
-  1
-);
+const imperialGaugeProduct = {
+  id: "imperial-gauge",
+  category: "gauge_plate",
+  form: "Flat",
+  metal: "Gauge Plate",
+  spec: "Imperial",
+  size: "1/4in",
+  unit: 'Length (9")',
+  stockSize: '18" x 3',
+  priceExVat: 6.45,
+};
+const imperialGaugeConfig = getMetalOrderConfig(imperialGaugeProduct);
+assert.equal(imperialGaugeConfig.mode, "length");
+assert.equal(imperialGaugeConfig.defaultInputUnit, "imperial");
+assertClose(imperialGaugeConfig.maxLengthMm, 457.2, "imperial gauge plate maxes at 18in");
+const missingImperialGaugeLength = calculateMetalOrderItem(imperialGaugeProduct, { inputUnit: "imperial" }, 1);
+assert.equal(missingImperialGaugeLength.ok, false);
+assert.match(missingImperialGaugeLength.error, /Enter the required length in inches/);
+const imperialGauge = calculateMetalOrderItem(imperialGaugeProduct, { inputUnit: "imperial", inputLength: 9 }, 1);
 assert.equal(imperialGauge.ok, true);
-assertClose(imperialGauge.unitPriceExVat, 12.9, "imperial gauge plate complete 18in length");
-assert.equal(imperialGauge.metalDimensions.display, 'Sold as pre-cut 18" lengths (priced from 9" catalogue rate)');
+assertClose(imperialGauge.unitPriceExVat, 6.45, "imperial gauge plate uses exact 9in catalogue rate");
+assert.equal(imperialGauge.metalDimensions.display, "Length 9 in");
+const imperialGaugeMax = calculateMetalOrderItem(imperialGaugeProduct, { inputUnit: "imperial", inputLength: 18 }, 1);
+assert.equal(imperialGaugeMax.ok, true);
+assertClose(imperialGaugeMax.unitPriceExVat, 12.9, "imperial gauge plate calculates 18in from 9in rate");
+const overImperialGaugeMax = calculateMetalOrderItem(imperialGaugeProduct, { inputUnit: "imperial", inputLength: 18.5 }, 1);
+assert.equal(overImperialGaugeMax.ok, false);
+assert.match(overImperialGaugeMax.error, /Maximum single length is 18 in/);
 
 const imperialGaugeStockLength = calculateMetalOrderItem(
   {
@@ -349,12 +360,12 @@ const imperialGaugeStockLength = calculateMetalOrderItem(
     stockSize: '24"',
     priceExVat: 65.77,
   },
-  {},
+  { inputUnit: "imperial", inputLength: 18 },
   1
 );
 assert.equal(imperialGaugeStockLength.ok, true);
-assertClose(imperialGaugeStockLength.unitPriceExVat, 65.77, "gauge plate stock length equal to unit should not be doubled");
-assert.equal(imperialGaugeStockLength.metalDimensions.display, 'Sold as pre-cut 24" lengths');
+assertClose(imperialGaugeStockLength.unitPriceExVat, 49.3275, "gauge plate with 24in unit prices 18in proportionally");
+assert.equal(imperialGaugeStockLength.metalDimensions.display, "Length 18 in");
 
 const silverSteel = calculateMetalOrderItem(
   {
