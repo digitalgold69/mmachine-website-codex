@@ -32,8 +32,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 PROJECT_ROOT = HERE.parent.parent
-PARTSBOOK = str(PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx")
-INVOICE_SRC = str(PROJECT_ROOT / "data-source" / "Mini Invoice Template.xlsm")
+from source_paths import source_file
+
+PARTSBOOK = str(source_file("PartsbookBenji2014.xlsx"))
+INVOICE_SRC = str(source_file("Mini Invoice Template.xlsm"))
 INVOICE = str(PROJECT_ROOT / "final-deliverables" / "Mini Invoice Template.xlsm")
 
 from surgical_xlsx import (

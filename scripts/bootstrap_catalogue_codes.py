@@ -16,6 +16,7 @@ sys.path.insert(0, str(HERE / "phase2"))
 
 from catalogue_codes import save_codes  # noqa: E402
 from metal_matching import make_catalogue_base, make_catalogue_link_id  # noqa: E402
+from source_paths import source_file  # noqa: E402
 from wire_catalogue import is_data_sheet, s  # noqa: E402
 
 
@@ -35,10 +36,7 @@ def read_old_products():
 
 def main():
     products = read_old_products()
-    workbook = openpyxl.load_workbook(
-        PROJECT_ROOT / "data-source" / "Metals catalogue 2023.xlsx",
-        data_only=True,
-    )
+    workbook = openpyxl.load_workbook(source_file("Metals catalogue 2023.xlsx"), data_only=True)
     codes = {}
     product_index = 0
 

@@ -34,7 +34,9 @@ warnings.filterwarnings("ignore", message="Data Validation extension is not supp
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 PROJECT_ROOT = HERE.parent.parent
-CATALOGUE_SRC = str(PROJECT_ROOT / "data-source" / "Metals catalogue 2023.xlsx")
+from source_paths import source_file
+
+CATALOGUE_SRC = str(source_file("Metals catalogue 2023.xlsx"))
 CATALOGUE = str(PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx")
 
 from build_lookup import build_lookup_rows

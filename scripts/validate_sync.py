@@ -29,6 +29,7 @@ from regen_website_data import (  # noqa: E402
 )
 from build_lookup import build_lookup_rows  # noqa: E402
 from metal_matching import MetalMatcher  # noqa: E402
+from source_paths import source_file  # noqa: E402
 from wire_catalogue import build_indexes, is_data_sheet  # noqa: E402
 
 
@@ -38,9 +39,9 @@ MINI_BOOK = PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.
 METALS_BOOK = PROJECT_ROOT / "final-deliverables" / "Metals catalogue 2023.xlsx"
 MINI_INVOICE = PROJECT_ROOT / "final-deliverables" / "Mini Invoice Template.xlsm"
 METALS_INVOICE = PROJECT_ROOT / "final-deliverables" / "Metals Invoice.xlsm"
-MINI_INVOICE_SOURCE = PROJECT_ROOT / "data-source" / "Mini Invoice Template.xlsm"
-METALS_INVOICE_SOURCE = PROJECT_ROOT / "data-source" / "Metals Invoice.xlsm"
-PARTSBOOK = PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx"
+MINI_INVOICE_SOURCE = source_file("Mini Invoice Template.xlsm")
+METALS_INVOICE_SOURCE = source_file("Metals Invoice.xlsm")
+PARTSBOOK = source_file("PartsbookBenji2014.xlsx")
 MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf"
 METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf"
 CATALOGUE_VERSIONS = PROJECT_ROOT / "lib" / "catalogue-versions.ts"

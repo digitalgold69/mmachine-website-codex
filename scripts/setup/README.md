@@ -14,7 +14,8 @@ The goal is deliberately simple:
 - `C:\mmachine` - local repo clone
 - Desktop folder: `M-Machine Master Files`
   - Points to `C:\mmachine\data-source`
-  - The owner puts the Excel files here
+  - The owner puts the two daily master files here
+  - Supporting/template workbooks live in its `More Files` subfolder
 - Desktop folder: `M-Machine Customer Files`
   - Points to `C:\mmachine\final-deliverables`
   - The owner opens refreshed catalogue files here
@@ -62,22 +63,25 @@ photograph or screenshot, revoke it immediately and create a replacement token.
 
 ## Files to copy into "M-Machine Master Files"
 
-Required:
+Daily master files the owner normally edits/replaces:
 
 - `Metals.xlsx`
 - `PartsbookBenji2014.xlsx`
+
+Supporting files that should live in `M-Machine Master Files\More Files`:
+
 - `Metals catalogue 2023.xlsx`
 - `Mini Catalogue Self Updating.xlsm`
+- `Mini Invoice Template.xlsm`
 
-Optional but recommended:
+Optional:
 
 - `Metals Invoice.xlsm`
-- `Mini Invoice Template.xlsm`
 
 The metals invoice is copied unchanged into "M-Machine Customer Files".
 
-The Mini invoice keeps its original layout and macros, but the sync points its
-existing Partsbook link at `C:\mmachine\data-source\PartsbookBenji2014.xlsx`.
+The Mini invoice keeps its original layout and macros, but the sync embeds fresh
+Partsbook prices into the customer copy on every run.
 
 ## Run the setup script
 

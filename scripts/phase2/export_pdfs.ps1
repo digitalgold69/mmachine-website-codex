@@ -15,7 +15,7 @@ param(
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
     [string]$Output2 = "public\catalogue\mini-catalogue.pdf",
     [string[]]$HideSheets2 = @("_PriceLookup"),
-    [string]$MiniMasterSource = "data-source\Mini Catalogue Self Updating.xlsm",
+    [string]$MiniMasterSource = "data-source\More Files\Mini Catalogue Self Updating.xlsm",
     [string]$MiniUpdateManifest = "final-deliverables\mini-catalogue-updates.json",
 
     [switch]$ForceLibreOffice
@@ -36,6 +36,37 @@ if (
 ) {
     $ForceLibreOffice = $true
 }
+
+function Resolve-ProjectPath {
+    param([Parameter(Mandatory)] [string]$Path)
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return $Path
+    }
+    return Join-Path $projectRoot $Path
+}
+
+function Resolve-DataSourceWorkbookPath {
+    param(
+        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$FileName
+    )
+
+    $preferred = Resolve-ProjectPath -Path $Path
+    if (Test-Path -LiteralPath $preferred) {
+        return $preferred
+    }
+
+    $legacy = Join-Path (Join-Path $projectRoot "data-source") $FileName
+    if (Test-Path -LiteralPath $legacy) {
+        return $legacy
+    }
+
+    return $preferred
+}
+
+$ResolvedMiniMasterSource = Resolve-DataSourceWorkbookPath `
+    -Path $MiniMasterSource `
+    -FileName "Mini Catalogue Self Updating.xlsm"
 
 function Get-LibreOfficeProgram {
     $roots = @(
@@ -499,10 +530,10 @@ try {
 
         if ($Source2 -ne "") {
             Export-MiniCatalogueWithExcel `
-                -MasterSourcePath (Join-Path $projectRoot $MiniMasterSource) `
-                -CustomerOutputPath (Join-Path $projectRoot $Source2) `
-                -ManifestPath (Join-Path $projectRoot $MiniUpdateManifest) `
-                -PdfOutputPath (Join-Path $projectRoot $Output2)
+                -MasterSourcePath $ResolvedMiniMasterSource `
+                -CustomerOutputPath (Resolve-ProjectPath -Path $Source2) `
+                -ManifestPath (Resolve-ProjectPath -Path $MiniUpdateManifest) `
+                -PdfOutputPath (Resolve-ProjectPath -Path $Output2)
         }
         $excelExportSucceeded = $true
     } catch {

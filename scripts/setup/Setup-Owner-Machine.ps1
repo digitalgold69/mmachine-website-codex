@@ -453,23 +453,73 @@ function Reset-GeneratedGitOutputs {
 
 function Get-RequiredExcelFiles {
     param([string]$Root)
+    $dataSource = Join-Path $Root "data-source"
+    $supporting = Join-Path $dataSource "More Files"
     return @(
-        (Join-Path $Root "data-source\Metals.xlsx"),
-        (Join-Path $Root "data-source\Metals catalogue 2023.xlsx"),
-        (Join-Path $Root "data-source\PartsbookBenji2014.xlsx"),
-        (Join-Path $Root "data-source\Mini Catalogue Self Updating.xlsm")
+        (Join-Path $dataSource "Metals.xlsx"),
+        (Join-Path $dataSource "PartsbookBenji2014.xlsx"),
+        (Join-Path $supporting "Metals catalogue 2023.xlsx"),
+        (Join-Path $supporting "Mini Catalogue Self Updating.xlsm"),
+        (Join-Path $supporting "Mini Invoice Template.xlsm")
     )
 }
 
 function Test-RequiredExcelFilesPresent {
     param([string]$Root)
+    $dataSource = Join-Path $Root "data-source"
+    $supporting = Join-Path $dataSource "More Files"
     $missing = @()
-    foreach ($file in Get-RequiredExcelFiles -Root $Root) {
-        if (-not (Test-Path $file)) {
+
+    foreach ($fileName in @("Metals.xlsx", "PartsbookBenji2014.xlsx")) {
+        $file = Join-Path $dataSource $fileName
+        if (-not (Test-Path -LiteralPath $file)) {
             $missing += $file
         }
     }
+
+    foreach ($fileName in @(
+        "Metals catalogue 2023.xlsx",
+        "Mini Catalogue Self Updating.xlsm",
+        "Mini Invoice Template.xlsm"
+    )) {
+        $preferred = Join-Path $supporting $fileName
+        $legacy = Join-Path $dataSource $fileName
+        if (
+            -not (Test-Path -LiteralPath $preferred) -and
+            -not (Test-Path -LiteralPath $legacy)
+        ) {
+            $missing += $preferred
+        }
+    }
     return $missing
+}
+
+function Move-SupportingExcelFilesToMoreFiles {
+    param([string]$DataSourcePath)
+
+    $supportingPath = Join-Path $DataSourcePath "More Files"
+    New-Item -ItemType Directory -Force -Path $supportingPath | Out-Null
+
+    foreach ($fileName in @(
+        "Metals catalogue 2023.xlsx",
+        "Mini Catalogue Self Updating.xlsm",
+        "Mini Invoice Template.xlsm",
+        "Metals Invoice.xlsm"
+    )) {
+        $rootFile = Join-Path $DataSourcePath $fileName
+        $targetFile = Join-Path $supportingPath $fileName
+        if (
+            (Test-Path -LiteralPath $rootFile) -and
+            -not (Test-Path -LiteralPath $targetFile)
+        ) {
+            try {
+                Move-Item -LiteralPath $rootFile -Destination $targetFile -Force
+                Write-Host "  Moved supporting file into More Files: $fileName" -ForegroundColor Gray
+            } catch {
+                Write-Host "  Could not move $fileName into More Files; sync will still use the existing copy." -ForegroundColor Yellow
+            }
+        }
+    }
 }
 
 function Create-FolderLink {
@@ -678,6 +728,7 @@ $finalPath = Join-Path $InstallPath "final-deliverables"
 
 Create-FolderLink -LinkPath $masterFolder -TargetPath $dataSourcePath -Purpose "put master Excel files here"
 Create-FolderLink -LinkPath $customerFolder -TargetPath $finalPath -Purpose "open refreshed customer files here"
+Move-SupportingExcelFilesToMoreFiles -DataSourcePath $dataSourcePath
 
 $SyncScriptPath = Join-Path $InstallPath "scripts\setup\daily-sync.ps1"
 $SyncScriptContent = @"
@@ -994,12 +1045,18 @@ For normal price changes, the files that matter are:
 Metals.xlsx
 PartsbookBenji2014.xlsx
 
-The other Excel files should stay in the folder too:
+The supporting files live in the folder named:
+
+More Files
+
+They are needed by the sync but normally should not be edited:
 
 Metals catalogue 2023.xlsx
 Mini Catalogue Self Updating.xlsm
-Metals Invoice.xlsm
 Mini Invoice Template.xlsm
+
+Metals Invoice.xlsm can also stay in More Files if you still want a copied
+version in Customer Files.
 
 Do not rename the files.
 Close Excel after saving.
@@ -1046,12 +1103,15 @@ if ($missingExcel.Count -gt 0) {
     Write-Host "  Setup is installed, but the first sync was skipped." -ForegroundColor Yellow
     Write-Host "  Copy these files into the desktop folder named 'M-Machine Master Files':"
     foreach ($file in $missingExcel) {
-        Write-Host "    - $(Split-Path -Leaf $file)"
+        $leaf = Split-Path -Leaf $file
+        if ($file -like "*\More Files\*") {
+            Write-Host "    - More Files\$leaf"
+        } else {
+            Write-Host "    - $leaf"
+        }
     }
     Write-Host ""
-    Write-Host "  Optional but recommended, also copy:"
-    Write-Host "    - Metals Invoice.xlsm"
-    Write-Host "    - Mini Invoice Template.xlsm"
+    Write-Host "  Optional: More Files\Metals Invoice.xlsm"
     Write-Host ""
     Write-Host "  Then run this in PowerShell:"
     Write-Host "    cd $InstallPath"

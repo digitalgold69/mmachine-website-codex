@@ -26,30 +26,45 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent.parent
+sys.path.insert(0, str(HERE))
+
+from source_paths import source_file, source_file_candidates
 
 # Files required to rebuild the two catalogue files.
 REQUIRED_FILES = [
-    PROJECT_ROOT / "data-source" / "Metals.xlsx",
-    PROJECT_ROOT / "data-source" / "Metals catalogue 2023.xlsx",
-    PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx",
-    PROJECT_ROOT / "data-source" / "Mini Catalogue Self Updating.xlsm",
-    PROJECT_ROOT / "data-source" / "Mini Invoice Template.xlsm",
+    source_file("Metals.xlsx"),
+    source_file("Metals catalogue 2023.xlsx"),
+    source_file("PartsbookBenji2014.xlsx"),
+    source_file("Mini Catalogue Self Updating.xlsm"),
+    source_file("Mini Invoice Template.xlsm"),
 ]
 
 # The Metals invoice is copied as-is. It is deliberately not rewired or edited.
 OPTIONAL_INVOICE_TEMPLATES = [
-    PROJECT_ROOT / "data-source" / "Metals Invoice.xlsm",
+    source_file("Metals Invoice.xlsm"),
 ]
 
 
 def check_inputs():
-    missing = [str(p) for p in REQUIRED_FILES if not p.exists()]
+    required_names = [
+        "Metals.xlsx",
+        "Metals catalogue 2023.xlsx",
+        "PartsbookBenji2014.xlsx",
+        "Mini Catalogue Self Updating.xlsm",
+        "Mini Invoice Template.xlsm",
+    ]
+    missing = [
+        " or ".join(str(candidate) for candidate in source_file_candidates(name))
+        for name in required_names
+        if not source_file(name).exists()
+    ]
     if missing:
         print("ERROR: catalogue sync needs these files in data-source/:")
         for m in missing:
             print(f"  - {m}")
         print()
-        print("Drop the latest copies from the owner into data-source/ and re-run.")
+        print("Drop Metals.xlsx and PartsbookBenji2014.xlsx into data-source/.")
+        print("Drop the supporting catalogue/template files into data-source/More Files/.")
         sys.exit(1)
 
 

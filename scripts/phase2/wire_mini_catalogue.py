@@ -35,8 +35,10 @@ warnings.filterwarnings("ignore", message="Data Validation extension is not supp
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 PROJECT_ROOT = HERE.parent.parent
-PARTSBOOK = str(PROJECT_ROOT / "data-source" / "PartsbookBenji2014.xlsx")
-MINI_CAT_SRC = str(PROJECT_ROOT / "data-source" / "Mini Catalogue Self Updating.xlsm")
+from source_paths import source_file
+
+PARTSBOOK = str(source_file("PartsbookBenji2014.xlsx"))
+MINI_CAT_SRC = str(source_file("Mini Catalogue Self Updating.xlsm"))
 MINI_CAT = str(PROJECT_ROOT / "final-deliverables" / "Mini Catalogue Self Updating.xlsm")
 MINI_MANIFEST = str(PROJECT_ROOT / "final-deliverables" / "mini-catalogue-updates.json")
 

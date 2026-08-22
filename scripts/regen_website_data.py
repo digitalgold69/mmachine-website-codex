@@ -48,13 +48,15 @@ FEATURED_JSON = SRC / "featured-work.json"
 FEATURED_IMG_SRC = SRC / "featured-images"
 FEATURED_IMG_DST = PUBLIC / "featured"
 
+from source_paths import source_file, source_file_candidates
+
 # Mini Catalogue is required for product list; PartsbookBenji for prices
-PARTSBOOK    = SRC / "PartsbookBenji2014.xlsx"
-MINI_CAT     = SRC / "Mini Catalogue Self Updating.xlsm"
+PARTSBOOK    = source_file("PartsbookBenji2014.xlsx")
+MINI_CAT     = source_file("Mini Catalogue Self Updating.xlsm")
 
 # Metals catalogue is required for product list; Metals.xlsx for prices
-METALS_CAT   = SRC / "Metals catalogue 2023.xlsx"
-METALS       = SRC / "Metals.xlsx"
+METALS_CAT   = source_file("Metals catalogue 2023.xlsx")
+METALS       = source_file("Metals.xlsx")
 
 from build_lookup import build_lookup_rows
 from catalogue_codes import CatalogueCodeRegistry
@@ -732,7 +734,17 @@ def main():
     print("\nM-Machine sync-data - regenerating website data from customer-facing docs\n")
 
     # Validate inputs
-    missing = [str(p) for p in [PARTSBOOK, MINI_CAT, METALS_CAT, METALS] if not p.exists()]
+    required_names = [
+        "PartsbookBenji2014.xlsx",
+        "Mini Catalogue Self Updating.xlsm",
+        "Metals catalogue 2023.xlsx",
+        "Metals.xlsx",
+    ]
+    missing = [
+        " or ".join(str(candidate) for candidate in source_file_candidates(name))
+        for name in required_names
+        if not source_file(name).exists()
+    ]
     if missing:
         print("ERROR: missing required files in data-source/:")
         for m in missing:

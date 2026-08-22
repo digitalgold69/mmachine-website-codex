@@ -29,7 +29,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 PROJECT_ROOT = HERE.parent.parent
-INVOICE_SRC = str(PROJECT_ROOT / "data-source" / "Metals Invoice.xlsm")
+from source_paths import source_file
+
+INVOICE_SRC = str(source_file("Metals Invoice.xlsm"))
 INVOICE = str(PROJECT_ROOT / "final-deliverables" / "Metals Invoice.xlsm")
 
 from build_lookup import build_lookup_rows, normalise
