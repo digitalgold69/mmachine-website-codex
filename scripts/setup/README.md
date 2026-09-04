@@ -1,6 +1,11 @@
-# Owner machine setup
+# Owner/server machine setup
 
-This is the one-time setup for the owner's Windows computer.
+This is the one-time setup for the Windows computer that will run the daily
+M-Machine sync. That can be the owner's PC or the office server.
+
+Important: running the setup kit from a server/network folder on the owner's PC
+still installs it on the owner's PC. To install it on the server, first log into
+the server itself, then run the setup there.
 
 The goal is deliberately simple:
 
@@ -11,7 +16,7 @@ The goal is deliberately simple:
 
 ## What the setup script creates
 
-- `C:\mmachine` - local repo clone
+- `C:\mmachine` - repo clone on the computer running the sync
 - Desktop folder: `M-Machine Master Files`
   - Points to `C:\mmachine\data-source`
   - The owner puts the two daily master files here
@@ -30,7 +35,8 @@ The goal is deliberately simple:
   - Runs hidden and uses the supplied GitHub token directly, so no GitHub
     account picker should appear
 
-The owner computer must have Microsoft Excel desktop installed and activated.
+The computer running the sync must have Microsoft Excel desktop installed and
+activated.
 Setup performs a capability test using the same shared automation layer as the
 daily PDF exporter. It does not rely on a hard-coded Excel version number.
 
@@ -47,8 +53,10 @@ installation is created at `C:\mmachine`.
 For USB setup, copy the setup kit files from `scripts\setup` to the USB stick
 and run `Run Owner Setup.bat` from that folder. That launcher asks for the
 GitHub token in a masked dialog and then runs the main setup script as
-Administrator. The `daily-sync.*` and `manual-sync.vbs` files are generated on
-the owner's computer during setup and do not need to be copied.
+Administrator. It also prints the current computer name before setup continues.
+If you are trying to install on the server, stop unless that name is the server.
+The `daily-sync.*` and `manual-sync.vbs` files are generated on the sync
+computer during setup and do not need to be copied.
 
 Setup verifies Python by running a real interpreter. It does not trust the
 Windows Microsoft Store `python.exe` App Execution Alias. Existing Python
@@ -83,6 +91,27 @@ The metals invoice is copied unchanged into "M-Machine Customer Files".
 The Mini invoice keeps its original layout and macros, but the sync embeds fresh
 Partsbook prices into the customer copy on every run.
 
+## Moving from owner PC to server
+
+Use this route when the owner PC already has a working local install, but the
+server should run the daily sync instead.
+
+1. On the owner PC, run `Disable Old Local Sync.bat` from the setup kit.
+   - This removes the local scheduled task and desktop shortcuts.
+   - It moves `C:\mmachine` to a dated backup folder instead of deleting it.
+2. Log into the server itself, for example with Remote Desktop.
+3. Confirm Microsoft Excel opens normally on the server and can save/export a
+   workbook as PDF.
+4. Run `Run Owner Setup.bat` on the server.
+5. When the setup prints the computer name, confirm it is the server.
+6. Put the master workbooks into the server's `M-Machine Master Files` shortcut.
+7. Share the server master/customer folders or ask the IT/server maintainer to
+   share them.
+8. Add shortcuts to those shared server folders on the office computers.
+
+Only one computer should have the `M-Machine Daily Sync` scheduled task active.
+After moving to the server, leave the owner PC local sync disabled.
+
 ## Run the setup script
 
 Recommended USB method:
@@ -93,6 +122,8 @@ Recommended USB method:
    C:\mmachine\scripts\setup\Run Owner Setup.bat
    C:\mmachine\scripts\setup\Run-Owner-Setup.ps1
    C:\mmachine\scripts\setup\Setup-Owner-Machine.ps1
+   C:\mmachine\scripts\setup\Disable Old Local Sync.bat
+   C:\mmachine\scripts\setup\Disable-Local-MMachine-Sync.ps1
    C:\mmachine\scripts\setup\Update GitHub Token.bat
    C:\mmachine\scripts\setup\Update-GitHub-Token.ps1
    C:\mmachine\scripts\setup\Fix-Daily-Sync-Window.ps1
@@ -113,6 +144,19 @@ The setup can be run again on an existing installation. It refreshes
 `C:\mmachine`, recreates the desktop shortcuts and scheduled task, and
 regenerates the daily sync runner. It does not delete the owner's master Excel
 files in `M-Machine Master Files`.
+
+## Metals source of truth
+
+The website metals catalogue uses `Metals catalogue 2023.xlsx` to decide which
+metal rows exist and where they sit in the catalogue.
+
+`Metals.xlsx` is the live price source. If a catalogue row no longer has a
+matching numeric price in `Metals.xlsx`, the website shows that row as `POA`
+rather than keeping an old catalogue price.
+
+To fully remove a metal from the website, remove it from
+`Metals catalogue 2023.xlsx`. Removing or blanking only the price in
+`Metals.xlsx` leaves the row visible as `POA`.
 
 Direct PowerShell method, if needed:
 

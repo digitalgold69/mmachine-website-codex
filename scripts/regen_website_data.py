@@ -13,7 +13,9 @@ Workflow:
   2. Look up each code's price from PartsbookBenji's Parts Data.
   3. For metals: read Metals catalogue 2023 → list of (shape, metal, spec, size)
      rows. Look up each row's price from Metals.xlsx via the same fuzzy
-     matching used by wire_catalogue.py.
+     matching used by wire_catalogue.py. Catalogue workbook prices are not used
+     as a website fallback; if Metals.xlsx no longer supplies a numeric price,
+     the website shows POA instead of retaining stale pricing.
   4. Write lib/mini-data.ts and lib/metals-data.ts.
 
 Result: the website shows exactly what's in the customer-facing docs, with
@@ -375,7 +377,8 @@ def build_metals_products():
     out = []
     next_id = 1
     auto_linked = 0
-    fallback = 0
+    catalogue_only_poa = 0
+    master_poa = 0
 
     for sheet_name in wb.sheetnames:
         if sheet_name.startswith("_"): continue
@@ -418,7 +421,6 @@ def build_metals_products():
 
             price_ex = None
             stock_size = ""
-            poa = False
             if matched_key:
                 master_price = keys[matched_key]["priceEx"]
                 stock_size = keys[matched_key].get("stockSize", "")
@@ -427,17 +429,14 @@ def build_metals_products():
                 else:
                     # Master has a text marker (POA or similar) — treat the
                     # row as in-stock with no numeric price
-                    poa = True
+                    master_poa += 1
                 auto_linked += 1
-            elif isinstance(existing_price, (int, float)):
-                price_ex = existing_price
-                fallback += 1
-            elif existing_price is not None and str(existing_price).strip() != "":
-                # Hardcoded text in catalogue (e.g. "POA")
-                poa = True
-                fallback += 1
             else:
-                fallback += 1
+                # The catalogue controls which metal rows exist, but Metals.xlsx
+                # is the live pricing authority. If a catalogue row no longer
+                # matches Metals.xlsx, keep it visible as POA rather than using
+                # any old price still present in the catalogue workbook.
+                catalogue_only_poa += 1
 
             price_inc = round2(price_ex * 1.20) if price_ex is not None else None
 
@@ -476,7 +475,16 @@ def build_metals_products():
 
     matcher.save()
     code_registry.save()
-    print(f"  OK Metals products: {len(out)}  (auto-linked {auto_linked}, hardcoded fallback {fallback})")
+    print(
+        f"  OK Metals products: {len(out)}  "
+        f"(auto-linked {auto_linked}, catalogue-only POA {catalogue_only_poa}, "
+        f"master POA {master_poa})"
+    )
+    if catalogue_only_poa:
+        print(
+            "  NOTE: catalogue-only metals are shown as POA because Metals.xlsx "
+            "is the live price source"
+        )
     if matcher.broken_links:
         print(f"  WARNING: {len(matcher.broken_links)} saved metal links pointed to removed master rows")
     return out

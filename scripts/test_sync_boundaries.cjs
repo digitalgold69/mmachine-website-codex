@@ -60,6 +60,10 @@ const setupScript = fs.readFileSync(
   path.join(projectRoot, "scripts/setup/Setup-Owner-Machine.ps1"),
   "utf8"
 );
+const regenScript = fs.readFileSync(
+  path.join(projectRoot, "scripts/regen_website_data.py"),
+  "utf8"
+);
 
 assert.match(
   setupScript,
@@ -80,6 +84,17 @@ assert.match(
   setupScript,
   /git add lib\/mini-data\.ts lib\/metals-data\.ts lib\/featured-data\.ts lib\/catalogue-versions\.ts/,
   "owner daily sync wrapper must stage every generated catalogue data file explicitly"
+);
+
+assert.doesNotMatch(
+  regenScript,
+  /price_ex\s*=\s*existing_price/,
+  "metals website prices must not fall back to stale Metals catalogue prices when Metals.xlsx no longer supplies a price"
+);
+assert.match(
+  regenScript,
+  /catalogue-only metals are shown as POA/,
+  "metals sync must document that catalogue-only rows become POA"
 );
 
 console.log("ok - daily sync boundaries are limited to documented generated catalogue outputs");

@@ -15,6 +15,8 @@ Pattern:
   • Catalogue gets its OWN copy of _PriceLookup (hidden sheet inside it).
   • Catalogue's E column does VLOOKUP against ITS OWN _PriceLookup.
   • Each sync run rebuilds the catalogue from scratch with fresh prices.
+  • Rows that no longer match Metals.xlsx are shown as POA, never with an old
+    catalogue workbook price.
 """
 import openpyxl
 import re
@@ -298,6 +300,11 @@ def wire_catalogue():
                 # Not auto-linked — but still want a Code in column H so the
                 # owner / customers can read it off the catalogue. Use the
                 # candidate code from this row's own text (no master lookup).
+                row_edits = [
+                    edit for edit in row_edits if edit[0] != f"G{row_idx}"
+                ]
+                row_edits.append((f"E{row_idx}", cell_str(f"E{row_idx}", "POA")))
+                row_edits.append((f"G{row_idx}", cell_str(f"G{row_idx}", "POA")))
                 if public_code:
                     row_edits.append((f"H{row_idx}", cell_str(f"H{row_idx}", public_code)))
                 review_rows.append({

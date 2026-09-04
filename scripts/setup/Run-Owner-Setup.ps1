@@ -87,14 +87,34 @@ function Read-GitHubToken {
     return $script:acceptedToken
 }
 
+function Confirm-InstallMachine {
+    Write-Host ""
+    Write-Host "IMPORTANT" -ForegroundColor Yellow
+    Write-Host "This setup installs the daily sync on THIS Windows computer:"
+    Write-Host ""
+    Write-Host "  $env:COMPUTERNAME" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Running this setup from a network/server folder does not install it on the server."
+    Write-Host "To make the server run the daily sync, log into the server first, then run this setup there."
+    Write-Host ""
+    Write-Host "Continue only if the computer name above is the machine that should run the daily M-Machine sync."
+    Write-Host ""
+
+    $answer = Read-Host "Type YES to continue"
+    if ($answer -ne "YES") {
+        throw "Setup cancelled before installation. Run it again on the machine that should run the daily sync."
+    }
+}
+
 Write-Host ""
 Write-Host "M-Machine owner setup" -ForegroundColor Cyan
-Write-Host "This installs the website sync system to C:\mmachine."
+Write-Host "This installs the website sync system to C:\mmachine on the current computer."
 Write-Host ""
 Write-Host "This installs from the separate Codex GitHub repo, leaving Claude's original repo alone."
 Write-Host ""
 
 try {
+    Confirm-InstallMachine
     $token = Read-GitHubToken
 
     New-Item -ItemType Directory -Path $localSetupRoot -Force | Out-Null

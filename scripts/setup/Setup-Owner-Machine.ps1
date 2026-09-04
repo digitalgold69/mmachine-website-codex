@@ -1,10 +1,10 @@
 # Setup-Owner-Machine.ps1
 # ------------------------------------------------------------------------------
-# One-time setup script for the M-Machine owner's Windows machine.
+# One-time setup script for the M-Machine owner/server Windows machine.
 #
 # What it does:
 #   1. Installs Node.js, Python, and Git via winget.
-#   2. Clones the mmachine-website repo to C:\mmachine.
+#   2. Clones the mmachine-website repo to C:\mmachine on the current computer.
 #   3. Installs npm and Python dependencies.
 #   4. Creates friendly desktop items:
 #        M-Machine Master Files   -> C:\mmachine\data-source
@@ -21,7 +21,9 @@
 #
 # Important:
 #   The Excel files are not stored in GitHub. After setup, copy the owner's
-#   Excel files into the "M-Machine Master Files" desktop folder.
+#   Excel files into the "M-Machine Master Files" desktop folder on the
+#   computer that runs the sync. If the sync should run on the server, run this
+#   setup while logged into the server itself.
 # ------------------------------------------------------------------------------
 
 param(
@@ -36,6 +38,10 @@ $ErrorActionPreference = "Stop"
 $env:GIT_TERMINAL_PROMPT = "0"
 $env:GCM_INTERACTIVE = "never"
 $env:GIT_ASKPASS = "echo"
+
+Write-Host ""
+Write-Host "M-Machine setup is running on computer: $env:COMPUTERNAME" -ForegroundColor Cyan
+Write-Host "Install path: $InstallPath"
 
 function Write-Step {
     param([string]$Message)
