@@ -44,6 +44,7 @@ import { normaliseQuoteDelivery } from "@/lib/quote-delivery";
 import type { QuoteCustomer } from "@/lib/quote-types";
 import { ukHistoryBounds, ukMonthBounds } from "@/lib/uk-time";
 import { listFeaturedWork, type FeaturedWork } from "@/lib/featured";
+import { listManualMiniProducts } from "@/lib/manual-mini-products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,13 +155,14 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
 function safePublicItem(
   raw: Partial<QuoteItem>,
   index: number,
-  featuredById: Map<string, FeaturedWork>
+  featuredById: Map<string, FeaturedWork>,
+  manualMiniById: typeof miniById
 ): QuoteItem {
   const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
   const productId = asString(raw.productId, 120);
 
   if (raw.catalogue === "mini") {
-    const product = miniById.get(productId);
+    const product = miniById.get(productId) || manualMiniById.get(productId);
     if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
     return {
       key: `mini-${product.id}`,
@@ -730,10 +732,14 @@ export async function POST(req: Request) {
 
   try {
     const needsFeatured = rawItems.some((item) => item.catalogue === "featured");
+    const needsMini = rawItems.some((item) => item.catalogue === "mini");
     const featuredById = needsFeatured
       ? new Map((await listFeaturedWork()).map((item) => [item.id, item]))
       : new Map<string, FeaturedWork>();
-    const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById));
+    const manualMiniById = needsMini
+      ? new Map((await listManualMiniProducts({ activeOnly: true })).map((item) => [item.id, item]))
+      : new Map<string, (typeof products)[number]>();
+    const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById, manualMiniById));
     if (items.some((item) => item.catalogue === "mini") && (!customer.vehicleYear || !customer.vehicleModel)) {
       return NextResponse.json(
         { error: "Vehicle year and model are required for Mini panel orders." },

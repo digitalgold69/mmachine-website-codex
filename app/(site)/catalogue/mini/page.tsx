@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { OrderButton } from "@/components/QuoteCart";
-import { products, sections, getSection } from "@/lib/mini-data";
+import { products, sections, getSection, type Product, type Section } from "@/lib/mini-data";
 import { miniCatalogueUrl, miniCatalogueVersion } from "@/lib/catalogue-versions";
+import { MANUAL_MINI_SECTION_CODE, manualMiniSection } from "@/lib/manual-mini-product-shared";
 
 const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
   ssr: false,
@@ -34,6 +35,7 @@ export default function MiniCataloguePage() {
   const [section, setSection] = useState("all");
   const [search, setSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(50);
+  const [catalogueProducts, setCatalogueProducts] = useState<Product[]>(products);
   const [productImages, setProductImages] = useState<Record<string, MiniProductImage>>({});
   const [previewImage, setPreviewImage] = useState<ProductPreviewImage | null>(null);
   const partsListRef = useRef<HTMLDivElement | null>(null);
@@ -41,6 +43,18 @@ export default function MiniCataloguePage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    fetch("/api/products?catalogue=mini&limit=1200", { cache: "no-store" })
+      .then(async (response): Promise<{ products?: Product[] } | null> =>
+        response.ok ? (await response.json()) as { products?: Product[] } : null
+      )
+      .then((data: { products?: Product[] } | null) => {
+        if (cancelled || !Array.isArray(data?.products)) return;
+        setCatalogueProducts(data.products);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogueProducts(products);
+      });
 
     fetch("/api/mini-product-images", { cache: "no-store" })
       .then(async (response): Promise<{ images?: MiniProductImage[] } | null> =>
@@ -60,7 +74,7 @@ export default function MiniCataloguePage() {
   }, []);
 
   const filtered = useMemo(() => {
-    let list = products;
+    let list = catalogueProducts;
     if (section !== "all") list = list.filter((p) => p.section === section);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -72,13 +86,13 @@ export default function MiniCataloguePage() {
       );
     }
     return list;
-  }, [section, search]);
+  }, [catalogueProducts, section, search]);
 
   const sectionCounts = useMemo(() => {
     const query = search.trim().toLowerCase();
     const counts: Record<string, number> = { all: 0 };
 
-    for (const product of products) {
+    for (const product of catalogueProducts) {
       if (query && ![product.code, product.name, product.fits].join(" ").toLowerCase().includes(query)) continue;
 
       counts.all += 1;
@@ -86,10 +100,17 @@ export default function MiniCataloguePage() {
     }
 
     return counts;
-  }, [search]);
+  }, [catalogueProducts, search]);
 
   const shown = filtered.slice(0, displayLimit);
-  const currentSection = getSection(section);
+  const catalogueSections = useMemo<Section[]>(
+    () =>
+      catalogueProducts.some((product) => product.section === MANUAL_MINI_SECTION_CODE)
+        ? [...sections, manualMiniSection]
+        : sections,
+    [catalogueProducts]
+  );
+  const currentSection = section === MANUAL_MINI_SECTION_CODE ? manualMiniSection : getSection(section);
 
   function chooseSection(nextSection: string) {
     setSection(nextSection);
@@ -110,7 +131,7 @@ export default function MiniCataloguePage() {
           Classic Mini panels catalogue
         </h1>
         <p className="text-ink-muted">
-          {products.length} parts across {sections.length} sections, organised in the same down-the-list order as the printed catalogue.
+          {catalogueProducts.length} parts across {catalogueSections.length} sections, organised in the same down-the-list order as the printed catalogue.
         </p>
       </div>
 
@@ -148,7 +169,7 @@ export default function MiniCataloguePage() {
                   </span>
                 </button>
 
-                {sections.map((s) => {
+                {catalogueSections.map((s) => {
                   const count = sectionCounts[s.code] || 0;
                   const active = section === s.code;
                   return (
@@ -234,7 +255,7 @@ export default function MiniCataloguePage() {
         <p className="text-sm text-ink-muted">
           Showing <strong className="text-racing">{shown.length}</strong> of{" "}
           <strong className="text-racing">{filtered.length}</strong> parts
-          {filtered.length !== products.length && ` (filtered from ${products.length})`}
+          {filtered.length !== catalogueProducts.length && ` (filtered from ${catalogueProducts.length})`}
         </p>
       </div>
 

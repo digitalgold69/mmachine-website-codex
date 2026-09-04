@@ -1,5 +1,6 @@
 import { products } from "@/lib/mini-data";
 import { getD1, getFeaturedImagesBucket, type R2BucketBinding } from "@/lib/cloudflare";
+import { getManualMiniProduct } from "@/lib/manual-mini-products";
 
 export type MiniProductImage = {
   productId: string;
@@ -56,9 +57,15 @@ function safeProductId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
 }
 
-function validateProductId(productId: string) {
+async function validateProductId(productId: string) {
   const safe = safeProductId(productId);
-  if (!safe || !products.some((product) => product.id === safe)) {
+  if (
+    !safe ||
+    (
+      !products.some((product) => product.id === safe) &&
+      !(await getManualMiniProduct(safe))
+    )
+  ) {
     throw new Error("Mini panel part not found.");
   }
   return safe;
@@ -117,7 +124,7 @@ export async function saveMiniProductImage(input: {
   productId: string;
   imageDataUrl: string;
 }): Promise<MiniProductImage> {
-  const productId = validateProductId(input.productId);
+  const productId = await validateProductId(input.productId);
   const ext = extFromDataUrl(input.imageDataUrl);
   if (!ext) throw new Error("Image must be JPG, PNG, or WebP.");
 
@@ -180,7 +187,7 @@ export async function saveMiniProductImage(input: {
 }
 
 export async function deleteMiniProductImage(productId: string): Promise<void> {
-  const safe = validateProductId(productId);
+  const safe = await validateProductId(productId);
   await ensureMiniProductImagesSchema();
   const db = await getD1();
   const current = await db

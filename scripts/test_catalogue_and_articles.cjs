@@ -46,6 +46,8 @@ async function main() {
   assert.doesNotMatch(miniPage, /More filters/, "Mini catalogue should not use the old More filters toggle");
   assert.doesNotMatch(miniPage, /Mark \/ year|YEAR_OPTIONS|markDigitFromCode|HYDROLASTIC_DIGITS|mini-panel-body|mini-panel-year/, "Mini catalogue should not hide parts behind year, body type or Hydrolastic filters");
   assert.match(miniPage, /\/api\/mini-product-images/, "Mini catalogue must load uploaded product photos");
+  assert.match(miniPage, /\/api\/products\?catalogue=mini&limit=1200/, "Mini catalogue must load dashboard-added manual Mini parts");
+  assert.match(miniPage, /manualMiniSection/, "Mini catalogue must expose the manual Other section when manual parts exist");
   assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
   assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");
   assert.match(miniPage, /<col className="w-\[58px\]" \/>/, "Mini catalogue desktop photo column should stay compact between code and description");
@@ -61,6 +63,23 @@ async function main() {
   const navbar = read("components/Navbar.tsx");
   assert.match(navbar, /Custom Engineering Work/, "Header navigation should use the fuller custom engineering wording where space allows");
   assert.match(navbar, /Custom Engineering/, "Header navigation should keep a shorter desktop custom engineering label available");
+
+  const productsRoute = read("app/api/products/route.ts");
+  assert.match(productsRoute, /listManualMiniProducts/, "Products API must merge active manual Mini parts into the public Mini catalogue");
+  assert.match(productsRoute, /catalogue === "mini" \? 1200 : 200/, "Products API must allow the full Mini catalogue plus manual additions to be fetched");
+
+  const quoteRoute = read("app/api/quote-requests/route.ts");
+  assert.match(quoteRoute, /manualMiniById/, "Quote requests must validate dashboard-added manual Mini parts");
+  assert.match(quoteRoute, /listManualMiniProducts\(\{ activeOnly: true \}\)/, "Public quote submission should only accept active manual Mini parts");
+
+  const dashboardProductsPage = read("app/dashboard/(protected)/products/page.tsx");
+  assert.match(dashboardProductsPage, /Manually added/, "Dashboard products tab must include manual Mini part management");
+  assert.match(dashboardProductsPage, /\/api\/manual-mini-products/, "Manual Mini products must be loaded and saved through their own API");
+  assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
+
+  const manualProductsLib = read("lib/manual-mini-products.ts");
+  assert.match(manualProductsLib, /create table if not exists manual_mini_products/, "Manual Mini products must be stored outside generated catalogue files");
+  assert.match(manualProductsLib, /on conflict\(id\) do update/, "Manual Mini products must support dashboard edits without duplicate rows");
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
