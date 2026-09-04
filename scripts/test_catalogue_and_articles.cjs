@@ -49,7 +49,8 @@ async function main() {
   assert.match(miniPage, /\/api\/products\?catalogue=mini&limit=1200/, "Mini catalogue must load dashboard-added manual Mini parts");
   assert.match(miniPage, /manualMiniSection/, "Mini catalogue must expose the manual Other section when manual parts exist");
   assert.match(miniPage, /setPreviewImage/, "Mini catalogue product photos must open in a preview modal");
-  assert.doesNotMatch(miniPage, /border-dashed border-racing\/10 bg-cream-dark\/50/, "Mini catalogue must not show empty thumbnail boxes when no product image exists");
+  assert.match(miniPage, /function NoImageIcon/, "Mini catalogue should show a compact No Image Yet marker in empty desktop photo cells");
+  assert.match(miniPage, /title="No image yet"/, "Mini catalogue no-image marker should explain the empty photo state");
   assert.match(miniPage, /<col className="w-\[58px\]" \/>/, "Mini catalogue desktop photo column should stay compact between code and description");
   assert.match(miniPage, /xl:pl-20/, "Mini catalogue desktop descriptions should sit closer to the photo column without losing the column spacing");
   assert.match(miniPage, /text-center">[\s\S]*Photo/, "Mini catalogue desktop photo column should be centred");

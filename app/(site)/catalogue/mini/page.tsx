@@ -298,7 +298,9 @@ export default function MiniCataloguePage() {
                         >
                           <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                         </button>
-                      ) : null}
+                      ) : (
+                        <NoImageIcon />
+                      )}
                     </td>
                     <td className="py-2 pl-12 pr-3 align-middle xl:pl-20">
                       <div className="font-medium text-racing leading-snug">{p.name}</div>
@@ -452,6 +454,19 @@ export default function MiniCataloguePage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function NoImageIcon() {
+  return (
+    <div
+      className="mx-auto flex h-11 w-11 translate-x-5 flex-col items-center justify-center rounded-md border border-dashed border-racing/20 bg-cream-dark/70 text-racing/60"
+      title="No image yet"
+      aria-label="No image yet"
+    >
+      <span className="relative block h-4 w-5 rounded-[3px] border border-current before:absolute before:-top-1 before:left-1 before:h-1 before:w-2 before:rounded-sm before:border before:border-current before:content-[''] after:absolute after:left-1/2 after:top-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-current after:content-['']" />
+      <span className="mt-1 text-[8px] font-bold uppercase leading-none">No image</span>
     </div>
   );
 }
