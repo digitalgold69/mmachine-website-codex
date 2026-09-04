@@ -17,7 +17,7 @@ Supporting/template workbooks should live in `More Files`:
 
 | File | Purpose |
 | --- | --- |
-| `More Files\Metals catalogue 2023.xlsx` | Metals catalogue template/product list |
+| `More Files\Metals Catalogue.xlsx` | Metals catalogue template/product list |
 | `More Files\Mini Catalogue Self Updating.xlsm` | Mini catalogue template/product list |
 | `More Files\Mini Invoice Template.xlsm` | Mini invoice template |
 
@@ -31,16 +31,17 @@ The sync reads these files, then regenerates:
 
 ## Metals source of truth
 
-The website metals catalogue uses `More Files\Metals catalogue 2023.xlsx` to
-decide which metal rows exist.
+The website metals catalogue uses `More Files\Metals Catalogue.xlsx` to decide
+which metal rows exist. The old filename `Metals catalogue 2023.xlsx` is still
+accepted, but `Metals Catalogue.xlsx` is the clearer name to use going forward.
 
 `Metals.xlsx` supplies live prices. If a catalogue row no longer has a matching
 numeric price in `Metals.xlsx`, the website shows it as `POA` rather than
 keeping an old catalogue price.
 
-To fully remove a metal from the website, remove it from
-`More Files\Metals catalogue 2023.xlsx`. Removing or blanking only the price in
-`Metals.xlsx` leaves the row visible as `POA`.
+To fully remove a metal from the website, remove it from the metals catalogue
+workbook. Removing or blanking only the price in `Metals.xlsx` leaves the row
+visible as `POA`.
 
 ## Optional invoice templates
 

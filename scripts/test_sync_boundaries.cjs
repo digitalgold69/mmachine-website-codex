@@ -64,6 +64,10 @@ const regenScript = fs.readFileSync(
   path.join(projectRoot, "scripts/regen_website_data.py"),
   "utf8"
 );
+const sourcePathsScript = fs.readFileSync(
+  path.join(projectRoot, "scripts/phase2/source_paths.py"),
+  "utf8"
+);
 
 assert.match(
   setupScript,
@@ -95,6 +99,16 @@ assert.match(
   regenScript,
   /catalogue-only metals are shown as POA/,
   "metals sync must document that catalogue-only rows become POA"
+);
+assert.match(
+  sourcePathsScript,
+  /Metals Catalogue\.xlsx/,
+  "sync must accept the owner's simplified Metals Catalogue.xlsx filename"
+);
+assert.match(
+  sourcePathsScript,
+  /Metals catalogue 2023\.xlsx/,
+  "sync must keep accepting the old Metals catalogue 2023.xlsx filename"
 );
 
 console.log("ok - daily sync boundaries are limited to documented generated catalogue outputs");

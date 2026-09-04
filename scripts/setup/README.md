@@ -78,7 +78,7 @@ Daily master files the owner normally edits/replaces:
 
 Supporting files that should live in `M-Machine Master Files\More Files`:
 
-- `Metals catalogue 2023.xlsx`
+- `Metals Catalogue.xlsx`
 - `Mini Catalogue Self Updating.xlsm`
 - `Mini Invoice Template.xlsm`
 
@@ -147,16 +147,18 @@ files in `M-Machine Master Files`.
 
 ## Metals source of truth
 
-The website metals catalogue uses `Metals catalogue 2023.xlsx` to decide which
-metal rows exist and where they sit in the catalogue.
+The website metals catalogue uses `Metals Catalogue.xlsx` to decide which metal
+rows exist and where they sit in the catalogue. The old filename
+`Metals catalogue 2023.xlsx` is still accepted, but `Metals Catalogue.xlsx` is
+the clearer name to use going forward.
 
 `Metals.xlsx` is the live price source. If a catalogue row no longer has a
 matching numeric price in `Metals.xlsx`, the website shows that row as `POA`
 rather than keeping an old catalogue price.
 
-To fully remove a metal from the website, remove it from
-`Metals catalogue 2023.xlsx`. Removing or blanking only the price in
-`Metals.xlsx` leaves the row visible as `POA`.
+To fully remove a metal from the website, remove it from the metals catalogue
+workbook. Removing or blanking only the price in `Metals.xlsx` leaves the row
+visible as `POA`.
 
 Direct PowerShell method, if needed:
 

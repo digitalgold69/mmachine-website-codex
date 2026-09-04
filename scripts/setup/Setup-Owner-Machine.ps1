@@ -464,10 +464,20 @@ function Get-RequiredExcelFiles {
     return @(
         (Join-Path $dataSource "Metals.xlsx"),
         (Join-Path $dataSource "PartsbookBenji2014.xlsx"),
-        (Join-Path $supporting "Metals catalogue 2023.xlsx"),
+        (Join-Path $supporting "Metals Catalogue.xlsx"),
         (Join-Path $supporting "Mini Catalogue Self Updating.xlsm"),
         (Join-Path $supporting "Mini Invoice Template.xlsm")
     )
+}
+
+function Test-AnyPathExists {
+    param([string[]]$Paths)
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path) {
+            return $true
+        }
+    }
+    return $false
 }
 
 function Test-RequiredExcelFilesPresent {
@@ -483,8 +493,19 @@ function Test-RequiredExcelFilesPresent {
         }
     }
 
+    $metalsCatalogueCandidates = @(
+        (Join-Path $supporting "Metals Catalogue.xlsx"),
+        (Join-Path $supporting "Metals catalogue.xlsx"),
+        (Join-Path $supporting "Metals catalogue 2023.xlsx"),
+        (Join-Path $dataSource "Metals Catalogue.xlsx"),
+        (Join-Path $dataSource "Metals catalogue.xlsx"),
+        (Join-Path $dataSource "Metals catalogue 2023.xlsx")
+    )
+    if (-not (Test-AnyPathExists -Paths $metalsCatalogueCandidates)) {
+        $missing += (Join-Path $supporting "Metals Catalogue.xlsx")
+    }
+
     foreach ($fileName in @(
-        "Metals catalogue 2023.xlsx",
         "Mini Catalogue Self Updating.xlsm",
         "Mini Invoice Template.xlsm"
     )) {
@@ -507,6 +528,8 @@ function Move-SupportingExcelFilesToMoreFiles {
     New-Item -ItemType Directory -Force -Path $supportingPath | Out-Null
 
     foreach ($fileName in @(
+        "Metals Catalogue.xlsx",
+        "Metals catalogue.xlsx",
         "Metals catalogue 2023.xlsx",
         "Mini Catalogue Self Updating.xlsm",
         "Mini Invoice Template.xlsm",
@@ -1057,7 +1080,7 @@ More Files
 
 They are needed by the sync but normally should not be edited:
 
-Metals catalogue 2023.xlsx
+Metals Catalogue.xlsx
 Mini Catalogue Self Updating.xlsm
 Mini Invoice Template.xlsm
 

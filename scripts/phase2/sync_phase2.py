@@ -48,7 +48,7 @@ OPTIONAL_INVOICE_TEMPLATES = [
 def check_inputs():
     required_names = [
         "Metals.xlsx",
-        "Metals catalogue 2023.xlsx",
+        "Metals Catalogue.xlsx",
         "PartsbookBenji2014.xlsx",
         "Mini Catalogue Self Updating.xlsm",
         "Mini Invoice Template.xlsm",
@@ -108,7 +108,7 @@ def main():
     (PROJECT_ROOT / "final-deliverables").mkdir(exist_ok=True)
 
     steps = [
-        ("Step 1 of 3 - Wire the Metals catalogue 2023", "wire_catalogue.py"),
+        ("Step 1 of 3 - Wire the Metals catalogue workbook", "wire_catalogue.py"),
         ("Step 2 of 3 - Wire the Mini Catalogue Self Updating", "wire_mini_catalogue.py"),
         ("Step 3 of 3 - Embed current prices in the Mini Invoice", "wire_mini_invoice.py"),
     ]
