@@ -1360,22 +1360,22 @@ export const metals: MetalProduct[] = [
   },
   {
     "id": "m0068",
-    "code": "Aluminium-4\"x2\"1/8wall",
-    "name": "Aluminium — 4\" x 2\" 1/8 wall",
+    "code": "HE30-4\"x2\"1/8wall",
+    "name": "Box — Aluminium — HE30 — 4\" x 2\" 1/8 wall",
     "category": "aluminium",
     "metal": "Aluminium",
-    "form": "",
+    "form": "Box",
     "stock": "in",
     "priceExVat": 12.0,
     "priceIncVat": 14.4,
     "unit": "foot/300mm",
-    "spec": "",
+    "spec": "HE30",
     "size": "4\" x 2\" 1/8 wall",
     "stockSize": "",
     "notes": "",
     "sourceSheet": "Alu Box n Channel",
     "pricePerKg": 12.0,
-    "description": "Aluminium — 4\" x 2\" 1/8 wall"
+    "description": "HE30"
   },
   {
     "id": "m0069",
