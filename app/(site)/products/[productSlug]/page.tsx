@@ -18,6 +18,7 @@ import {
   relatedProducts,
   type SeoProduct,
 } from "@/lib/seo";
+import { catalogueMoney, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 type PageProps = {
   params: Promise<{ productSlug: string }>;
@@ -26,8 +27,7 @@ type PageProps = {
 export const dynamicParams = true;
 export const revalidate = 86400;
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? `\u00a3${value.toFixed(2)}` : "POA";
+const money = catalogueMoney;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { productSlug } = await params;
@@ -208,8 +208,8 @@ function quoteItem(item: SeoProduct) {
       code: p.code,
       description: p.name,
       unit: "each",
-      unitPriceExVat: p.priceExVat,
-      unitPriceIncVat: p.priceIncVat,
+      unitPriceExVat: normaliseCataloguePrice(p.priceExVat),
+      unitPriceIncVat: normaliseCataloguePrice(p.priceIncVat),
     };
   }
 
@@ -226,7 +226,7 @@ function quoteItem(item: SeoProduct) {
     size: p.size,
     stockSize: p.stockSize,
     unit: p.unit,
-    unitPriceExVat: p.priceExVat,
-    unitPriceIncVat: p.priceIncVat,
+    unitPriceExVat: normaliseCataloguePrice(p.priceExVat),
+    unitPriceIncVat: normaliseCataloguePrice(p.priceIncVat),
   };
 }

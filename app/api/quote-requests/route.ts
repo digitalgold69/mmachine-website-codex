@@ -38,6 +38,7 @@ import type {
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
 import { getLiveMetalCatalogueProducts, getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 import { calculateMetalOrderItem, getMetalOrderConfig } from "@/lib/metal-pricing";
 import { checkRateLimit } from "@/lib/request-limits";
 import { readCompletedFileToken } from "@/lib/quote-upload-token";
@@ -67,6 +68,10 @@ function asNumberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function cataloguePrice(value: number | null | undefined) {
+  return normaliseCataloguePrice(value);
 }
 
 function asBoolean(value: unknown, fallback: boolean) {
@@ -175,8 +180,8 @@ function safePublicItem(
       description: product.name,
       unit: "each",
       qty,
-      unitPriceExVat: product.priceExVat,
-      unitPriceIncVat: product.priceIncVat,
+      unitPriceExVat: cataloguePrice(product.priceExVat),
+      unitPriceIncVat: cataloguePrice(product.priceIncVat),
     };
   }
 
@@ -198,8 +203,8 @@ function safePublicItem(
       stockSize: product.stockSize,
       unit: product.unit,
       qty,
-      unitPriceExVat: product.priceExVat,
-      unitPriceIncVat: product.priceIncVat,
+      unitPriceExVat: cataloguePrice(product.priceExVat),
+      unitPriceIncVat: cataloguePrice(product.priceIncVat),
     };
     const config = getMetalOrderConfig(product);
     if (config.mode === "length" || config.mode === "sheet" || config.mode === "fixed") {
@@ -220,7 +225,7 @@ function safePublicItem(
   if (raw.catalogue === "featured") {
     const featured = featuredById.get(productId);
     if (!featured) throw new Error(`Item ${index + 1} is no longer available.`);
-    const priceExVat = featured.priceExVat;
+    const priceExVat = cataloguePrice(featured.priceExVat);
     return {
       key: `featured-${featured.id}`,
       catalogue: "featured",
@@ -230,7 +235,7 @@ function safePublicItem(
       unit: "each",
       qty,
       unitPriceExVat: priceExVat,
-      unitPriceIncVat: typeof priceExVat === "number" ? Number((priceExVat * 1.2).toFixed(2)) : null,
+      unitPriceIncVat: priceExVat !== null ? Number((priceExVat * 1.2).toFixed(2)) : null,
     };
   }
 

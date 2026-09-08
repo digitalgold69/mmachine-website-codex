@@ -523,6 +523,25 @@ assert.equal(poaProfile.unitPriceExVat, null);
 assert.equal(poaProfile.unitPriceIncVat, null);
 assert.equal(poaProfile.metalDimensions.display, "Length 24 in");
 
+const zeroPriceProfile = calculateMetalOrderItem(
+  {
+    id: "zero-price-profile",
+    category: "aluminium",
+    form: "Flat",
+    metal: "Aluminium",
+    size: '1/2" x 1/8"',
+    unit: "foot/300mm",
+    stockSize: "5m",
+    priceExVat: 0,
+  },
+  { inputUnit: "imperial", inputLength: 24 },
+  3
+);
+assert.equal(zeroPriceProfile.ok, true);
+assert.equal(zeroPriceProfile.unitPriceExVat, null);
+assert.equal(zeroPriceProfile.unitPriceIncVat, null);
+assert.equal(zeroPriceProfile.metalDimensions.display, "Length 24 in");
+
 const poaSheet = calculateMetalOrderItem(
   {
     id: "poa-sheet",

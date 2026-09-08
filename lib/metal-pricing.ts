@@ -1,4 +1,5 @@
 import type { QuoteItem } from "@/lib/quote-types";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 export const METAL_DIMENSION_DISCLAIMER =
   "Material dimensions are nominal and may vary slightly. Contact us before ordering for precision jobs. Cutting charges may apply.";
@@ -101,7 +102,8 @@ function moneyPrecision(value: number) {
 }
 
 export function moneyLineTotal(unitPrice: number | null | undefined, qty: number) {
-  return typeof unitPrice === "number" ? moneyPrecision(unitPrice * Math.max(1, qty)) : null;
+  const price = normaliseCataloguePrice(unitPrice);
+  return price === null ? null : moneyPrecision(price * Math.max(1, qty));
 }
 
 function normalise(value: unknown) {
@@ -136,9 +138,7 @@ function productText(product: MetalPricingProduct) {
 }
 
 function productPriceExVat(product: MetalPricingProduct) {
-  if (typeof product.priceExVat === "number") return product.priceExVat;
-  if (typeof product.unitPriceExVat === "number") return product.unitPriceExVat;
-  return null;
+  return normaliseCataloguePrice(product.priceExVat) ?? normaliseCataloguePrice(product.unitPriceExVat);
 }
 
 function parseFraction(value: string) {

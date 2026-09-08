@@ -2,6 +2,7 @@ import { products as generatedMiniProducts, type Product } from "@/lib/mini-data
 import { metals as generatedMetals, type MetalProduct } from "@/lib/metals-data";
 import { listManualMiniProducts } from "@/lib/manual-mini-products";
 import { getCatalogueOverrideProducts, type CatalogueOverrideMeta } from "@/lib/catalogue-overrides";
+import { normaliseCatalogueProductPrices } from "@/lib/catalogue-pricing";
 
 export type LiveMiniCatalogue = {
   products: Product[];
@@ -15,13 +16,13 @@ export type LiveMetalsCatalogue = {
 };
 
 export async function getLiveMiniCatalogueProducts(options: { includeManual?: boolean } = {}): Promise<LiveMiniCatalogue> {
-  let baseProducts = generatedMiniProducts;
+  let baseProducts = normaliseCatalogueProductPrices(generatedMiniProducts);
   let override: CatalogueOverrideMeta | null = null;
 
   try {
     const uploaded = await getCatalogueOverrideProducts<Product>("mini");
     if (uploaded?.products?.length) {
-      baseProducts = uploaded.products;
+      baseProducts = normaliseCatalogueProductPrices(uploaded.products);
       override = uploaded.meta;
     }
   } catch (error) {
@@ -38,7 +39,7 @@ export async function getLiveMiniCatalogueProducts(options: { includeManual?: bo
   try {
     const manualProducts = await listManualMiniProducts({ activeOnly: true });
     return {
-      products: [...baseProducts, ...manualProducts],
+      products: [...baseProducts, ...normaliseCatalogueProductPrices(manualProducts)],
       catalogueProductCount,
       override,
     };
@@ -54,7 +55,7 @@ export async function getLiveMetalCatalogueProducts(): Promise<LiveMetalsCatalog
   try {
     const uploaded = await getCatalogueOverrideProducts<MetalProduct>("metals");
     if (uploaded?.products?.length) {
-      return { products: uploaded.products, override: uploaded.meta };
+      return { products: normaliseCatalogueProductPrices(uploaded.products), override: uploaded.meta };
     }
   } catch (error) {
     console.error("metals_catalogue_override_unavailable", {
@@ -62,5 +63,5 @@ export async function getLiveMetalCatalogueProducts(): Promise<LiveMetalsCatalog
     });
   }
 
-  return { products: generatedMetals, override: null };
+  return { products: normaliseCatalogueProductPrices(generatedMetals), override: null };
 }

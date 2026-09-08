@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { hasCataloguePrice } from "@/lib/catalogue-pricing";
 
 // Server-side type — kept in sync with /api/featured/route.ts
 type Entry = {
@@ -298,7 +299,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
             </div>
             <h3 className="font-display text-lg text-racing mb-2">{job.title}</h3>
             <p className="text-sm text-ink-muted mb-4 line-clamp-2">{job.description}</p>
-            {typeof job.priceExVat === "number" && (
+            {hasCataloguePrice(job.priceExVat) && (
               <p className="mb-4 text-sm font-semibold text-racing">
                 {GBP}{job.priceExVat.toFixed(2)}{job.hideExVat ? "" : " ex VAT"}
               </p>
@@ -393,7 +394,7 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
                       {preview.fullStory}
                     </div>
                   )}
-                  {typeof preview.priceExVat === "number" && (
+                  {hasCataloguePrice(preview.priceExVat) && (
                     <div className="rounded-lg border border-racing/10 p-4">
                       <div className="text-xs uppercase tracking-wider text-ink-muted">
                         {preview.hideExVat ? "Price" : "Price ex VAT"}

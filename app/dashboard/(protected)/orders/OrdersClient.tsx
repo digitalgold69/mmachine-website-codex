@@ -14,6 +14,7 @@ import {
   websiteInvoiceDisplay,
 } from "@/lib/order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 import type { PaymentSettings } from "@/lib/payment-settings";
 import type {
   QuoteAccountingBucket,
@@ -343,8 +344,8 @@ function catalogueResultSubtitle(product: CatalogueSearchProduct, catalogue: Add
 }
 
 function quoteItemFromCatalogueProduct(product: CatalogueSearchProduct, catalogue: AddLineCatalogue): QuoteItem {
-  const unitPriceExVat = typeof product.priceExVat === "number" ? product.priceExVat : null;
-  const unitPriceIncVat = typeof product.priceIncVat === "number" ? product.priceIncVat : incVatFromExVat(unitPriceExVat);
+  const unitPriceExVat = normaliseCataloguePrice(product.priceExVat);
+  const unitPriceIncVat = normaliseCataloguePrice(product.priceIncVat) ?? incVatFromExVat(unitPriceExVat);
 
   if (catalogue === "metals") {
     return {
@@ -747,9 +748,14 @@ function PaymentSettingsModal({
   onSave: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-racing-dark/60 px-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="payment-settings-title" className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-racing-dark/60 px-3 py-4 sm:px-4 sm:py-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-settings-title"
+        className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-h-[calc(100vh-3rem)]"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
           <div>
             <h2 id="payment-settings-title" className="font-display text-2xl text-racing">Payment methods</h2>
             <p className="mt-1 text-sm leading-6 text-ink-muted">
@@ -761,113 +767,115 @@ function PaymentSettingsModal({
           </button>
         </div>
 
-        <div className="mt-5 space-y-5">
-          <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">BACS details</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="payment-account-type">Account type</label>
-                <input
-                  id="payment-account-type"
-                  value={draft.accountType}
-                  onChange={(event) => onChange({ accountType: event.target.value })}
-                  className="input"
-                  placeholder="Business"
-                />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-5">
+          <div className="space-y-4">
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">BACS details</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="payment-account-type">Account type</label>
+                  <input
+                    id="payment-account-type"
+                    value={draft.accountType}
+                    onChange={(event) => onChange({ accountType: event.target.value })}
+                    className="input"
+                    placeholder="Business"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="payment-account-name">Account name</label>
+                  <input
+                    id="payment-account-name"
+                    value={draft.accountName}
+                    onChange={(event) => onChange({ accountName: event.target.value })}
+                    className="input"
+                    placeholder="Craftgrange Limited"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="payment-sort-code">Sort code</label>
+                  <input
+                    id="payment-sort-code"
+                    value={draft.sortCode}
+                    onChange={(event) => onChange({ sortCode: event.target.value })}
+                    className="input"
+                    placeholder="00-00-00"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="payment-account-number">Account number</label>
+                  <input
+                    id="payment-account-number"
+                    value={draft.accountNumber}
+                    onChange={(event) => onChange({ accountNumber: event.target.value })}
+                    className="input"
+                    placeholder="00000000"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="label" htmlFor="payment-account-name">Account name</label>
-                <input
-                  id="payment-account-name"
-                  value={draft.accountName}
-                  onChange={(event) => onChange({ accountName: event.target.value })}
-                  className="input"
-                  placeholder="Craftgrange Limited"
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="payment-sort-code">Sort code</label>
-                <input
-                  id="payment-sort-code"
-                  value={draft.sortCode}
-                  onChange={(event) => onChange({ sortCode: event.target.value })}
-                  className="input"
-                  placeholder="00-00-00"
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="payment-account-number">Account number</label>
-                <input
-                  id="payment-account-number"
-                  value={draft.accountNumber}
-                  onChange={(event) => onChange({ accountNumber: event.target.value })}
-                  className="input"
-                  placeholder="00000000"
-                />
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Export order details</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="payment-bic">BIC</label>
-                <input
-                  id="payment-bic"
-                  value={draft.bic}
-                  onChange={(event) => onChange({ bic: event.target.value })}
-                  className="input uppercase"
-                  placeholder="ABCDGB2L"
-                />
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Export order details</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="payment-bic">BIC</label>
+                  <input
+                    id="payment-bic"
+                    value={draft.bic}
+                    onChange={(event) => onChange({ bic: event.target.value })}
+                    className="input uppercase"
+                    placeholder="ABCDGB2L"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="payment-iban">IBAN</label>
+                  <input
+                    id="payment-iban"
+                    value={draft.iban}
+                    onChange={(event) => onChange({ iban: event.target.value })}
+                    className="input uppercase"
+                    placeholder="GB00 ABCD 0000 0000 0000 00"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="label" htmlFor="payment-iban">IBAN</label>
-                <input
-                  id="payment-iban"
-                  value={draft.iban}
-                  onChange={(event) => onChange({ iban: event.target.value })}
-                  className="input uppercase"
-                  placeholder="GB00 ABCD 0000 0000 0000 00"
-                />
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Company details</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="payment-company-number">Company number</label>
-                <input
-                  id="payment-company-number"
-                  value={draft.companyNumber}
-                  onChange={(event) => onChange({ companyNumber: event.target.value })}
-                  className="input"
-                  placeholder={DEFAULT_COMPANY_NUMBER}
-                />
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Company details</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="payment-company-number">Company number</label>
+                  <input
+                    id="payment-company-number"
+                    value={draft.companyNumber}
+                    onChange={(event) => onChange({ companyNumber: event.target.value })}
+                    className="input"
+                    placeholder={DEFAULT_COMPANY_NUMBER}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="payment-vat-number">VAT number</label>
+                  <input
+                    id="payment-vat-number"
+                    value={draft.vatNumber}
+                    onChange={(event) => onChange({ vatNumber: event.target.value })}
+                    className="input uppercase"
+                    placeholder="GB..."
+                  />
+                </div>
               </div>
-              <div>
-                <label className="label" htmlFor="payment-vat-number">VAT number</label>
-                <input
-                  id="payment-vat-number"
-                  value={draft.vatNumber}
-                  onChange={(event) => onChange({ vatNumber: event.target.value })}
-                  className="input uppercase"
-                  placeholder="GB..."
-                />
-              </div>
+            </section>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {error}
             </div>
-          </section>
+          )}
         </div>
 
-        {error && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="flex shrink-0 justify-end gap-3 border-t border-racing/10 px-4 py-3 sm:px-5">
           <button type="button" onClick={onClose} disabled={saving} className="btn-secondary px-4 py-2 text-sm disabled:opacity-60">
             Cancel
           </button>

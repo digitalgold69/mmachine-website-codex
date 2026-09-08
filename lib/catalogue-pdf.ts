@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { getCloudflareEnv } from "@/lib/cloudflare";
 import { sections, type Product, type Section } from "@/lib/mini-data";
 import { metalCategories, type MetalProduct } from "@/lib/metals-data";
+import { catalogueMoney } from "@/lib/catalogue-pricing";
 
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
@@ -30,7 +31,7 @@ function cleanPdfText(value: unknown, max = 220) {
 }
 
 function money(value: number | null | undefined) {
-  return typeof value === "number" ? `£${value.toFixed(2)}` : "POA";
+  return catalogueMoney(value);
 }
 
 function lineWrap(text: string, font: PDFFont, size: number, maxWidth: number) {

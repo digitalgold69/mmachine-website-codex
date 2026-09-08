@@ -22,6 +22,7 @@ import {
 } from "@/lib/metal-pricing";
 import type { MetalDimensionUnit } from "@/lib/metal-pricing";
 import type { QuoteItem } from "@/lib/quote-types";
+import { catalogueMoney, hasCataloguePrice, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 type PendingItem = Omit<QuoteItem, "qty">;
 
@@ -36,8 +37,7 @@ const STORAGE_KEY = "mmachine-quote-cart";
 const MINI_VEHICLE_MODELS = ["Saloon", "Van", "Traveller", "Pickup"];
 const VAT_MULTIPLIER = 1.2;
 
-const money = (value: number | null) =>
-  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
+const money = catalogueMoney;
 
 const itemLabel = (item: QuoteItem | PendingItem) =>
   item.catalogue === "custom"
@@ -130,14 +130,14 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
 
   const count = items.reduce((sum, item) => sum + item.qty, 0);
   const showCartUi = !pathname?.startsWith("/dashboard");
-  const hasPoaItems = items.some((item) => typeof item.unitPriceExVat !== "number");
+  const hasPoaItems = items.some((item) => !hasCataloguePrice(item.unitPriceExVat));
   const needsVehicleDetails = items.some((item) => item.catalogue === "mini");
 
   const subtotal = useMemo(
     () =>
       items.reduce(
         (sum, item) =>
-          sum + (typeof item.unitPriceExVat === "number" ? item.unitPriceExVat * item.qty : 0),
+          sum + (hasCataloguePrice(item.unitPriceExVat) ? normaliseCataloguePrice(item.unitPriceExVat)! * item.qty : 0),
         0
       ),
     [items]
@@ -178,9 +178,9 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   const pendingCatalogueUnitPrice = pending?.unitPriceExVat ?? null;
   const pendingCatalogueUnit = pending?.unit;
   const pendingPreviewLineExVat =
-    typeof pendingPreviewUnitPrice === "number" ? pendingPreviewUnitPrice * pendingQty : null;
+    hasCataloguePrice(pendingPreviewUnitPrice) ? normaliseCataloguePrice(pendingPreviewUnitPrice)! * pendingQty : null;
   const pendingPreviewLineIncVat =
-    typeof pendingPreviewLineExVat === "number" ? pendingPreviewLineExVat * VAT_MULTIPLIER : null;
+    hasCataloguePrice(pendingPreviewLineExVat) ? normaliseCataloguePrice(pendingPreviewLineExVat)! * VAT_MULTIPLIER : null;
   const subtotalIncVat = subtotal * VAT_MULTIPLIER;
   const pendingDimensionUnitText = metalDimensionUnitLabel(pendingDimensionUnit);
   const pendingDimensionStep = pendingDimensionUnit === "imperial" ? "0.001" : "0.1";
@@ -519,7 +519,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
                       {pendingMetalCalculation.metalDimensions.display}:{" "}
                       <strong>
                         {money(pendingMetalCalculation.unitPriceExVat)}
-                        {typeof pendingMetalCalculation.unitPriceExVat === "number" ? " ex VAT each" : ""}
+                        {hasCataloguePrice(pendingMetalCalculation.unitPriceExVat) ? " ex VAT each" : ""}
                       </strong>
                     </div>
                   ) : (

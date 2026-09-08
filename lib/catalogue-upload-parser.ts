@@ -35,11 +35,11 @@ function round2(value: number) {
 }
 
 function priceOrNull(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return round2(value);
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return round2(value);
   const text = cleanText(value, 80);
   if (!text || /^poa$/i.test(text) || /^[-–—]+$/.test(text)) return null;
   const parsed = Number(text.replace(/£|,|\s/g, ""));
-  return Number.isFinite(parsed) && parsed >= 0 ? round2(parsed) : null;
+  return Number.isFinite(parsed) && parsed > 0 ? round2(parsed) : null;
 }
 
 function normaliseKey(value: unknown) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { products, sections } from "@/lib/mini-data";
 import { metalCategories, metals } from "@/lib/metals-data";
 import { MANUAL_MINI_SECTION_CODE } from "@/lib/manual-mini-product-shared";
+import { catalogueMoney } from "@/lib/catalogue-pricing";
 
 type Catalogue = "mini" | "metals" | "manual";
 type MiniProduct = (typeof products)[number];
@@ -385,7 +386,7 @@ export default function DashboardProductsPage() {
       name: product.name,
       section: product.section,
       fits: product.fits || "",
-      priceExVat: typeof product.priceExVat === "number" ? product.priceExVat.toFixed(2) : "",
+      priceExVat: product.priceExVat && product.priceExVat > 0 ? product.priceExVat.toFixed(2) : "",
       active: product.active !== false,
     });
     setManualAction(null);
@@ -775,7 +776,7 @@ export default function DashboardProductsPage() {
 }
 
 function money(value: number | null | undefined) {
-  return typeof value === "number" ? `\u00a3${value.toFixed(2)}` : "POA";
+  return catalogueMoney(value);
 }
 
 function formatUploadTime(value: string) {

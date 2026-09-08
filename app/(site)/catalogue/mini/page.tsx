@@ -7,6 +7,7 @@ import { OrderButton } from "@/components/QuoteCart";
 import { products, sections, getSection, type Product, type Section } from "@/lib/mini-data";
 import { miniCatalogueUrl, miniCatalogueVersion } from "@/lib/catalogue-versions";
 import { MANUAL_MINI_SECTION_CODE, manualMiniSection } from "@/lib/manual-mini-product-shared";
+import { catalogueMoney, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
   ssr: false,
@@ -28,8 +29,7 @@ type ProductPreviewImage = MiniProductImage & {
   code: string;
 };
 
-const money = (value: number | null) =>
-  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
+const money = catalogueMoney;
 
 export default function MiniCataloguePage() {
   const [section, setSection] = useState("all");
@@ -320,8 +320,8 @@ export default function MiniCataloguePage() {
                           code: p.code,
                           description: p.name,
                           unit: "each",
-                          unitPriceExVat: p.priceExVat,
-                          unitPriceIncVat: p.priceIncVat,
+                          unitPriceExVat: normaliseCataloguePrice(p.priceExVat),
+                          unitPriceIncVat: normaliseCataloguePrice(p.priceIncVat),
                         }}
                       />
                     </td>
@@ -380,8 +380,8 @@ export default function MiniCataloguePage() {
                       code: p.code,
                       description: p.name,
                       unit: "each",
-                      unitPriceExVat: p.priceExVat,
-                      unitPriceIncVat: p.priceIncVat,
+                      unitPriceExVat: normaliseCataloguePrice(p.priceExVat),
+                      unitPriceIncVat: normaliseCataloguePrice(p.priceIncVat),
                     }}
                     className="w-full"
                   />

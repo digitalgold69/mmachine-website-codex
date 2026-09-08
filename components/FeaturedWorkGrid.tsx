@@ -6,6 +6,7 @@ import type { FeaturedWork } from "@/lib/featured";
 import { featuredOrderItem } from "@/lib/featured-order";
 import { OrderButton } from "@/components/QuoteCart";
 import Link from "next/link";
+import { hasCataloguePrice } from "@/lib/catalogue-pricing";
 
 type FeaturedWorkGridProps = {
   items: FeaturedWork[];
@@ -131,7 +132,7 @@ export default function FeaturedWorkGrid({
             {!showDescription && (
               <p className="text-sm text-ink-muted leading-relaxed">{job.description}</p>
             )}
-            {typeof job.priceExVat === "number" && (
+            {hasCataloguePrice(job.priceExVat) && (
               <div
                 className="mt-auto flex items-center justify-between gap-4 border-t border-racing/10 pt-4"
                 onClick={(event) => event.stopPropagation()}
@@ -205,7 +206,7 @@ export default function FeaturedWorkGrid({
                       {selected.fullStory}
                     </div>
                   )}
-                  {typeof selected.priceExVat === "number" && (
+                  {hasCataloguePrice(selected.priceExVat) && (
                     <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-racing/10 p-4">
                       <div>
                         <div className="text-xs uppercase tracking-wider text-ink-muted">

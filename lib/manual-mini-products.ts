@@ -1,6 +1,7 @@
 import { getD1 } from "@/lib/cloudflare";
 import { sections, type Product } from "@/lib/mini-data";
 import { MANUAL_MINI_SECTION_CODE } from "@/lib/manual-mini-product-shared";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 export type ManualMiniProductInput = {
   code: string;
@@ -73,9 +74,9 @@ function manualId() {
 }
 
 function rowToProduct(row: ManualMiniProductRow): Product {
-  const priceExVat = typeof row.price_ex_vat === "number" && Number.isFinite(row.price_ex_vat)
-    ? Number(row.price_ex_vat.toFixed(2))
-    : null;
+  const priceExVat = normaliseCataloguePrice(
+    typeof row.price_ex_vat === "number" ? Number(row.price_ex_vat.toFixed(2)) : null
+  );
   return {
     id: row.id,
     code: row.code,
@@ -100,10 +101,9 @@ function normaliseInput(input: ManualMiniProductInput) {
   if (!name) throw new Error("Enter a description.");
 
   const price = input.priceExVat;
-  const priceExVat =
-    typeof price === "number" && Number.isFinite(price) && price >= 0
-      ? Number(price.toFixed(2))
-      : null;
+  const priceExVat = normaliseCataloguePrice(
+    typeof price === "number" && Number.isFinite(price) ? Number(price.toFixed(2)) : null
+  );
 
   return {
     code,

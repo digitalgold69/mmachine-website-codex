@@ -1,4 +1,5 @@
 import { getD1, getFeaturedImagesBucket } from "@/lib/cloudflare";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 export type FeaturedWork = {
   id: string;
@@ -93,7 +94,7 @@ function rowToWork(row: FeaturedRow): FeaturedWork {
     category: row.category || "Fabrication",
     fullStory: row.full_story || "",
     imagePath: row.image_url || imageUrlFromPath(row.image_path),
-    priceExVat: typeof row.price_ex_vat === "number" ? row.price_ex_vat : null,
+    priceExVat: normaliseCataloguePrice(row.price_ex_vat),
     hideExVat: row.hide_ex_vat === 1,
   };
 }
@@ -216,12 +217,11 @@ export async function saveFeaturedEntry(input: {
 
   const now = new Date().toISOString();
   const rawPrice = entry.priceExVat;
-  const priceExVat = rawPrice === null || rawPrice === undefined
-    ? null
-    : Number(rawPrice);
-  if (priceExVat !== null && (!Number.isFinite(priceExVat) || priceExVat < 0)) {
+  const numericPrice = rawPrice === null || rawPrice === undefined ? null : Number(rawPrice);
+  if (numericPrice !== null && (!Number.isFinite(numericPrice) || numericPrice < 0)) {
     throw new Error("Price must be a valid amount, or left blank.");
   }
+  const priceExVat = normaliseCataloguePrice(numericPrice);
   const hideExVat = entry.hideExVat === true;
   const result = await db
     .prepare(

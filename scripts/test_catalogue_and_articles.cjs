@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const XLSX = require("xlsx");
 const { PDFDocument } = require("pdf-lib");
 
 const root = path.resolve(__dirname, "..");
@@ -18,6 +19,18 @@ const {
 } = jiti("../lib/mini-section-pdfs.ts");
 const { guides } = jiti("../lib/articles.ts");
 const { parseUploadedCatalogue } = jiti("../lib/catalogue-upload-parser.ts");
+const {
+  catalogueMoney,
+  normaliseCatalogueProductPrices,
+} = jiti("../lib/catalogue-pricing.ts");
+
+function workbookBytes(sheets) {
+  const workbook = XLSX.utils.book_new();
+  for (const [name, rows] of Object.entries(sheets)) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), name);
+  }
+  return new Uint8Array(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+}
 
 async function main() {
   const pdfBytes = fs.readFileSync(path.join(root, "public/catalogue/mini-catalogue.pdf"));
@@ -100,9 +113,44 @@ async function main() {
   assert.match(uploadRoute, /buildMiniCataloguePdfBytes/, "Mini workbook uploads must regenerate the live Mini PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
 
+  const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
+  assert.match(ordersClient, /PaymentSettingsModal/, "Dashboard must expose editable payment method settings");
+  assert.match(ordersClient, /max-h-\[calc\(100vh-2rem\)\]/, "Payment method settings modal must fit short laptop screens");
+  assert.match(ordersClient, /min-h-0 flex-1 overflow-y-auto px-4 pb-4/, "Payment method settings modal fields must scroll inside the dialog");
+
   const overridesLib = read("lib/catalogue-overrides.ts");
   assert.match(overridesLib, /catalogue_overrides/, "Uploaded catalogue metadata must be stored separately from manual Mini products");
   assert.match(overridesLib, /catalogue-overrides\/\$\{input\.catalogue\}/, "Uploaded workbooks, products and PDFs must be stored in a catalogue override R2 path");
+
+  assert.equal(catalogueMoney(0), "POA", "Catalogue prices entered as zero must display as POA");
+  assert.equal(catalogueMoney(0.17), "\u00a30.17", "Sub-pound catalogue prices must remain valid");
+  const normalisedZero = normaliseCatalogueProductPrices([{ priceExVat: 0, priceIncVat: 0 }])[0];
+  assert.equal(normalisedZero.priceExVat, null, "Generated or stored zero ex VAT prices must normalise to POA");
+  assert.equal(normalisedZero.priceIncVat, null, "Generated or stored zero inc VAT prices must normalise to POA");
+
+  const zeroMiniUpload = parseUploadedCatalogue(
+    "mini",
+    workbookBytes({
+      "999B": [
+        ["Code", "Description", "Ex VAT", "Inc VAT"],
+        ["11.99.00.00", "Zero Price Test Panel", 0, 0],
+      ],
+    })
+  );
+  assert.equal(zeroMiniUpload.products[0].priceExVat, null, "Uploaded Mini lines priced at zero must become POA");
+  assert.equal(zeroMiniUpload.products[0].priceIncVat, null, "Uploaded Mini inc VAT zero prices must become POA");
+
+  const zeroMetalsUpload = parseUploadedCatalogue(
+    "metals",
+    workbookBytes({
+      Steel: [
+        ["Shape", "Metal", "Spec", "Size", "Ex VAT", "Unit", "", "Code"],
+        ["Flat", "Steel", "EN3B", "10mm x 20mm", 0, "foot/300mm", "", "ZERO-METAL"],
+      ],
+    })
+  );
+  assert.equal(zeroMetalsUpload.products[0].priceExVat, null, "Uploaded metals lines priced at zero must become POA");
+  assert.equal(zeroMetalsUpload.products[0].priceIncVat, null, "Uploaded metals inc VAT zero prices must become POA");
 
   const miniUploadSource = fs.existsSync(path.join(root, "final-deliverables/Mini Catalogue Self Updating.xlsm"))
     ? "final-deliverables/Mini Catalogue Self Updating.xlsm"

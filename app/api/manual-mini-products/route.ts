@@ -6,6 +6,7 @@ import {
   saveManualMiniProduct,
 } from "@/lib/manual-mini-products";
 import { deleteMiniProductImage } from "@/lib/mini-product-images";
+import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ function asString(value: unknown, max = 500) {
 function asPrice(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  return normaliseCataloguePrice(Number.isFinite(parsed) ? parsed : null);
 }
 
 export async function GET() {

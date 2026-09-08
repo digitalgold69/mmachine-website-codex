@@ -7,14 +7,14 @@ import { OrderButton } from "@/components/QuoteCart";
 import type { MetalProduct } from "@/lib/metals-data";
 import { metalsCatalogueUrl } from "@/lib/catalogue-versions";
 import type { MetalShapeFilter } from "@/lib/metals-filters";
+import { catalogueMoney, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
 const PAGE_SIZE = 120;
 
 type Category = { key: string; label: string; count: number };
 type ProductsResponse = { products?: MetalProduct[]; count?: number; error?: string };
 
-const formatPrice = (value: number | null) =>
-  value === null ? "POA" : `\u00a3${value.toFixed(2)}`;
+const formatPrice = catalogueMoney;
 
 export default function MetalsCatalogueClient({
   initialProducts,
@@ -325,7 +325,7 @@ function quoteItem(product: MetalProduct) {
     size: product.size,
     stockSize: product.stockSize,
     unit: product.unit,
-    unitPriceExVat: product.priceExVat,
-    unitPriceIncVat: product.priceIncVat,
+    unitPriceExVat: normaliseCataloguePrice(product.priceExVat),
+    unitPriceIncVat: normaliseCataloguePrice(product.priceIncVat),
   };
 }
