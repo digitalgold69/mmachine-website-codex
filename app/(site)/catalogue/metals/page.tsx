@@ -1,10 +1,14 @@
 import MetalsCatalogueClient from "./MetalsCatalogueClient";
-import { metalCategories, metals } from "@/lib/metals-data";
+import { metalCategories } from "@/lib/metals-data";
+import { getLiveMetalCatalogueProducts } from "@/lib/catalogue-products";
 import { buildMetalShapeFilters } from "@/lib/metals-filters";
 
 const INITIAL_PAGE_SIZE = 120;
 
-export default function MetalsCataloguePage() {
+export const dynamic = "force-dynamic";
+
+export default async function MetalsCataloguePage() {
+  const { products: metals } = await getLiveMetalCatalogueProducts();
   const categories = metalCategories.map((category) => ({
     ...category,
     count: metals.filter((metal) => metal.category === category.key).length,

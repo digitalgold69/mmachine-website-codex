@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
+import { getLiveMetalCatalogueProducts, getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
 import { listFeaturedWork } from "@/lib/featured";
 import {
   accountingBucketForCatalogue,
@@ -56,6 +57,8 @@ export default async function DashboardHomePage() {
   let quotes: QuoteRequest[] = [];
   let bestPaidMonth: BestPaidMonth | null = null;
   let featuredCount = 0;
+  let miniCount = products.length;
+  let metalsCount = metals.length;
   let dataError = "";
 
   try {
@@ -78,8 +81,20 @@ export default async function DashboardHomePage() {
     featuredCount = 0;
   }
 
+  try {
+    const [liveMini, liveMetals] = await Promise.all([
+      getLiveMiniCatalogueProducts({ includeManual: true }),
+      getLiveMetalCatalogueProducts(),
+    ]);
+    miniCount = liveMini.products.length;
+    metalsCount = liveMetals.products.length;
+  } catch {
+    miniCount = products.length;
+    metalsCount = metals.length;
+  }
+
   const analytics = buildAnalytics(quotes, bestPaidMonth);
-  const catalogueCount = products.length + metals.length;
+  const catalogueCount = miniCount + metalsCount;
 
   return (
     <div>
@@ -208,7 +223,7 @@ export default async function DashboardHomePage() {
             <span className="text-xs font-mono text-gold">{catalogueCount.toLocaleString()} ITEMS</span>
           </div>
           <p className="text-sm text-ink-muted mb-3">
-            {products.length.toLocaleString()} Mini panel lines and {metals.length.toLocaleString()} metal lines.
+            {miniCount.toLocaleString()} Mini panel lines and {metalsCount.toLocaleString()} metal lines.
           </p>
           <span className="text-sm font-medium text-racing group-hover:text-gold">Open products</span>
         </Link>

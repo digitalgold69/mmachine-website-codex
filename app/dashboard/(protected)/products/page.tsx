@@ -7,6 +7,8 @@ import { MANUAL_MINI_SECTION_CODE } from "@/lib/manual-mini-product-shared";
 
 type Catalogue = "mini" | "metals" | "manual";
 type MiniProduct = (typeof products)[number];
+type MetalProduct = (typeof metals)[number];
+type UploadCatalogue = "mini" | "metals";
 
 type MiniProductImage = {
   productId: string;
@@ -26,6 +28,22 @@ type ProductPreviewImage = MiniProductImage & {
 
 type ImageAction = {
   productId: string;
+  text: string;
+  tone: "loading" | "success" | "error";
+} | null;
+
+type CatalogueUploadMeta = {
+  catalogue: UploadCatalogue;
+  sourceFilename: string;
+  sourceSize: number;
+  productCount: number;
+  version: string;
+  uploadedAt: string;
+  uploadedBy: string | null;
+};
+
+type UploadAction = {
+  catalogue: UploadCatalogue;
   text: string;
   tone: "loading" | "success" | "error";
 } | null;
@@ -103,12 +121,18 @@ export default function DashboardProductsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [limit, setLimit] = useState(40);
+  const [liveMiniProducts, setLiveMiniProducts] = useState<MiniProduct[]>(products);
+  const [liveMetalProducts, setLiveMetalProducts] = useState<MetalProduct[]>(metals);
   const [miniProductImages, setMiniProductImages] = useState<Record<string, MiniProductImage>>({});
   const [manualProducts, setManualProducts] = useState<ManualMiniProduct[]>([]);
   const [manualDraft, setManualDraft] = useState<ManualDraft>(EMPTY_MANUAL_DRAFT);
   const [manualAction, setManualAction] = useState<{ text: string; tone: "loading" | "success" | "error" } | null>(null);
   const [imagePreview, setImagePreview] = useState<ProductPreviewImage | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>(null);
+  const [uploadFiles, setUploadFiles] = useState<Record<UploadCatalogue, File | null>>({ mini: null, metals: null });
+  const [uploadStatus, setUploadStatus] = useState<Record<UploadCatalogue, CatalogueUploadMeta | null>>({ mini: null, metals: null });
+  const [uploadAction, setUploadAction] = useState<UploadAction>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +161,45 @@ export default function DashboardProductsPage() {
         if (!cancelled) setManualProducts([]);
       });
 
+    fetch("/api/products?catalogue=mini&limit=1200", { cache: "no-store" })
+      .then(async (response): Promise<{ products?: MiniProduct[] } | null> =>
+        response.ok ? (await response.json()) as { products?: MiniProduct[] } : null
+      )
+      .then((data: { products?: MiniProduct[] } | null) => {
+        if (cancelled || !Array.isArray(data?.products)) return;
+        setLiveMiniProducts(data.products.filter((product) => !product.id.startsWith("manual-mini-")));
+      })
+      .catch(() => {
+        if (!cancelled) setLiveMiniProducts(products);
+      });
+
+    fetch("/api/products?catalogue=metals&limit=5000", { cache: "no-store" })
+      .then(async (response): Promise<{ products?: MetalProduct[] } | null> =>
+        response.ok ? (await response.json()) as { products?: MetalProduct[] } : null
+      )
+      .then((data: { products?: MetalProduct[] } | null) => {
+        if (cancelled || !Array.isArray(data?.products)) return;
+        setLiveMetalProducts(data.products);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveMetalProducts(metals);
+      });
+
+    fetch("/api/catalogue-uploads", { cache: "no-store" })
+      .then(async (response): Promise<{ uploads?: CatalogueUploadMeta[] } | null> =>
+        response.ok ? (await response.json()) as { uploads?: CatalogueUploadMeta[] } : null
+      )
+      .then((data: { uploads?: CatalogueUploadMeta[] } | null) => {
+        if (cancelled || !Array.isArray(data?.uploads)) return;
+        setUploadStatus({
+          mini: data.uploads.find((upload) => upload.catalogue === "mini") || null,
+          metals: data.uploads.find((upload) => upload.catalogue === "metals") || null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setUploadStatus({ mini: null, metals: null });
+      });
+
     return () => {
       cancelled = true;
     };
@@ -144,22 +207,22 @@ export default function DashboardProductsPage() {
 
   const miniRows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return products.filter((product) =>
+    return liveMiniProducts.filter((product) =>
       (category === "all" || product.section === category) &&
       (!query || [product.code, product.name, product.fits].join(" ").toLowerCase().includes(query))
     );
-  }, [category, search]);
+  }, [category, liveMiniProducts, search]);
 
   const metalRows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return metals.filter((product) =>
+    return liveMetalProducts.filter((product) =>
       (category === "all" || product.category === category) &&
       (!query || [product.code, product.form, product.metal, product.spec, product.size, product.unit]
         .join(" ")
         .toLowerCase()
         .includes(query))
     );
-  }, [category, search]);
+  }, [category, liveMetalProducts, search]);
 
   const manualRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -170,13 +233,63 @@ export default function DashboardProductsPage() {
   }, [category, manualProducts, search]);
 
   const rows = catalogue === "mini" ? miniRows : catalogue === "metals" ? metalRows : manualRows;
-  const total = catalogue === "mini" ? products.length : catalogue === "metals" ? metals.length : manualProducts.length;
+  const total = catalogue === "mini" ? liveMiniProducts.length : catalogue === "metals" ? liveMetalProducts.length : manualProducts.length;
 
   function switchCatalogue(next: Catalogue) {
     setCatalogue(next);
     setSearch("");
     setCategory("all");
     setLimit(40);
+  }
+
+  async function refreshLiveCatalogue(kind: UploadCatalogue) {
+    const limitParam = kind === "mini" ? "1200" : "5000";
+    const response = await fetch(`/api/products?catalogue=${kind}&limit=${limitParam}`, { cache: "no-store" });
+    const data = await response.json() as { products?: MiniProduct[] | MetalProduct[]; error?: string };
+    if (!response.ok || !Array.isArray(data.products)) {
+      throw new Error(data.error || "Catalogue could not be refreshed.");
+    }
+    if (kind === "mini") {
+      setLiveMiniProducts((data.products as MiniProduct[]).filter((product) => !product.id.startsWith("manual-mini-")));
+    } else {
+      setLiveMetalProducts(data.products as MetalProduct[]);
+    }
+  }
+
+  async function uploadCatalogueWorkbook(kind: UploadCatalogue) {
+    const file = uploadFiles[kind];
+    if (!file) {
+      setUploadAction({ catalogue: kind, text: "Choose an Excel file first.", tone: "error" });
+      return;
+    }
+
+    setUploadAction({ catalogue: kind, text: "Uploading and reading workbook...", tone: "loading" });
+    try {
+      const form = new FormData();
+      form.append("catalogue", kind);
+      form.append("file", file);
+      const response = await fetch("/api/catalogue-uploads", {
+        method: "POST",
+        body: form,
+      });
+      const data = await response.json() as { upload?: CatalogueUploadMeta; warnings?: string[]; error?: string };
+      if (!response.ok || !data.upload) throw new Error(data.error || "Catalogue upload failed.");
+
+      setUploadStatus((current) => ({ ...current, [kind]: data.upload! }));
+      setUploadFiles((current) => ({ ...current, [kind]: null }));
+      setUploadInputKey((value) => value + 1);
+      await refreshLiveCatalogue(kind);
+      const warningText = Array.isArray(data.warnings) && data.warnings.length
+        ? ` Saved with ${data.warnings.length} note${data.warnings.length === 1 ? "" : "s"}.`
+        : "";
+      setUploadAction({
+        catalogue: kind,
+        text: `Saved ${data.upload.productCount.toLocaleString("en-GB")} catalogue lines.${warningText}`,
+        tone: "success",
+      });
+    } catch (error) {
+      setUploadAction({ catalogue: kind, text: (error as Error).message || "Upload failed.", tone: "error" });
+    }
   }
 
   async function uploadMiniProductImage(productId: string, file: File | null) {
@@ -287,12 +400,76 @@ export default function DashboardProductsPage() {
         </p>
       </div>
 
+      <div className="mb-4 rounded-xl border border-racing/10 bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl text-racing">Update catalogues</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Upload the current Excel catalogue to update website rows and PDF downloads. Manual Mini parts stay separate.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {(["mini", "metals"] as const).map((kind) => {
+            const status = uploadStatus[kind];
+            const action = uploadAction?.catalogue === kind ? uploadAction : null;
+            return (
+              <div key={kind} className="rounded-lg border border-racing/10 bg-cream p-3">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-bold text-racing">
+                      {kind === "mini" ? "Mini panels catalogue" : "Metals catalogue"}
+                    </div>
+                    <div className="mt-1 text-xs text-ink-muted">
+                      {status
+                        ? `${status.productCount.toLocaleString("en-GB")} lines from ${status.sourceFilename} · ${formatUploadTime(status.uploadedAt)}`
+                        : "Using the generated catalogue until an Excel upload is saved."}
+                    </div>
+                  </div>
+                  {status && (
+                    <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
+                      Live upload
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <input
+                    key={`${kind}-${uploadInputKey}`}
+                    type="file"
+                    accept=".xlsx,.xlsm,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={(event) =>
+                      setUploadFiles((current) => ({ ...current, [kind]: event.target.files?.[0] || null }))
+                    }
+                    className="block w-full rounded-md border border-racing/20 bg-white px-3 py-2 text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-racing file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-cream hover:file:bg-racing-light"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void uploadCatalogueWorkbook(kind)}
+                    disabled={action?.tone === "loading"}
+                    className="btn-primary whitespace-nowrap px-4 py-2 text-sm disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Upload &amp; save
+                  </button>
+                </div>
+                {action && (
+                  <div className={`mt-2 text-xs font-semibold ${
+                    action.tone === "error" ? "text-red-700" : action.tone === "success" ? "text-green-800" : "text-ink-muted"
+                  }`}>
+                    {action.text}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-racing/10 bg-white p-1">
         <button type="button" onClick={() => switchCatalogue("mini")} aria-pressed={catalogue === "mini"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "mini" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
-          Mini panels ({products.length.toLocaleString("en-GB")})
+          Mini panels ({liveMiniProducts.length.toLocaleString("en-GB")})
         </button>
         <button type="button" onClick={() => switchCatalogue("metals")} aria-pressed={catalogue === "metals"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "metals" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
-          Metals ({metals.length.toLocaleString("en-GB")})
+          Metals ({liveMetalProducts.length.toLocaleString("en-GB")})
         </button>
         <button type="button" onClick={() => switchCatalogue("manual")} aria-pressed={catalogue === "manual"} className={`rounded-md px-4 py-2 text-sm font-semibold ${catalogue === "manual" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"}`}>
           Manually added ({manualProducts.length.toLocaleString("en-GB")})
@@ -599,6 +776,18 @@ export default function DashboardProductsPage() {
 
 function money(value: number | null | undefined) {
   return typeof value === "number" ? `\u00a3${value.toFixed(2)}` : "POA";
+}
+
+function formatUploadTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "saved";
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function sectionLabel(code: string) {

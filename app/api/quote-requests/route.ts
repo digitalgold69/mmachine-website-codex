@@ -37,6 +37,7 @@ import type {
 } from "@/lib/quote-types";
 import { products } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
+import { getLiveMetalCatalogueProducts, getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
 import { calculateMetalOrderItem, getMetalOrderConfig } from "@/lib/metal-pricing";
 import { checkRateLimit } from "@/lib/request-limits";
 import { readCompletedFileToken } from "@/lib/quote-upload-token";
@@ -44,7 +45,6 @@ import { normaliseQuoteDelivery } from "@/lib/quote-delivery";
 import type { QuoteCustomer } from "@/lib/quote-types";
 import { ukHistoryBounds, ukMonthBounds } from "@/lib/uk-time";
 import { listFeaturedWork, type FeaturedWork } from "@/lib/featured";
-import { listManualMiniProducts } from "@/lib/manual-mini-products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +56,8 @@ const MINI_VEHICLE_MODELS = ["Saloon", "Van", "Traveller", "Pickup"];
 
 const miniById = new Map(products.map((product) => [product.id, product]));
 const metalsById = new Map(metals.map((product) => [product.id, product]));
+type MiniProduct = (typeof products)[number];
+type MetalProduct = (typeof metals)[number];
 
 function asString(value: unknown, max = 500) {
   return String(value ?? "").trim().slice(0, max);
@@ -156,13 +158,14 @@ function safePublicItem(
   raw: Partial<QuoteItem>,
   index: number,
   featuredById: Map<string, FeaturedWork>,
-  manualMiniById: typeof miniById
+  liveMiniById: Map<string, MiniProduct>,
+  liveMetalsById: Map<string, MetalProduct>
 ): QuoteItem {
   const qty = Math.max(1, Math.min(999, Math.floor(Number(raw.qty) || 1)));
   const productId = asString(raw.productId, 120);
 
   if (raw.catalogue === "mini") {
-    const product = miniById.get(productId) || manualMiniById.get(productId);
+    const product = liveMiniById.get(productId) || miniById.get(productId);
     if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
     return {
       key: `mini-${product.id}`,
@@ -178,7 +181,7 @@ function safePublicItem(
   }
 
   if (raw.catalogue === "metals") {
-    const product = metalsById.get(productId);
+    const product = liveMetalsById.get(productId) || metalsById.get(productId);
     if (!product) throw new Error(`Item ${index + 1} is no longer available.`);
     const baseItem: QuoteItem = {
       key: `metals-${product.id}`,
@@ -736,10 +739,13 @@ export async function POST(req: Request) {
     const featuredById = needsFeatured
       ? new Map((await listFeaturedWork()).map((item) => [item.id, item]))
       : new Map<string, FeaturedWork>();
-    const manualMiniById = needsMini
-      ? new Map((await listManualMiniProducts({ activeOnly: true })).map((item) => [item.id, item]))
-      : new Map<string, (typeof products)[number]>();
-    const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById, manualMiniById));
+    const liveMiniById = needsMini
+      ? new Map((await getLiveMiniCatalogueProducts({ includeManual: true })).products.map((item) => [item.id, item]))
+      : new Map<string, MiniProduct>();
+    const liveMetalsById = rawItems.some((item) => item.catalogue === "metals")
+      ? new Map((await getLiveMetalCatalogueProducts()).products.map((item) => [item.id, item]))
+      : new Map<string, MetalProduct>();
+    const items = rawItems.map((item, index) => safePublicItem(item, index, featuredById, liveMiniById, liveMetalsById));
     if (items.some((item) => item.catalogue === "mini") && (!customer.vehicleYear || !customer.vehicleModel)) {
       return NextResponse.json(
         { error: "Vehicle year and model are required for Mini panel orders." },

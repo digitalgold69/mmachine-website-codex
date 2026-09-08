@@ -1,6 +1,7 @@
 import { products } from "@/lib/mini-data";
 import { getD1, getFeaturedImagesBucket, type R2BucketBinding } from "@/lib/cloudflare";
 import { getManualMiniProduct } from "@/lib/manual-mini-products";
+import { getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
 
 export type MiniProductImage = {
   productId: string;
@@ -54,15 +55,17 @@ function rowToImage(row: MiniProductImageRow): MiniProductImage {
 }
 
 function safeProductId(value: string) {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+  return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 120);
 }
 
 async function validateProductId(productId: string) {
   const safe = safeProductId(productId);
+  const liveMiniProducts = await getLiveMiniCatalogueProducts({ includeManual: true }).catch(() => null);
   if (
     !safe ||
     (
       !products.some((product) => product.id === safe) &&
+      !liveMiniProducts?.products.some((product) => product.id === safe) &&
       !(await getManualMiniProduct(safe))
     )
   ) {

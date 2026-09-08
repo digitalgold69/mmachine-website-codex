@@ -17,6 +17,7 @@ const {
   miniSectionPdfPageIndexes,
 } = jiti("../lib/mini-section-pdfs.ts");
 const { guides } = jiti("../lib/articles.ts");
+const { parseUploadedCatalogue } = jiti("../lib/catalogue-upload-parser.ts");
 
 async function main() {
   const pdfBytes = fs.readFileSync(path.join(root, "public/catalogue/mini-catalogue.pdf"));
@@ -66,17 +67,21 @@ async function main() {
   assert.match(navbar, /Custom Engineering/, "Header navigation should keep a shorter desktop custom engineering label available");
 
   const productsRoute = read("app/api/products/route.ts");
-  assert.match(productsRoute, /listManualMiniProducts/, "Products API must merge active manual Mini parts into the public Mini catalogue");
-  assert.match(productsRoute, /catalogue === "mini" \? 1200 : 200/, "Products API must allow the full Mini catalogue plus manual additions to be fetched");
+  assert.match(productsRoute, /getLiveMiniCatalogueProducts\(\{ includeManual: true \}\)/, "Products API must merge active manual Mini parts through the live Mini catalogue helper");
+  assert.match(productsRoute, /getLiveMetalCatalogueProducts/, "Products API must read dashboard-uploaded metals before generated fallback data");
+  assert.match(productsRoute, /catalogue === "mini" \? 1200 : 5000/, "Products API must allow the full Mini and metals catalogues to be fetched by the dashboard");
 
   const quoteRoute = read("app/api/quote-requests/route.ts");
-  assert.match(quoteRoute, /manualMiniById/, "Quote requests must validate dashboard-added manual Mini parts");
-  assert.match(quoteRoute, /listManualMiniProducts\(\{ activeOnly: true \}\)/, "Public quote submission should only accept active manual Mini parts");
+  assert.match(quoteRoute, /getLiveMiniCatalogueProducts\(\{ includeManual: true \}\)/, "Quote requests must validate uploaded and dashboard-added Mini parts");
+  assert.match(quoteRoute, /getLiveMetalCatalogueProducts/, "Quote requests must validate uploaded metals catalogue lines");
 
   const dashboardProductsPage = read("app/dashboard/(protected)/products/page.tsx");
   assert.match(dashboardProductsPage, /Manually added/, "Dashboard products tab must include manual Mini part management");
   assert.match(dashboardProductsPage, /\/api\/manual-mini-products/, "Manual Mini products must be loaded and saved through their own API");
   assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
+  assert.match(dashboardProductsPage, /Update catalogues/, "Dashboard products tab must include catalogue workbook upload controls");
+  assert.match(dashboardProductsPage, /Upload &amp; save/, "Catalogue upload button must use the requested label");
+  assert.match(dashboardProductsPage, /\/api\/catalogue-uploads/, "Dashboard uploads must save via the catalogue upload API");
 
   const manualProductsLib = read("lib/manual-mini-products.ts");
   assert.match(manualProductsLib, /create table if not exists manual_mini_products/, "Manual Mini products must be stored outside generated catalogue files");
@@ -84,9 +89,40 @@ async function main() {
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
-  assert.match(sectionPdfRoute, /fetch\(sourceUrl,\s*\{\s*cache:\s*"no-store"\s*\}\)/, "Local section PDF generation must keep a direct-fetch fallback");
+  assert.match(sectionPdfRoute, /getCatalogueOverrideProducts/, "Section PDF downloads must use uploaded Mini catalogue rows when available");
+  assert.match(sectionPdfRoute, /staticCatalogueAssetResponse/, "Local section PDF generation must keep a static asset fallback");
   assert.match(sectionPdfRoute, /"Content-Disposition": `inline;/, "Section PDFs should render in-browser by default");
   assert.match(sectionPdfRoute, /"Cache-Control": "no-store"/, "Section PDFs should not keep stale download headers cached");
+
+  const uploadRoute = read("app/api/catalogue-uploads/route.ts");
+  assert.match(uploadRoute, /parseUploadedCatalogue/, "Catalogue upload API must parse Excel workbooks server-side");
+  assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
+  assert.match(uploadRoute, /buildMiniCataloguePdfBytes/, "Mini workbook uploads must regenerate the live Mini PDF");
+  assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
+
+  const overridesLib = read("lib/catalogue-overrides.ts");
+  assert.match(overridesLib, /catalogue_overrides/, "Uploaded catalogue metadata must be stored separately from manual Mini products");
+  assert.match(overridesLib, /catalogue-overrides\/\$\{input\.catalogue\}/, "Uploaded workbooks, products and PDFs must be stored in a catalogue override R2 path");
+
+  const miniUploadSource = fs.existsSync(path.join(root, "final-deliverables/Mini Catalogue Self Updating.xlsm"))
+    ? "final-deliverables/Mini Catalogue Self Updating.xlsm"
+    : "data-source/Mini Catalogue Self Updating.xlsm";
+  const miniUpload = parseUploadedCatalogue(
+    "mini",
+    new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))
+  );
+  assert.ok(miniUpload.products.length >= 700, "Mini workbook uploads should parse the full catalogue");
+  assert.equal(miniUpload.products[0].id, "p0001", "Known Mini rows should keep generated ids so product photos remain attached");
+
+  const metalsUploadSource = fs.existsSync(path.join(root, "final-deliverables/Metals catalogue 2023.xlsx"))
+    ? "final-deliverables/Metals catalogue 2023.xlsx"
+    : "data-source/Metals catalogue 2023.xlsx";
+  const metalsUpload = parseUploadedCatalogue(
+    "metals",
+    new Uint8Array(fs.readFileSync(path.join(root, metalsUploadSource)))
+  );
+  assert.ok(metalsUpload.products.length >= 1000, "Metals workbook uploads should parse the full catalogue");
+  assert.ok(metalsUpload.products.some((product) => product.form && product.size && product.unit), "Uploaded metals rows must keep shape, size and unit fields for dimension pricing");
 
   const guideDates = guides.map((guide) => Date.parse(guide.publishedAt));
   assert.deepEqual(

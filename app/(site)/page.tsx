@@ -6,6 +6,7 @@ import {
 } from "@/lib/catalogue-versions";
 import { products, sections } from "@/lib/mini-data";
 import { metals } from "@/lib/metals-data";
+import { getLiveMetalCatalogueProducts, getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
 import { featuredWork as fallbackFeaturedWork } from "@/lib/featured-data";
 import { listFeaturedWork } from "@/lib/featured";
 import FeaturedWorkGrid from "@/components/FeaturedWorkGrid";
@@ -53,8 +54,16 @@ export default async function HomePage() {
 
   const latestFeatured = featuredWork.slice(0, 6);
   const latestGuides = guides.slice(0, 6);
-  const miniCount = products.length;
-  const metalsCount = metals.length;
+  const [liveMini, liveMetals] = await Promise.all([
+    getLiveMiniCatalogueProducts({ includeManual: true }).catch(() => ({
+      products,
+      catalogueProductCount: products.length,
+      override: null,
+    })),
+    getLiveMetalCatalogueProducts().catch(() => ({ products: metals, override: null })),
+  ]);
+  const miniCount = liveMini.products.length;
+  const metalsCount = liveMetals.products.length;
   const sectionCount = sections.length;
 
   return (

@@ -6,6 +6,9 @@ import {
   miniSectionPdfFilename,
   miniSectionPdfPageIndexes,
 } from "@/lib/mini-section-pdfs";
+import { getCatalogueOverrideProducts } from "@/lib/catalogue-overrides";
+import { buildMiniSectionPdfBytes, pdfResponse, staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
+import type { Product } from "@/lib/mini-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,11 +26,30 @@ export async function GET(
     return new Response("Section not found", { status: 404 });
   }
 
+  const uploaded = await getCatalogueOverrideProducts<Product>("mini").catch(() => null);
+  if (uploaded?.products?.length) {
+    const sectionRows = uploaded.products.filter(
+      (product) => product.section.toLowerCase() === section.code.toLowerCase()
+    );
+    if (!sectionRows.length) {
+      return new Response("Section not found in the uploaded catalogue", { status: 404 });
+    }
+
+    try {
+      return pdfResponse(
+        await buildMiniSectionPdfBytes(section, sectionRows),
+        miniSectionPdfFilename(section)
+      );
+    } catch {
+      return new Response("Section PDF could not be created", { status: 500 });
+    }
+  }
+
   const sourceUrl = new URL(miniCatalogueUrl, req.url);
   const env = await getCloudflareEnv().catch(() => null);
   const sourceResponse = env?.ASSETS
     ? await env.ASSETS.fetch(new Request(sourceUrl))
-    : await fetch(sourceUrl, { cache: "no-store" });
+    : await staticCatalogueAssetResponse(req, "/catalogue/mini-catalogue.pdf");
   if (!sourceResponse.ok) {
     return new Response("Catalogue PDF could not be loaded", { status: 502 });
   }
