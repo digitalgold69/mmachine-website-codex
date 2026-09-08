@@ -5,6 +5,7 @@ import {
   requiredRefundInvoiceCount,
   requiredWebsiteInvoiceCount,
 } from "@/lib/order-accounting";
+import { quoteMatchesPaidHistorySearch } from "@/lib/quote-search";
 import type { QuoteItem, QuotePaymentMethod, QuoteRefund, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
 import { ukDateKey, ukMonthBounds } from "@/lib/uk-time";
 
@@ -303,12 +304,6 @@ export async function listPaidQuoteHistory(options: {
     clauses.push("paid_at < ?");
     bindings.push(options.end);
   }
-  if (options.query?.trim()) {
-    const escaped = options.query.trim().toLowerCase().replace(/[\\%_]/g, "\\$&");
-    clauses.push("lower(id || ' ' || customer || ' ' || items || ' ' || coalesce(owner_notes, '') || ' ' || coalesce(customer_message, '')) like ? escape '\\'");
-    bindings.push(`%${escaped}%`);
-  }
-
   const where = clauses.join(" and ");
   const result = await db
     .prepare(`select * from quote_requests where ${where} order by paid_at desc`)
@@ -318,7 +313,8 @@ export async function listPaidQuoteHistory(options: {
   if (result.error) throw new Error(`D1 paid history read failed: ${result.error}`);
   const allQuotes = await ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));
   const filteredQuotes = allQuotes.filter((quote) =>
-    quoteMatchesPaidHistoryOrderType(quote, options.orderType || "all")
+    quoteMatchesPaidHistoryOrderType(quote, options.orderType || "all") &&
+    quoteMatchesPaidHistorySearch(quote, options.query || "")
   );
   const offset = Math.max(0, options.offset);
   const limit = Math.max(1, Math.min(100, options.limit));

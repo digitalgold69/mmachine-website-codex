@@ -18,6 +18,7 @@ const {
   requiredWebsiteInvoiceCount,
   websiteInvoiceDisplay,
 } = jiti("../lib/order-accounting.ts");
+const { quoteMatchesPaidHistorySearch } = jiti("../lib/quote-search.ts");
 
 const quote = {
   id: "Q-MIXED-TEST",
@@ -112,6 +113,16 @@ assert.equal(noVatRows.every((row) => row["T/C"] === "T0"), true);
 assert.equal(noVatRows.every((row) => row.Tax === 0), true);
 assert.equal(quoteTotals({ ...quote, includeVat: false }).totalIncVat, 650);
 assert.equal(sageSaleRowsForQuote({ ...quote, paymentMethod: null })[0]["Payment Method"], "Card");
+assert.equal(quoteMatchesPaidHistorySearch(quote, "W1234-W1237"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "1235"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "Alice Works"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "01325000000"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "14A1234"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "MS-SHEET"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "Machined bracket"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "4010"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "BACS"), true);
+assert.equal(quoteMatchesPaidHistorySearch(quote, "not in this order"), false);
 
 const refundedQuote = {
   ...quote,
