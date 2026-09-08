@@ -161,7 +161,7 @@ export default function DashboardProductsPage() {
         if (!cancelled) setManualProducts([]);
       });
 
-    fetch("/api/products?catalogue=mini&limit=1200", { cache: "no-store" })
+    fetch("/api/products?catalogue=mini&limit=5000", { cache: "no-store" })
       .then(async (response): Promise<{ products?: MiniProduct[] } | null> =>
         response.ok ? (await response.json()) as { products?: MiniProduct[] } : null
       )
