@@ -30,7 +30,7 @@ const GBP = "\u00a3";
 const categoryTextClass = "text-xs tracking-wider text-gold font-semibold";
 
 function categoryLabel(entry: Entry) {
-  return entry.category?.trim() || "Featured Work";
+  return entry.category?.trim() || "Misc Stock";
 }
 
 function imageSrc(image: string): string | null {
@@ -219,11 +219,11 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="font-display text-3xl text-racing">Featured Work</h1>
-          <p className="text-ink-muted text-sm">{items.length} showcase {items.length === 1 ? "job" : "jobs"} on the public site</p>
+          <h1 className="font-display text-3xl text-racing">Misc Stock</h1>
+          <p className="text-ink-muted text-sm">{items.length} stock {items.length === 1 ? "item" : "items"} on the public site</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={startAdd} className="btn-primary">+ Add new job</button>
+          <button onClick={startAdd} className="btn-primary">+ Add new item</button>
           <button onClick={handleSignOut} className="btn-secondary text-sm">Sign out</button>
         </div>
       </div>
@@ -313,15 +313,15 @@ export default function FeaturedClient({ initialEntries }: { initialEntries: Ent
 
       {items.length === 0 && (
         <div className="bg-white rounded-xl border border-racing/10 p-12 text-center">
-          <p className="text-ink-muted mb-4">No featured items yet. Add one to showcase what M-Machine can make.</p>
-          <button onClick={startAdd} className="btn-primary">Add your first job</button>
+          <p className="text-ink-muted mb-4">No misc stock items yet. Add one to make it available on the public site.</p>
+          <button onClick={startAdd} className="btn-primary">Add your first item</button>
         </div>
       )}
 
       {pendingDelete && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-racing-dark/55 px-4">
           <div role="dialog" aria-modal="true" aria-labelledby="delete-featured-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 id="delete-featured-title" className="font-display text-2xl text-racing">Delete this featured job?</h2>
+            <h2 id="delete-featured-title" className="font-display text-2xl text-racing">Delete this misc stock item?</h2>
             <p className="mt-3 text-sm leading-6 text-ink-muted">
               &ldquo;{pendingDelete.title}&rdquo; will be removed from the public website. This cannot be undone.
             </p>
@@ -466,9 +466,9 @@ function EditForm({
   return (
     <div>
       <button onClick={onCancel} className="text-sm text-ink-muted hover:text-racing mb-3" disabled={busy}>
-        ← Back to Featured Work
+        ← Back to Misc Stock
       </button>
-      <h1 className="font-display text-3xl text-racing mb-6">{isNew ? "Add new featured job" : "Edit featured job"}</h1>
+      <h1 className="font-display text-3xl text-racing mb-6">{isNew ? "Add new misc stock item" : "Edit misc stock item"}</h1>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm mb-5 max-w-3xl">

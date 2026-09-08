@@ -103,6 +103,10 @@ const paymentSettings = {
   accountName: "Craftgrange Limited",
   sortCode: "12-34-56",
   accountNumber: "12345678",
+  bic: "LOYDGB2L",
+  iban: "GB29 LOYD 6016 1331 9268 19",
+  companyNumber: "01476185",
+  vatNumber: "GB987654321",
 };
 
 const miniQuote = {
@@ -192,7 +196,7 @@ const featuredQuote = {
       key: "featured-shell",
       catalogue: "featured",
       productId: "shell",
-      code: "FW-SHELL",
+      code: "MS-SHELL",
       description: "Restored Mini shell",
       qty: 1,
       unit: "each",
@@ -251,7 +255,7 @@ assert.equal(configuredFullFromInput.FromEmailAddress, "\"New Metals Order\" <or
 assert.equal(ownerNotificationFromName(quote), "New Custom Work Order");
 assert.equal(ownerNotificationFromName(miniQuote), "New Mini Panel Order");
 assert.equal(ownerNotificationFromName(metalsQuote), "New Metals Order");
-assert.equal(ownerNotificationFromName(featuredQuote), "New Featured Order");
+assert.equal(ownerNotificationFromName(featuredQuote), "New Misc Stock Order");
 assert.equal(
   ownerNotificationFromName({
     ...quote,
@@ -352,11 +356,18 @@ assert.match(customerHtml, /01325 381302/);
 assert.match(customerHtml, /BACS/);
 assert.match(customerHtml, /Craftgrange Limited/);
 assert.match(customerHtml, /12-34-56/);
+assert.doesNotMatch(customerHtml, /LOYDGB2L/);
+assert.doesNotMatch(customerHtml, /GB29 LOYD 6016 1331 9268 19/);
 assert.match(customerHtml, /Pay online/);
 assert.match(customerHtml, /https:\/\/pay\.example\.test\/invoice\/W4321/);
 assert.match(customerHtml, /Call to arrange cash payment on collection/);
 assert.doesNotMatch(customerHtml, /Please contact us on 01325 381302 to confirm the order and arrange payment/);
-assert.match(customerHtml, /GB123456789/);
+assert.match(customerHtml, /Company no\. 01476185/);
+assert.match(customerHtml, /GB987654321/);
+
+const exportCustomerHtml = buildCustomerInvoiceEmail({ ...quote, exportOrder: true }, process.env, paymentSettings);
+assert.match(exportCustomerHtml, /LOYDGB2L/);
+assert.match(exportCustomerHtml, /GB29 LOYD 6016 1331 9268 19/);
 
 const metalsCustomerHtml = buildCustomerInvoiceEmail({
   ...metalsQuote,

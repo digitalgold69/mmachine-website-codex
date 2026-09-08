@@ -1,6 +1,6 @@
 // /api/featured
 //
-// Runtime dashboard CMS for featured work. Text is stored in Cloudflare D1
+// Runtime dashboard CMS for Misc Stock. Text is stored in Cloudflare D1
 // and images are stored in Cloudflare R2, so owner edits update immediately
 // without committing to GitHub or waiting for a rebuild.
 

@@ -96,7 +96,7 @@ const ORDER_REQUEST_FILTERS: { value: OrderRequestFilter; label: string }[] = [
   { value: "mini", label: "Mini panels" },
   { value: "metals", label: "Metals" },
   { value: "custom", label: "Custom Engineering" },
-  { value: "featured", label: "Featured Work" },
+  { value: "featured", label: "Misc Stock" },
 ];
 
 const PAYMENT_METHOD_OPTIONS: { value: QuotePaymentMethod; label: string }[] = [
@@ -104,6 +104,8 @@ const PAYMENT_METHOD_OPTIONS: { value: QuotePaymentMethod; label: string }[] = [
   { value: "bacs", label: "BACS" },
   { value: "cash", label: "Cash" },
 ];
+
+const DEFAULT_COMPANY_NUMBER = "01476185";
 
 const BLANK_MANUAL_LINE: ManualLineDraft = {
   qty: "1",
@@ -161,7 +163,7 @@ const itemName = (item: QuoteItem) =>
   item.catalogue === "custom"
     ? item.custom?.projectName || item.description || "Custom fabrication request"
     : item.catalogue === "featured"
-    ? item.description || "Featured Work item"
+    ? item.description || "Misc Stock item"
     : item.catalogue === "metals"
     ? [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ")
     : item.description;
@@ -212,7 +214,7 @@ function invoiceLineSubtitle(item: QuoteItem) {
   if (item.catalogue === "metals") {
     return item.code || [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" / ") || "Metal";
   }
-  if (item.catalogue === "featured") return item.code || "Featured Work";
+  if (item.catalogue === "featured") return item.code || "Misc Stock";
   return item.code || "Mini panel";
 }
 
@@ -251,13 +253,30 @@ function paymentMethodLabel(value: QuotePaymentMethod | null | undefined) {
   return PAYMENT_METHOD_OPTIONS.find((option) => option.value === value)?.label || "Card";
 }
 
-function paymentSettingsRows(settings: PaymentSettings) {
-  return [
+function paymentSettingsRows(settings: PaymentSettings, includeExportDetails = false) {
+  const rows = [
     { label: "Account type", value: settings.accountType },
     { label: "Account name", value: settings.accountName },
     { label: "Sort code", value: settings.sortCode },
     { label: "Account number", value: settings.accountNumber },
-  ].filter((row) => compactText(row.value));
+  ];
+
+  if (includeExportDetails) {
+    rows.push(
+      { label: "BIC", value: settings.bic },
+      { label: "IBAN", value: settings.iban }
+    );
+  }
+
+  return rows.filter((row) => compactText(row.value));
+}
+
+function companyNumber(settings: PaymentSettings) {
+  return compactText(settings.companyNumber) || DEFAULT_COMPANY_NUMBER;
+}
+
+function vatNumber(settings: PaymentSettings) {
+  return compactText(settings.vatNumber);
 }
 
 function safePaymentLink(value: string | null | undefined) {
@@ -373,7 +392,7 @@ const KIND_LABELS: Record<QuoteKind, string> = {
   mini: "Mini panels",
   metals: "Metals",
   custom: "Custom fab",
-  featured: "Featured Work",
+  featured: "Misc Stock",
   mixed: "Mixed order",
 };
 
@@ -729,12 +748,12 @@ function PaymentSettingsModal({
 }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-racing-dark/60 px-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="payment-settings-title" className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="payment-settings-title" className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="payment-settings-title" className="font-display text-2xl text-racing">Payment methods</h2>
             <p className="mt-1 text-sm leading-6 text-ink-muted">
-              These BACS details are used on future customer invoice emails.
+              These details are used on future customer invoice emails and printed invoices.
             </p>
           </div>
           <button type="button" onClick={onClose} disabled={saving} className="btn-secondary px-3 py-2 text-sm disabled:opacity-60">
@@ -742,47 +761,104 @@ function PaymentSettingsModal({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="payment-account-type">Account type</label>
-            <input
-              id="payment-account-type"
-              value={draft.accountType}
-              onChange={(event) => onChange({ accountType: event.target.value })}
-              className="input"
-              placeholder="Business"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="payment-account-name">Account name</label>
-            <input
-              id="payment-account-name"
-              value={draft.accountName}
-              onChange={(event) => onChange({ accountName: event.target.value })}
-              className="input"
-              placeholder="Craftgrange Limited"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="payment-sort-code">Sort code</label>
-            <input
-              id="payment-sort-code"
-              value={draft.sortCode}
-              onChange={(event) => onChange({ sortCode: event.target.value })}
-              className="input"
-              placeholder="00-00-00"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="payment-account-number">Account number</label>
-            <input
-              id="payment-account-number"
-              value={draft.accountNumber}
-              onChange={(event) => onChange({ accountNumber: event.target.value })}
-              className="input"
-              placeholder="00000000"
-            />
-          </div>
+        <div className="mt-5 space-y-5">
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">BACS details</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="payment-account-type">Account type</label>
+                <input
+                  id="payment-account-type"
+                  value={draft.accountType}
+                  onChange={(event) => onChange({ accountType: event.target.value })}
+                  className="input"
+                  placeholder="Business"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="payment-account-name">Account name</label>
+                <input
+                  id="payment-account-name"
+                  value={draft.accountName}
+                  onChange={(event) => onChange({ accountName: event.target.value })}
+                  className="input"
+                  placeholder="Craftgrange Limited"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="payment-sort-code">Sort code</label>
+                <input
+                  id="payment-sort-code"
+                  value={draft.sortCode}
+                  onChange={(event) => onChange({ sortCode: event.target.value })}
+                  className="input"
+                  placeholder="00-00-00"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="payment-account-number">Account number</label>
+                <input
+                  id="payment-account-number"
+                  value={draft.accountNumber}
+                  onChange={(event) => onChange({ accountNumber: event.target.value })}
+                  className="input"
+                  placeholder="00000000"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Export order details</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="payment-bic">BIC</label>
+                <input
+                  id="payment-bic"
+                  value={draft.bic}
+                  onChange={(event) => onChange({ bic: event.target.value })}
+                  className="input uppercase"
+                  placeholder="ABCDGB2L"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="payment-iban">IBAN</label>
+                <input
+                  id="payment-iban"
+                  value={draft.iban}
+                  onChange={(event) => onChange({ iban: event.target.value })}
+                  className="input uppercase"
+                  placeholder="GB00 ABCD 0000 0000 0000 00"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Company details</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="payment-company-number">Company number</label>
+                <input
+                  id="payment-company-number"
+                  value={draft.companyNumber}
+                  onChange={(event) => onChange({ companyNumber: event.target.value })}
+                  className="input"
+                  placeholder={DEFAULT_COMPANY_NUMBER}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="payment-vat-number">VAT number</label>
+                <input
+                  id="payment-vat-number"
+                  value={draft.vatNumber}
+                  onChange={(event) => onChange({ vatNumber: event.target.value })}
+                  className="input uppercase"
+                  placeholder="GB..."
+                />
+              </div>
+            </div>
+          </section>
         </div>
 
         {error && (
@@ -807,8 +883,10 @@ function PaymentSettingsModal({
 function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; paymentSettings: PaymentSettings }) {
   const quoteTotal = totals(quote);
   const includeVat = quoteIncludesVat(quote);
-  const bacs = paymentSettingsRows(paymentSettings);
+  const bacs = paymentSettingsRows(paymentSettings, quote.exportOrder === true);
   const paymentLink = safePaymentLink(quote.paymentLink);
+  const invoiceCompanyNumber = companyNumber(paymentSettings);
+  const invoiceVatNumber = vatNumber(paymentSettings);
   return (
     <div className="invoice-print-sheet">
       <div className="mb-6 flex items-start justify-between gap-6 border-b border-racing/20 pb-4">
@@ -907,6 +985,14 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         {paymentLink && <div className="mt-2"><strong>Pay online:</strong> {paymentLink}</div>}
         <div className="mt-2"><strong>Cash on collection:</strong> Call to arrange cash payment on collection.</div>
       </section>
+
+      <div className="mt-4 border-t border-racing/10 pt-3 text-xs leading-5 text-ink-muted">
+        <strong className="block text-racing">M-Machine / Craftgrange Limited</strong>
+        Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br />
+        Metals &amp; Engineering: 01325 381302 &nbsp; Mini Panels &amp; Accounts: 01325 381300<br />
+        sales@m-machine.co.uk{invoiceCompanyNumber ? `  Company no. ${invoiceCompanyNumber}` : ""}
+        {invoiceVatNumber && <><br />VAT registration no. {invoiceVatNumber}</>}
+      </div>
     </div>
   );
 }
@@ -2406,17 +2492,31 @@ export default function OrdersClient({
                     </section>
 
                     <section className="rounded-lg border border-racing/10 p-3">
-                      <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={quoteIncludesVat(draft)}
-                          onChange={(e) => patchDraft({ includeVat: e.target.checked })}
-                          className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
-                        />
-                        <span>
-                          <span className="block text-sm font-semibold text-racing">Include VAT</span>
-                        </span>
-                      </label>
+                      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={quoteIncludesVat(draft)}
+                            onChange={(e) => patchDraft({ includeVat: e.target.checked })}
+                            className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
+                          />
+                          <span>
+                            <span className="block text-sm font-semibold text-racing">Include VAT</span>
+                          </span>
+                        </label>
+                        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={draft.exportOrder === true}
+                            onChange={(e) => patchDraft({ exportOrder: e.target.checked })}
+                            className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
+                          />
+                          <span>
+                            <span className="block text-sm font-semibold text-racing">Export Order</span>
+                            <span className="block text-xs leading-5 text-ink-muted">Shows BIC and IBAN on invoices.</span>
+                          </span>
+                        </label>
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="label" htmlFor="carriage">{baseTotalLabel(draft, "Carriage")}</label>

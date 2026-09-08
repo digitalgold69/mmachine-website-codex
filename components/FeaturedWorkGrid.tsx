@@ -17,7 +17,7 @@ type FeaturedWorkGridProps = {
 };
 
 const GBP = "\u00a3";
-const categoryLabel = (job: FeaturedWork) => job.category?.trim() || "Featured Work";
+const categoryLabel = (job: FeaturedWork) => job.category?.trim() || "Misc Stock";
 const categoryTextClass = "text-xs tracking-wider text-gold font-semibold";
 
 function price(value: number) {

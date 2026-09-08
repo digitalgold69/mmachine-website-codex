@@ -7,6 +7,10 @@ export type PaymentSettings = {
   accountName: string;
   sortCode: string;
   accountNumber: string;
+  bic: string;
+  iban: string;
+  companyNumber: string;
+  vatNumber: string;
 };
 
 const EMPTY_PAYMENT_SETTINGS: PaymentSettings = {
@@ -14,6 +18,10 @@ const EMPTY_PAYMENT_SETTINGS: PaymentSettings = {
   accountName: "",
   sortCode: "",
   accountNumber: "",
+  bic: "",
+  iban: "",
+  companyNumber: "01476185",
+  vatNumber: "",
 };
 
 let paymentSettingsSchemaReady: Promise<void> | null = null;
@@ -28,6 +36,10 @@ export function normalisePaymentSettings(input: Partial<PaymentSettings> = {}): 
     accountName: asString(input.accountName, 160),
     sortCode: asString(input.sortCode, 40),
     accountNumber: asString(input.accountNumber, 40),
+    bic: asString(input.bic, 40).toUpperCase(),
+    iban: asString(input.iban, 80).toUpperCase().replace(/\s+/g, " "),
+    companyNumber: asString(input.companyNumber, 40),
+    vatNumber: asString(input.vatNumber, 60).toUpperCase().replace(/\s+/g, " "),
   };
 }
 

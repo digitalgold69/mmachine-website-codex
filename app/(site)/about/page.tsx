@@ -147,7 +147,7 @@ export default function AboutPage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/custom-engineering" className="btn-primary">Request a custom quote</Link>
-              <Link href="/featured" className="btn-secondary">View Featured Work</Link>
+              <Link href="/featured" className="btn-secondary">View Misc Stock</Link>
             </div>
           </div>
           <ul className="grid gap-3 sm:grid-cols-2" aria-label="Engineering capabilities">

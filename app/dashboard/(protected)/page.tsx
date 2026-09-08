@@ -230,13 +230,13 @@ export default async function DashboardHomePage() {
 
         <Link href="/dashboard/featured" className="card bg-white group block">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display text-xl text-racing">Featured Work</h2>
-            <span className="text-xs font-mono text-gold">{featuredCount} JOBS</span>
+            <h2 className="font-display text-xl text-racing">Misc Stock</h2>
+            <span className="text-xs font-mono text-gold">{featuredCount} ITEMS</span>
           </div>
           <p className="text-sm text-ink-muted mb-3">
-            Manage workshop case studies and images from Cloudflare.
+            Manage misc stock listings and images from Cloudflare.
           </p>
-          <span className="text-sm font-medium text-racing group-hover:text-gold">Open Featured Work</span>
+          <span className="text-sm font-medium text-racing group-hover:text-gold">Open Misc Stock</span>
         </Link>
 
         <div className="card bg-cream-dark">
@@ -366,7 +366,7 @@ function topItemsFrom(quotes: QuoteRequest[]): RankedItem[] {
         label,
         detail:
           item.catalogue === "featured"
-            ? "Featured Work"
+            ? "Misc Stock"
             : item.catalogue === "metals"
               ? "Metals"
               : item.code || "Mini panels",

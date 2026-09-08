@@ -19,7 +19,7 @@ const links = [
       </>
     ),
   },
-  { href: "/featured", label: "Featured Work" },
+  { href: "/featured", label: "Misc Stock" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];

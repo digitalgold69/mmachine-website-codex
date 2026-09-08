@@ -36,7 +36,7 @@ dashboard authentication.
 | `QUOTE_CUSTOM_OWNER_EMAIL` | Custom-work request notification address |
 | `QUOTE_MINI_OWNER_EMAIL` | Mini panel order notification address |
 | `QUOTE_METALS_OWNER_EMAIL` | Metals order notification address |
-| `QUOTE_FEATURED_OWNER_EMAIL` | Featured-work order notification address |
+| `QUOTE_FEATURED_OWNER_EMAIL` | Misc Stock order notification address |
 | `QUOTE_ENQUIRY_OWNER_EMAIL` | Optional website contact/enquiry notification address |
 
 Email is sent through Amazon SES API v2. Staff order notifications set a
@@ -84,5 +84,5 @@ Run this in PowerShell:
 - While testing on Cloudflare, set it to the Cloudflare placeholder URL.
 - When the real domain is connected, update it to the final live domain and redeploy.
 - Order requests and featured-work content are stored in Cloudflare D1.
-- Featured-work images are stored in Cloudflare R2.
+- Misc Stock images are stored in Cloudflare R2.
 - Custom quote files are stored in the `QUOTE_FILES` R2 bucket.

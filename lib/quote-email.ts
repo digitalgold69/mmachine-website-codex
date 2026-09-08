@@ -18,12 +18,17 @@ const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
 const DEFAULT_FROM_NAME = "New M Machine Order";
 export const CUSTOMER_INVOICE_FROM_NAME = "Your M Machine Order";
 const CARD_PAYMENT_PHONE = "01325 381302";
+const DEFAULT_COMPANY_NUMBER = "01476185";
 
 const EMPTY_PAYMENT_SETTINGS: PaymentSettings = {
   accountType: "",
   accountName: "",
   sortCode: "",
   accountNumber: "",
+  bic: "",
+  iban: "",
+  companyNumber: DEFAULT_COMPANY_NUMBER,
+  vatNumber: "",
 };
 
 type EmailEnv = Record<string, unknown>;
@@ -102,13 +107,13 @@ const invoiceItemName = (item: QuoteItem) => item.catalogue === "custom" ? "Cust
 function itemReference(item: QuoteItem) {
   if (item.catalogue === "custom") return "Custom";
   if (item.catalogue === "metals") return item.code || item.shape || "Metal";
-  return item.code || (item.catalogue === "featured" ? "Featured Work" : "");
+  return item.code || (item.catalogue === "featured" ? "Misc Stock" : "");
 }
 
 function orderType(quote: QuoteRequest) {
   const kinds = new Set(quote.items.map((item) => item.catalogue));
   if (kinds.size > 1) return "Mixed order";
-  if (kinds.has("featured")) return "Featured Work";
+  if (kinds.has("featured")) return "Misc Stock";
   if (kinds.has("custom")) return "Custom fabrication";
   if (kinds.has("metals")) return "Metals";
   return "Mini panels";
@@ -120,7 +125,7 @@ export function ownerNotificationFromName(quote: QuoteRequest) {
   if (kinds.has("metals")) return "New Metals Order";
   if (kinds.has("mini")) return "New Mini Panel Order";
   if (kinds.has("custom")) return "New Custom Work Order";
-  if (kinds.has("featured")) return "New Featured Order";
+  if (kinds.has("featured")) return "New Misc Stock Order";
   return "New M Machine Order";
 }
 
@@ -390,18 +395,22 @@ function safePaymentLink(value: string | null | undefined) {
   }
 }
 
-function bacsRows(settings: PaymentSettings) {
-  return [
+function bacsRows(settings: PaymentSettings, includeExportDetails = false) {
+  const rows = [
     ["Account type", settings.accountType],
     ["Account name", settings.accountName],
     ["Sort code", settings.sortCode],
     ["Account number", settings.accountNumber],
-  ].filter(([, value]) => String(value || "").trim());
+  ];
+  if (includeExportDetails) {
+    rows.push(["BIC", settings.bic], ["IBAN", settings.iban]);
+  }
+  return rows.filter(([, value]) => String(value || "").trim());
 }
 
 function paymentMethodsBlock(quote: QuoteRequest, settings: PaymentSettings) {
   const onlineLink = safePaymentLink(quote.paymentLink);
-  const rows = bacsRows(settings);
+  const rows = bacsRows(settings, quote.exportOrder === true);
   return `
     <div style="margin:24px 0 0;padding:16px;border:1px solid #eadfca;border-radius:10px;background:#fbf8f1">
       <h2 style="margin:0 0 12px;color:#0f3d2e;font-size:18px">Payment methods</h2>
@@ -453,7 +462,8 @@ export function buildCustomerInvoiceEmail(
 ) {
   const totals = quoteTotals(quote);
   const includeVat = quoteIncludesVat(quote);
-  const vatRegistrationNumber = envValue(env, "VAT_REGISTRATION_NUMBER");
+  const vatRegistrationNumber = paymentSettings.vatNumber || envValue(env, "VAT_REGISTRATION_NUMBER");
+  const companyNumber = paymentSettings.companyNumber || DEFAULT_COMPANY_NUMBER;
   const isUpdatedInvoice = Boolean(quote.customerEmailSentAt);
   const title = isUpdatedInvoice ? "Updated invoice" : "Order invoice";
   const invoiceDate = quote.invoiceSentAt || quote.customerEmailSentAt || quote.updatedAt || new Date().toISOString();
@@ -534,7 +544,7 @@ export function buildCustomerInvoiceEmail(
             <strong style="display:block;color:#0f3d2e">M-Machine / Craftgrange Limited</strong>
             Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br>
             Metals &amp; Engineering: 01325 381302 &nbsp; Mini Panels &amp; Accounts: 01325 381300<br>
-            sales@m-machine.co.uk &nbsp; Company no. 01476185
+            sales@m-machine.co.uk${companyNumber ? ` &nbsp; Company no. ${escapeHtml(companyNumber)}` : ""}
             ${vatRegistrationNumber ? `<br>VAT registration no. ${escapeHtml(vatRegistrationNumber)}` : ""}
           </div>
         </div>

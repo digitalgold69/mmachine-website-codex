@@ -71,7 +71,7 @@ export default function DashboardNav({
         )}
       </Link>
       <Link href="/dashboard/featured" className={linkClass("/dashboard/featured")}>
-        Featured Work
+        Misc Stock
       </Link>
       {userRole === "admin" && (
         <Link href="/dashboard/team" className={linkClass("/dashboard/team")}>

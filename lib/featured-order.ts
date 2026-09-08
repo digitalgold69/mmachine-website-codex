@@ -6,7 +6,7 @@ export function featuredOrderItem(job: FeaturedWork): Omit<QuoteItem, "qty"> {
     key: `featured-${job.id}`,
     catalogue: "featured",
     productId: job.id,
-    code: `FW-${job.id.toUpperCase()}`,
+    code: `MS-${job.id.toUpperCase()}`,
     description: job.title,
     unit: "each",
     unitPriceExVat: job.priceExVat,

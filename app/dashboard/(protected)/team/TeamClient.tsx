@@ -27,7 +27,7 @@ const notificationOptions: { id: NotificationRoute; label: string }[] = [
   { id: "mini", label: "Mini panels" },
   { id: "metals", label: "Metals" },
   { id: "custom", label: "Custom work" },
-  { id: "featured", label: "Featured work" },
+  { id: "featured", label: "Misc stock" },
 ];
 
 export default function TeamClient({ initialTeam, initialAudit, currentUserId }: TeamClientProps) {

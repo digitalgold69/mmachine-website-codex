@@ -23,6 +23,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     accountName: "",
     sortCode: "",
     accountNumber: "",
+    bic: "",
+    iban: "",
+    companyNumber: "01476185",
+    vatNumber: "",
   };
   let error = "";
   const params = searchParams ? await searchParams : {};

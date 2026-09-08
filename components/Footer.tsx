@@ -30,7 +30,7 @@ export default function Footer() {
               <li><Link href="/catalogue/mini" className="hover:text-gold">Classic Mini panels</Link></li>
               <li><Link href="/catalogue/metals" className="hover:text-gold">Engineering metals</Link></li>
               <li><Link href="/custom-engineering" className="hover:text-gold">Custom engineering quotes</Link></li>
-              <li><Link href="/featured" className="hover:text-gold">Featured Work</Link></li>
+              <li><Link href="/featured" className="hover:text-gold">Misc Stock</Link></li>
             </ul>
           </div>
 

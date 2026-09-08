@@ -29,6 +29,7 @@ type QuoteRow = {
   customer_email_sent_at: string | null;
   owner_email_sent_at: string | null;
   include_vat?: number | string | boolean | null;
+  export_order?: number | string | boolean | null;
   website_invoice_number?: string | null;
   website_invoice_count?: number | string | null;
   refunds?: string | null;
@@ -54,6 +55,7 @@ async function ensureQuoteAccountingSchemaInner() {
     `ALTER TABLE quote_requests ADD COLUMN refunds TEXT NOT NULL DEFAULT '[]'`,
     `ALTER TABLE quote_requests ADD COLUMN payment_link TEXT`,
     `ALTER TABLE quote_requests ADD COLUMN payment_method TEXT`,
+    `ALTER TABLE quote_requests ADD COLUMN export_order INTEGER NOT NULL DEFAULT 0`,
     `CREATE UNIQUE INDEX IF NOT EXISTS quote_requests_website_invoice_number_idx
       ON quote_requests(website_invoice_number)`,
     `CREATE TABLE IF NOT EXISTS accounting_sequences (
@@ -167,6 +169,7 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     customerEmailSentAt: row.customer_email_sent_at,
     ownerEmailSentAt: row.owner_email_sent_at,
     includeVat: boolFromDb(row.include_vat, true),
+    exportOrder: boolFromDb(row.export_order, false),
     websiteInvoiceNumber: row.website_invoice_number || null,
     websiteInvoiceCount: intFromDb(row.website_invoice_count, 1),
     refunds: quoteRefunds({ refunds: parseJson(row.refunds || null, []) }),
@@ -635,10 +638,11 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         customer_email_sent_at,
         owner_email_sent_at,
         include_vat,
+        export_order,
         website_invoice_number,
         website_invoice_count,
         refunds
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       on conflict(id) do update set
         submitted_at = excluded.submitted_at,
         updated_at = excluded.updated_at,
@@ -659,6 +663,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
         customer_email_sent_at = excluded.customer_email_sent_at,
         owner_email_sent_at = excluded.owner_email_sent_at,
         include_vat = excluded.include_vat,
+        export_order = excluded.export_order,
         website_invoice_number = excluded.website_invoice_number,
         website_invoice_count = excluded.website_invoice_count,
         refunds = excluded.refunds
@@ -685,6 +690,7 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       quote.customerEmailSentAt ?? null,
       quote.ownerEmailSentAt ?? null,
       quote.includeVat === false ? 0 : 1,
+      quote.exportOrder === true ? 1 : 0,
       quote.websiteInvoiceNumber ?? null,
       websiteInvoiceCount,
       JSON.stringify(quoteRefunds(quote))

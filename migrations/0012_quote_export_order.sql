@@ -1,0 +1,1 @@
+ALTER TABLE quote_requests ADD COLUMN export_order INTEGER NOT NULL DEFAULT 0;

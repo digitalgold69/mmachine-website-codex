@@ -103,6 +103,7 @@ export type QuoteRequest = {
   customerEmailSentAt?: string | null;
   ownerEmailSentAt?: string | null;
   includeVat?: boolean;
+  exportOrder?: boolean;
   websiteInvoiceNumber?: string | null;
   websiteInvoiceCount?: number | null;
   refunds?: QuoteRefund[];

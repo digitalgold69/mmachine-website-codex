@@ -33,7 +33,7 @@ export const ACCOUNTING_BUCKET_LABELS: Record<QuoteAccountingBucket, string> = {
   metals: "Metals",
   carriage: "Carriage",
   engineering: "Engineering",
-  featured: "Featured work",
+  featured: "Misc stock",
 };
 
 export type AccountingGroup = {

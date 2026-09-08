@@ -246,22 +246,22 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* FEATURED */}
+      {/* MISC STOCK */}
       <section className="bg-cream-dark py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
             <div>
-              <h2 className="font-display text-3xl text-racing mb-2">Featured Work</h2>
-              <p className="text-ink-muted">One-off fabrication, machining and restoration work.</p>
+              <h2 className="font-display text-3xl text-racing mb-2">Misc Stock</h2>
+              <p className="text-ink-muted">Ready-to-order stock, one-off fabrication, machining and restoration work.</p>
             </div>
             <Link href="/featured" className="text-sm font-medium text-racing hover:text-gold">
-              View all Featured Work →
+              View all Misc Stock →
             </Link>
           </div>
 
           <FeaturedWorkGrid
             items={latestFeatured}
-            emptyText="New Featured Work will appear here as it is added by M-Machine."
+            emptyText="New Misc Stock will appear here as it is added by M-Machine."
             gridClassName="grid md:grid-cols-3 gap-6"
             cardImageClassName="aspect-[4/3]"
             showCategory={false}

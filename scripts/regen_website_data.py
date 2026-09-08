@@ -491,12 +491,12 @@ def build_metals_products():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Featured Work — read JSON, copy images to public/, write lib/featured-data.ts
+# Misc Stock — read JSON, copy images to public/, write lib/featured-data.ts
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def build_featured_work():
-    print("Reading Featured Work JSON")
+    print("Reading Misc Stock JSON")
     if not FEATURED_JSON.exists():
         print(f"  ! featured-work.json not found at {FEATURED_JSON}; skipping")
         return None
@@ -589,7 +589,7 @@ def build_featured_work():
         if len(missing_images) > 5:
             print(f"     ... plus {len(missing_images) - 5} more")
 
-    print(f"  OK Featured work: {len(out)} entries  ({len(written)} with images, {len(missing_images)} missing images)")
+    print(f"  OK Misc stock: {len(out)} entries  ({len(written)} with images, {len(missing_images)} missing images)")
     return out
 
 
@@ -763,7 +763,7 @@ def main():
     metals_list = build_metals_products()
     write_mini_data_file(mini)
     write_metals_data_file(metals_list)
-    # Featured Work is NOT touched here — the in-browser editor commits both
+    # Misc Stock is NOT touched here — the in-browser editor commits both
     # data-source/featured-work.json AND lib/featured-data.ts directly via
     # the GitHub API. The local sync should leave both files alone to avoid
     # racing with the editor.

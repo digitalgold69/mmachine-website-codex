@@ -225,7 +225,7 @@ function safePublicItem(
       key: `featured-${featured.id}`,
       catalogue: "featured",
       productId: featured.id,
-      code: `FW-${featured.id.toUpperCase()}`,
+      code: `MS-${featured.id.toUpperCase()}`,
       description: featured.title,
       unit: "each",
       qty,
@@ -385,6 +385,7 @@ async function persistCustomQuote(
     paidAt: null,
     customerEmailSentAt: null,
     ownerEmailSentAt: null,
+    exportOrder: false,
   };
 
   let saved = await ensureWebsiteInvoiceNumber(await saveQuoteRequest(quote));
@@ -755,7 +756,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     const featuredOnly = items.every((item) => item.catalogue === "featured");
     const quote: QuoteRequest = {
-      id: quoteId(featuredOnly ? "FW" : ""),
+      id: quoteId(featuredOnly ? "MS" : ""),
       submittedAt: now,
       updatedAt: now,
       status: "new",
@@ -770,6 +771,7 @@ export async function POST(req: Request) {
       paidAt: null,
       customerEmailSentAt: null,
       ownerEmailSentAt: null,
+      exportOrder: false,
     };
 
     let saved = await ensureWebsiteInvoiceNumber(await saveQuoteRequest(quote));
@@ -777,7 +779,7 @@ export async function POST(req: Request) {
     const email = await sendQuoteEmail({
       to: recipients,
       subject: featuredOnly
-        ? `New M-Machine Featured Work order ${websiteInvoiceDisplay(saved)}`
+        ? `New M-Machine misc stock order ${websiteInvoiceDisplay(saved)}`
         : `New M-Machine quote request ${websiteInvoiceDisplay(saved)}`,
       html: await buildOwnerQuoteEmailForRuntime(saved),
       replyTo: saved.customer.email,
@@ -829,6 +831,7 @@ export async function PATCH(req: Request) {
     extraChargesExVat?: number | string | null;
     paymentLink?: string | null;
     paymentMethod?: QuotePaymentMethod;
+    exportOrder?: boolean | string | number;
     emailCustomer?: boolean;
     markPaid?: boolean;
     saveNoEmail?: boolean;
@@ -863,6 +866,7 @@ export async function PATCH(req: Request) {
         ? current.paymentMethod ?? null
         : safePaymentMethod(body.paymentMethod, current.paymentMethod || "card"),
       includeVat: asBoolean(body.includeVat, current.includeVat !== false),
+      exportOrder: asBoolean(body.exportOrder, current.exportOrder === true),
       updatedAt: new Date().toISOString(),
     };
 

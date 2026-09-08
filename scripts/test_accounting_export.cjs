@@ -65,7 +65,7 @@ const quote = {
       key: "featured-a",
       catalogue: "featured",
       productId: "featured-a",
-      code: "FW-1",
+      code: "MS-1",
       description: "Machined bracket",
       qty: 1,
       unit: "each",
