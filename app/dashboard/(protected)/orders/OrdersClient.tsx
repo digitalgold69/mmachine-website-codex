@@ -80,6 +80,7 @@ const STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "reviewing", label: "Reviewing" },
   { value: "invoice_sent", label: "Invoice sent" },
+  { value: "pending_payment", label: "Pending payment" },
   { value: "paid", label: "Paid" },
   { value: "closed", label: "Closed" },
 ];
@@ -130,6 +131,7 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
   new: "bg-gold/15 text-gold",
   reviewing: "bg-blue-50 text-blue-800",
   invoice_sent: "bg-racing/10 text-racing",
+  pending_payment: "bg-racing/10 text-racing",
   paid: "bg-green-50 text-green-800",
   closed: "bg-stone-100 text-stone-700",
 };
@@ -451,6 +453,13 @@ function statusLabel(status: QuoteStatus) {
   return STATUS_OPTIONS.find((option) => option.value === status)?.label || status;
 }
 
+function dashboardStatus(quote: QuoteRequest): QuoteStatus {
+  if (isPaidQuote(quote)) return "paid";
+  if (quote.status === "pending_payment") return "pending_payment";
+  if (quote.status === "invoice_sent" && !quote.customerEmailSentAt) return "pending_payment";
+  return quote.status;
+}
+
 function formatDateTime(value: string | null | undefined) {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-GB", {
@@ -493,14 +502,19 @@ function isPaidQuote(quote: QuoteRequest) {
 }
 
 function isPendingPaymentQuote(quote: QuoteRequest) {
-  return !isPaidQuote(quote) && (quote.status === "invoice_sent" || Boolean(quote.invoiceSentAt || quote.customerEmailSentAt));
+  return !isPaidQuote(quote) && (
+    quote.status === "invoice_sent" ||
+    quote.status === "pending_payment" ||
+    Boolean(quote.invoiceSentAt || quote.customerEmailSentAt)
+  );
 }
 
 function isOpenRequestQuote(quote: QuoteRequest) {
   return !isPaidQuote(quote) && !isPendingPaymentQuote(quote) && quote.status !== "closed";
 }
 
-function StatusPill({ status }: { status: QuoteStatus }) {
+function StatusPill({ quote }: { quote: QuoteRequest }) {
+  const status = dashboardStatus(quote);
   return (
     <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLES[status]}`}>
       {statusLabel(status)}
@@ -609,7 +623,9 @@ function OrderCard({
   const itemQuantity = orderItemQuantity(quote);
   const displayRef = quoteDisplayRef(quote);
   const refundText = refundCardText(quote, quoteTotals);
-  const sentDateText = !quote.paidAt && quote.invoiceSentAt ? formatDateTime(dateValue || quote.invoiceSentAt) : "";
+  const sentDateText = !quote.paidAt && isPendingPaymentQuote(quote)
+    ? formatDateTime(dateValue || quote.customerEmailSentAt || quote.invoiceSentAt || quote.quotedAt)
+    : "";
   const bodyDateText = sentDateText ? "" : `${dateLabel}: ${formatDateTime(dateValue)}`;
   const footerStatusText = quote.paidAt ? `Paid ${formatDateTime(quote.paidAt)}` : "";
   const customerLines = [
@@ -640,7 +656,7 @@ function OrderCard({
         <div className="flex items-center justify-between gap-2">
           <OrderTypePill quote={quote} />
           <div className="flex shrink-0 flex-col items-end gap-1">
-            <StatusPill status={quote.status} />
+            <StatusPill quote={quote} />
             {sentDateText && (
               <span className="text-right text-[11px] font-medium leading-4 text-ink-muted">
                 {sentDateText}
@@ -1624,7 +1640,7 @@ export default function OrdersClient({
       const text = options.markPaid
         ? "Order marked as paid."
         : options.saveNoEmail
-          ? "Invoice saved without email and moved to pending payment."
+          ? "Marked pending payment without emailing the customer."
           : options.emailCustomer
           ? wasPreviouslySent
             ? "Updated invoice emailed to customer."
@@ -1653,7 +1669,7 @@ export default function OrdersClient({
     await patchQuote(draft, { emailCustomer, label: emailCustomer ? "email" : "save" });
   }
 
-  async function saveNoEmail() {
+  async function markPendingPayment() {
     if (!draft) return;
     await patchQuote(draft, { saveNoEmail: true, label: "save-no-email" });
   }
@@ -1754,7 +1770,7 @@ export default function OrdersClient({
   const draftTotals = draft ? totals(draft) : null;
   const hasDraftPoaItems = Boolean(draftTotals?.hasPoaItems);
   const draftCustomerInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt) : false;
-  const draftInvoiceWasSaved = draft ? Boolean(draft.invoiceSentAt) : false;
+  const draftInvoiceWasMarkedPending = draft ? dashboardStatus(draft) === "pending_payment" : false;
   const invoiceReady = draft
     ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
     : false;
@@ -2070,11 +2086,11 @@ export default function OrdersClient({
                     </button>
                   </div>
                 </div>
-                {(draftCustomerInvoiceWasSent || draftInvoiceWasSaved) && (
+                {(draftCustomerInvoiceWasSent || draftInvoiceWasMarkedPending) && (
                   <div className="mt-3 rounded-lg bg-cream-dark px-3 py-2 text-xs font-semibold text-racing">
                     {draftCustomerInvoiceWasSent
                       ? `Customer invoice last emailed ${formatDateTime(draft.customerEmailSentAt)}. Edits can be sent with the updated invoice button.`
-                      : `Invoice saved without email ${formatDateTime(draft.invoiceSentAt)}.`}
+                      : `Marked pending payment ${formatDateTime(draft.quotedAt || draft.invoiceSentAt || draft.updatedAt)}. No customer email was sent.`}
                   </div>
                 )}
               </div>
@@ -2463,7 +2479,7 @@ export default function OrdersClient({
                     <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <span className="text-xs uppercase tracking-wider text-ink-muted">Invoice state</span>
-                        <StatusPill status={draft.status} />
+                        <StatusPill quote={draft} />
                       </div>
                       <div className="space-y-1 text-ink-muted">
                         <div className="flex justify-between gap-3">
@@ -2476,10 +2492,12 @@ export default function OrdersClient({
                                 : "Not sent"}
                           </strong>
                         </div>
-                        {draft.websiteInvoiceNumber && draft.invoiceSentAt && (
+                        {draft.websiteInvoiceNumber && (draft.customerEmailSentAt || draft.invoiceSentAt || draft.quotedAt) && (
                           <div className="flex justify-between gap-3">
-                            <span>{draft.customerEmailSentAt ? "Sent" : "Saved"}</span>
-                            <strong className="text-right text-racing">{formatDateTime(draft.invoiceSentAt)}</strong>
+                            <span>{draft.customerEmailSentAt ? "Sent" : "Pending"}</span>
+                            <strong className="text-right text-racing">
+                              {formatDateTime(draft.customerEmailSentAt || draft.invoiceSentAt || draft.quotedAt)}
+                            </strong>
                           </div>
                         )}
                         <div className="flex justify-between gap-3">
@@ -2814,12 +2832,22 @@ export default function OrdersClient({
                     )}
                     <button
                       type="button"
-                      disabled={isSaving || !invoiceReady}
-                      onClick={saveNoEmail}
+                      disabled={isSaving}
+                      onClick={() => saveDraft(false)}
                       className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {savingAction === `${draft.id}:save-no-email` ? "Saving..." : "Save, No Email"}
+                      {savingAction === `${draft.id}:save` ? "Saving..." : "Save changes"}
                     </button>
+                    {draft.status !== "paid" && dashboardStatus(draft) !== "pending_payment" && (
+                      <button
+                        type="button"
+                        disabled={isSaving || !invoiceReady}
+                        onClick={markPendingPayment}
+                        className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {savingAction === `${draft.id}:save-no-email` ? "Saving..." : "Mark pending payment"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={isSaving || !invoiceReady}

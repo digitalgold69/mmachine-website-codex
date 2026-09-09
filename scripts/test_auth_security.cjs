@@ -95,6 +95,10 @@ assert.match(ordersClient, /Shows BIC &amp; IBAN/, "export-order helper must use
 assert.doesNotMatch(ordersClient, /Shows BIC and IBAN on invoices/, "export-order helper must not use the long overflowing sentence");
 assert.match(ordersClient, /paymentSettingsRows\(paymentSettings, quote\.exportOrder === true\)/, "printed invoices must only show BIC and IBAN when export order is enabled");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
+assert.match(ordersClient, /Save changes/, "invoice editor must allow draft changes to be saved without moving the order");
+assert.match(ordersClient, /Mark pending payment/, "invoice editor must provide a clear no-email pending-payment action");
+assert.doesNotMatch(ordersClient, /Save, No Email/, "invoice editor must not use ambiguous save-no-email wording");
+assert.match(ordersClient, /dashboardStatus\(quote\)/, "quote cards must display pending-payment separately from invoice-sent email state");
 assert.match(quoteRequestRoute, /orderTypeParam/, "quote request history API must accept order-type filtering");
 assert.match(quoteRequestRoute, /orderTypeParam === "featured"/, "quote request history API must accept misc stock filtering");
 assert.match(quoteRequestRoute, /ensureRefundInvoiceNumbers/, "quote request refund saves must allocate refund invoice refs");
@@ -126,6 +130,8 @@ assert.ok(saveNoEmailStart >= 0 && customerEmailStart > saveNoEmailStart, "save-
 const saveNoEmailSection = quoteRequestRoute.slice(saveNoEmailStart, customerEmailStart);
 assert.doesNotMatch(saveNoEmailSection, /sendQuoteEmail/, "save-no-email must not send a customer email");
 assert.doesNotMatch(saveNoEmailSection, /customerEmailSentAt\s*=/, "save-no-email must not mark a customer email as sent");
+assert.match(saveNoEmailSection, /next\.status = "pending_payment"/, "save-no-email must mark the order as pending payment, not invoice sent");
+assert.match(quotesStore, /status in \('new', 'reviewing', 'invoice_sent', 'pending_payment'\)/, "pending payment orders must stay visible on the active dashboard");
 assert.match(teamClient, /Reset Password/, "team reset button must use clear password reset wording");
 assert.doesNotMatch(teamClient, /Default fallback/, "team notification selector must not expose fallback copy");
 assert.match(teamClient, /Order Notifications/, "team notification column must be labelled for order notifications");

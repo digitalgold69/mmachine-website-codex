@@ -65,7 +65,7 @@ export type QuoteCustomer = {
   message?: string;
 };
 
-export type QuoteStatus = "new" | "reviewing" | "invoice_sent" | "paid" | "closed";
+export type QuoteStatus = "new" | "reviewing" | "invoice_sent" | "pending_payment" | "paid" | "closed";
 export type QuotePaymentMethod = "card" | "bacs" | "cash";
 
 export type QuoteAccountingBucket = "mini" | "metals" | "engineering" | "featured" | "carriage";

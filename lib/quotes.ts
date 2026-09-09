@@ -119,6 +119,7 @@ function normaliseStatus(status: string): QuoteStatus {
     status === "new" ||
     status === "reviewing" ||
     status === "invoice_sent" ||
+    status === "pending_payment" ||
     status === "paid" ||
     status === "closed"
   ) {
@@ -188,7 +189,7 @@ export async function listDashboardQuoteRequests(sincePaidAt: string): Promise<Q
   const result = await db
     .prepare(
       `select * from quote_requests
-       where status in ('new', 'reviewing', 'invoice_sent')
+       where status in ('new', 'reviewing', 'invoice_sent', 'pending_payment')
           or (status = 'paid' and paid_at >= ?)
        order by submitted_at desc`
     )
@@ -278,7 +279,7 @@ function quoteMatchesPaidHistoryOrderType(quote: QuoteRequest, orderType: PaidHi
 export async function listActiveQuoteRequests(): Promise<QuoteRequest[]> {
   const db = await getD1();
   const result = await db
-    .prepare("select * from quote_requests where status in ('new', 'reviewing', 'invoice_sent') order by submitted_at desc")
+    .prepare("select * from quote_requests where status in ('new', 'reviewing', 'invoice_sent', 'pending_payment') order by submitted_at desc")
     .all<QuoteRow>();
   if (result.error) throw new Error(`D1 active quote read failed: ${result.error}`);
   return ensureStoredInvoiceRanges((result.results || []).map(rowToQuote));

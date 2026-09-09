@@ -244,7 +244,7 @@ function safePublicItem(
 
 function safeStatus(value: unknown): QuoteStatus {
   if (value === "quoted" || value === "invoice_sent") return "invoice_sent";
-  if (value === "reviewing" || value === "paid" || value === "closed") return value;
+  if (value === "reviewing" || value === "pending_payment" || value === "paid" || value === "closed") return value;
   return "new";
 }
 
@@ -886,6 +886,10 @@ export async function PATCH(req: Request) {
       next.invoiceSentAt = next.customerEmailSentAt || next.quotedAt || new Date().toISOString();
     }
 
+    if (next.status === "pending_payment" && !next.quotedAt) {
+      next.quotedAt = next.invoiceSentAt || new Date().toISOString();
+    }
+
     if (next.status === "paid" && !next.paidAt) {
       next.paidAt = new Date().toISOString();
     }
@@ -928,9 +932,9 @@ export async function PATCH(req: Request) {
 
       next = await ensureWebsiteInvoiceNumber(next);
       const savedAt = new Date().toISOString();
-      next.status = "invoice_sent";
+      next.status = "pending_payment";
       next.quotedAt = next.quotedAt || savedAt;
-      next.invoiceSentAt = next.invoiceSentAt || savedAt;
+      if (!next.customerEmailSentAt) next.invoiceSentAt = null;
     }
 
     let customerEmailSent = false;
