@@ -417,4 +417,15 @@ const updatedCustomerHtml = buildCustomerInvoiceEmail({
 assert.match(updatedCustomerHtml, /Updated invoice/);
 assert.match(updatedCustomerHtml, /See your order summary below\./);
 
+const paidUpdatedCustomerHtml = buildCustomerInvoiceEmail({
+  ...quote,
+  status: "paid",
+  invoiceSentAt: "2026-07-27T14:00:00.000Z",
+  customerEmailSentAt: "2026-07-27T14:00:00.000Z",
+  paidAt: "2026-07-28T09:30:00.000Z",
+  paymentMethod: "bacs",
+});
+assert.match(paidUpdatedCustomerHtml, /Status[\s\S]*Paid/);
+assert.match(paidUpdatedCustomerHtml, /Payment method[\s\S]*BACS/);
+
 console.log("ok - quote and enquiry email templates include routed recipients, focused dashboard links, and clean invoice details");

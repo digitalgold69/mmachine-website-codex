@@ -9,7 +9,7 @@ import {
 } from "./order-accounting";
 import { getPaymentSettings, type PaymentSettings } from "./payment-settings";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-delivery";
-import type { QuoteCatalogue, QuoteItem, QuoteRequest } from "./quote-types";
+import type { QuoteCatalogue, QuoteItem, QuotePaymentMethod, QuoteRequest } from "./quote-types";
 
 const GBP = "\u00a3";
 const DEFAULT_SITE_URL = "https://m-machine-metals.co.uk";
@@ -408,6 +408,35 @@ function bacsRows(settings: PaymentSettings, includeExportDetails = false) {
   return rows.filter(([, value]) => String(value || "").trim());
 }
 
+function paymentMethodLabel(value: QuotePaymentMethod | null | undefined) {
+  if (value === "bacs") return "BACS";
+  if (value === "cash") return "Cash";
+  return "Card";
+}
+
+function paidInvoiceStateRows(quote: QuoteRequest) {
+  const paid = quote.status === "paid" || Boolean(quote.paidAt);
+  if (!paid) return "";
+  return `
+    <tr>
+      <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Status</td>
+      <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">Paid</td>
+    </tr>
+    ${
+      quote.paidAt
+        ? `<tr>
+            <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Paid</td>
+            <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca">${escapeHtml(formatDate(quote.paidAt))}</td>
+          </tr>`
+        : ""
+    }
+    <tr>
+      <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Payment method</td>
+      <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca;font-weight:700;color:#0f3d2e">${escapeHtml(paymentMethodLabel(quote.paymentMethod))}</td>
+    </tr>
+  `;
+}
+
 function paymentMethodsBlock(quote: QuoteRequest, settings: PaymentSettings) {
   const onlineLink = safePaymentLink(quote.paymentLink);
   const rows = bacsRows(settings, quote.exportOrder === true);
@@ -507,6 +536,7 @@ export function buildCustomerInvoiceEmail(
                 <td style="padding:8px 0;color:#6b5a46;border-top:1px solid #eadfca">Submitted</td>
                 <td style="padding:8px 0;text-align:right;border-top:1px solid #eadfca">${escapeHtml(formatDate(quote.submittedAt))}</td>
               </tr>
+              ${paidInvoiceStateRows(quote)}
             </tbody>
           </table>
 

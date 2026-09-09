@@ -440,6 +440,10 @@ function cloneQuote(quote: QuoteRequest): QuoteRequest {
   return JSON.parse(JSON.stringify(quote));
 }
 
+function quoteSnapshot(quote: QuoteRequest) {
+  return JSON.stringify(quote);
+}
+
 function mergeQuoteUpdates(current: QuoteRequest[], incoming: QuoteRequest[]) {
   if (incoming.length === 0) return current;
   const byId = new Map(current.map((quote) => [quote.id, quote]));
@@ -911,6 +915,7 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   const paymentLink = safePaymentLink(quote.paymentLink);
   const invoiceCompanyNumber = companyNumber(paymentSettings);
   const invoiceVatNumber = vatNumber(paymentSettings);
+  const printedStatus = statusLabel(dashboardStatus(quote));
   return (
     <div className="invoice-print-sheet">
       <div className="mb-6 flex items-start justify-between gap-6 border-b border-racing/20 pb-4">
@@ -927,13 +932,38 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         </div>
       </div>
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-2">
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <section className="rounded-lg border border-racing/10 p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
           <div className="font-semibold text-racing">{quote.customer.name}</div>
           {quote.customer.company && <div>{quote.customer.company}</div>}
           <div>{quote.customer.email}</div>
           <div>{quote.customer.phone}</div>
+        </section>
+        <section className="rounded-lg border border-racing/10 p-3">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
+          <div className="grid gap-1 text-sm">
+            <div className="flex justify-between gap-3">
+              <span className="text-ink-muted">Status</span>
+              <strong className="text-right text-racing">{printedStatus}</strong>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-ink-muted">Reference</span>
+              <strong className="text-right text-racing">{websiteInvoiceDisplay(quote)}</strong>
+            </div>
+            {quote.paidAt && (
+              <div className="flex justify-between gap-3">
+                <span className="text-ink-muted">Paid</span>
+                <strong className="text-right text-racing">{formatDateTime(quote.paidAt)}</strong>
+              </div>
+            )}
+            {isPaidQuote(quote) && (
+              <div className="flex justify-between gap-3">
+                <span className="text-ink-muted">Paid by</span>
+                <strong className="text-right text-racing">{paymentMethodLabel(quote.paymentMethod)}</strong>
+              </div>
+            )}
+          </div>
         </section>
         <section className="rounded-lg border border-racing/10 p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Delivery</h2>
@@ -1129,6 +1159,10 @@ export default function OrdersClient({
   const selected = useMemo(
     () => quotes.find((quote) => quote.id === selectedId) ?? null,
     [quotes, selectedId]
+  );
+  const draftHasUnsavedChanges = useMemo(
+    () => Boolean(draft && selected && quoteSnapshot(draft) !== quoteSnapshot(selected)),
+    [draft, selected]
   );
 
   const pageCount = Math.max(1, Math.ceil(historyCount / PAGE_SIZE));
@@ -1608,7 +1642,7 @@ export default function OrdersClient({
   async function patchQuote(
     quote: QuoteRequest,
     options: { emailCustomer?: boolean; markPaid?: boolean; saveNoEmail?: boolean; label: string }
-  ) {
+  ): Promise<QuoteRequest | null> {
     setSavingAction(`${quote.id}:${options.label}`);
     setMessage("");
     setActionNotice(null);
@@ -1634,7 +1668,7 @@ export default function OrdersClient({
       updateQuote(updated);
       if (updated.status === "closed") {
         setMessage(`Deleted ${updated.id}.`);
-        return;
+        return null;
       }
       const wasPreviouslySent = Boolean(quote.customerEmailSentAt);
       const text = options.markPaid
@@ -1652,6 +1686,7 @@ export default function OrdersClient({
       } else {
         setMessage(text);
       }
+      return updated;
     } catch (err) {
       const text = (err as Error).message || "Save failed";
       if (options.emailCustomer || selectedId === quote.id) {
@@ -1659,6 +1694,7 @@ export default function OrdersClient({
       } else {
         setMessage(text);
       }
+      return null;
     } finally {
       setSavingAction("");
     }
@@ -1667,6 +1703,16 @@ export default function OrdersClient({
   async function saveDraft(emailCustomer = false) {
     if (!draft) return;
     await patchQuote(draft, { emailCustomer, label: emailCustomer ? "email" : "save" });
+  }
+
+  async function saveAndCloseDraft() {
+    if (!draft) return;
+    if (!draftHasUnsavedChanges) {
+      closeInvoice();
+      return;
+    }
+    const updated = await patchQuote(draft, { label: "save-close" });
+    if (updated) closeInvoice();
   }
 
   async function markPendingPayment() {
@@ -2081,8 +2127,17 @@ export default function OrdersClient({
                         ))}
                       </select>
                     </div>
-                    <button type="button" onClick={closeInvoice} className="btn-secondary mt-2 w-full px-3 py-2 text-sm">
-                      Close
+                    <button
+                      type="button"
+                      onClick={saveAndCloseDraft}
+                      disabled={isSaving}
+                      className="btn-secondary mt-2 w-full px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingAction === `${draft.id}:save-close`
+                        ? "Saving..."
+                        : draftHasUnsavedChanges
+                          ? "Save & Close"
+                          : "Close"}
                     </button>
                   </div>
                 </div>
@@ -2830,15 +2885,7 @@ export default function OrdersClient({
                         </button>
                       </div>
                     )}
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => saveDraft(false)}
-                      className="btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {savingAction === `${draft.id}:save` ? "Saving..." : "Save changes"}
-                    </button>
-                    {draft.status !== "paid" && dashboardStatus(draft) !== "pending_payment" && (
+                    {draft.status !== "paid" && !isPendingPaymentQuote(draft) && (
                       <button
                         type="button"
                         disabled={isSaving || !invoiceReady}
