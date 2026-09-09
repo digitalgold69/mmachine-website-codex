@@ -324,7 +324,7 @@ function clampQty(value: string | number) {
 function priceFromInput(value: string) {
   if (value.trim() === "") return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  return Number.isFinite(parsed) && parsed >= 0 ? Number(parsed.toFixed(2)) : null;
 }
 
 function incVatFromExVat(value: number | null) {
@@ -916,6 +916,12 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   const invoiceCompanyNumber = companyNumber(paymentSettings);
   const invoiceVatNumber = vatNumber(paymentSettings);
   const printedStatus = statusLabel(dashboardStatus(quote));
+  const printStateRows = [
+    { label: "Reference", value: websiteInvoiceDisplay(quote) },
+    { label: "Status", value: printedStatus },
+    { label: isPaidQuote(quote) ? "Paid" : "Submitted", value: formatDateTime(isPaidQuote(quote) ? quote.paidAt || quote.updatedAt : quote.submittedAt) },
+    { label: isPaidQuote(quote) ? "Paid by" : "Payment", value: isPaidQuote(quote) ? paymentMethodLabel(quote.paymentMethod) : "Awaiting" },
+  ];
   return (
     <div className="invoice-print-sheet">
       <div className="mb-6 flex items-start justify-between gap-6 border-b border-racing/20 pb-4">
@@ -932,38 +938,25 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         </div>
       </div>
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="mb-5 rounded-lg border border-racing/10 bg-cream-dark p-3">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
+        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {printStateRows.map((row) => (
+            <div key={row.label} className="min-w-0">
+              <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
+              <dd className="mt-0.5 truncate font-semibold text-racing">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2">
         <section className="rounded-lg border border-racing/10 p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
           <div className="font-semibold text-racing">{quote.customer.name}</div>
           {quote.customer.company && <div>{quote.customer.company}</div>}
           <div>{quote.customer.email}</div>
           <div>{quote.customer.phone}</div>
-        </section>
-        <section className="rounded-lg border border-racing/10 p-3">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
-          <div className="grid gap-1 text-sm">
-            <div className="flex justify-between gap-3">
-              <span className="text-ink-muted">Status</span>
-              <strong className="text-right text-racing">{printedStatus}</strong>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-ink-muted">Reference</span>
-              <strong className="text-right text-racing">{websiteInvoiceDisplay(quote)}</strong>
-            </div>
-            {quote.paidAt && (
-              <div className="flex justify-between gap-3">
-                <span className="text-ink-muted">Paid</span>
-                <strong className="text-right text-racing">{formatDateTime(quote.paidAt)}</strong>
-              </div>
-            )}
-            {isPaidQuote(quote) && (
-              <div className="flex justify-between gap-3">
-                <span className="text-ink-muted">Paid by</span>
-                <strong className="text-right text-racing">{paymentMethodLabel(quote.paymentMethod)}</strong>
-              </div>
-            )}
-          </div>
         </section>
         <section className="rounded-lg border border-racing/10 p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Delivery</h2>
@@ -2335,7 +2328,7 @@ export default function OrdersClient({
                                   step="0.01"
                                   value={item.unitPriceExVat ?? ""}
                                   onChange={(e) => {
-                                    const unitPriceExVat = e.target.value === "" ? null : Number(e.target.value);
+                                    const unitPriceExVat = priceFromInput(e.target.value);
                                     patchItem(index, {
                                       unitPriceExVat,
                                       unitPriceIncVat: incVatFromExVat(unitPriceExVat),

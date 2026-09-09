@@ -70,8 +70,14 @@ function asNumberOrNull(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
+function asMoneyOrNull(value: unknown) {
+  const n = asNumberOrNull(value);
+  return n === null ? null : roundAccounting(n);
+}
+
 function cataloguePrice(value: number | null | undefined) {
-  return normaliseCataloguePrice(value);
+  const price = normaliseCataloguePrice(value);
+  return price === null ? null : roundAccounting(price);
 }
 
 function asBoolean(value: unknown, fallback: boolean) {
@@ -152,8 +158,8 @@ function safeItem(raw: Partial<QuoteItem>, index: number): QuoteItem {
     stockSize: asString(raw.stockSize, 120),
     unit: asString(raw.unit, 120),
     qty,
-    unitPriceExVat: asNumberOrNull(raw.unitPriceExVat),
-    unitPriceIncVat: asNumberOrNull(raw.unitPriceIncVat),
+    unitPriceExVat: asMoneyOrNull(raw.unitPriceExVat),
+    unitPriceIncVat: asMoneyOrNull(raw.unitPriceIncVat),
     metalDimensions: safeMetalDimensions(raw.metalDimensions),
     custom: raw.custom,
   };
@@ -214,8 +220,8 @@ function safePublicItem(
         ...baseItem,
         key: `${baseItem.key}-${calculated.keySuffix}`,
         unit: calculated.unit,
-        unitPriceExVat: calculated.unitPriceExVat,
-        unitPriceIncVat: calculated.unitPriceIncVat,
+        unitPriceExVat: asMoneyOrNull(calculated.unitPriceExVat),
+        unitPriceIncVat: asMoneyOrNull(calculated.unitPriceIncVat),
         metalDimensions: calculated.metalDimensions,
       };
     }
@@ -235,7 +241,7 @@ function safePublicItem(
       unit: "each",
       qty,
       unitPriceExVat: priceExVat,
-      unitPriceIncVat: priceExVat !== null ? Number((priceExVat * 1.2).toFixed(2)) : null,
+      unitPriceIncVat: priceExVat !== null ? roundAccounting(priceExVat * 1.2) : null,
     };
   }
 
@@ -864,8 +870,8 @@ export async function PATCH(req: Request) {
       status: body.status ? safeStatus(body.status) : current.status,
       ownerNotes: asString(body.ownerNotes ?? current.ownerNotes, 3000),
       customerMessage: asString(body.customerMessage ?? current.customerMessage, 3000),
-      carriageExVat: body.carriageExVat === undefined ? current.carriageExVat : asNumberOrNull(body.carriageExVat),
-      extraChargesExVat: body.extraChargesExVat === undefined ? current.extraChargesExVat : asNumberOrNull(body.extraChargesExVat),
+      carriageExVat: body.carriageExVat === undefined ? current.carriageExVat : asMoneyOrNull(body.carriageExVat),
+      extraChargesExVat: body.extraChargesExVat === undefined ? current.extraChargesExVat : asMoneyOrNull(body.extraChargesExVat),
       paymentLink: body.paymentLink === undefined ? current.paymentLink || "" : safePaymentLink(body.paymentLink),
       paymentMethod: body.paymentMethod === undefined
         ? current.paymentMethod ?? null

@@ -4,6 +4,7 @@ import {
   quoteRefunds,
   requiredRefundInvoiceCount,
   requiredWebsiteInvoiceCount,
+  roundAccounting,
 } from "@/lib/order-accounting";
 import { quoteMatchesPaidHistorySearch } from "@/lib/quote-search";
 import type { QuoteItem, QuotePaymentMethod, QuoteRefund, QuoteRequest, QuoteStatus } from "@/lib/quote-types";
@@ -151,6 +152,29 @@ function intFromDb(value: unknown, fallback = 1) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function moneyFromStoredValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? roundAccounting(numeric) : null;
+}
+
+function normaliseQuoteItems(items: QuoteItem[]) {
+  return items.map((item) => ({
+    ...item,
+    unitPriceExVat: moneyFromStoredValue(item.unitPriceExVat),
+    unitPriceIncVat: moneyFromStoredValue(item.unitPriceIncVat),
+  }));
+}
+
+function normaliseQuoteMoney(quote: QuoteRequest): QuoteRequest {
+  return {
+    ...quote,
+    items: normaliseQuoteItems(quote.items),
+    carriageExVat: moneyFromStoredValue(quote.carriageExVat),
+    extraChargesExVat: moneyFromStoredValue(quote.extraChargesExVat),
+  };
+}
+
 function rowToQuote(row: QuoteRow): QuoteRequest {
   return {
     id: row.id,
@@ -158,11 +182,11 @@ function rowToQuote(row: QuoteRow): QuoteRequest {
     updatedAt: row.updated_at,
     status: normaliseStatus(row.status),
     customer: parseJson(row.customer, { name: "", email: "", phone: "" }),
-    items: parseJson<QuoteItem[]>(row.items, []),
+    items: normaliseQuoteItems(parseJson<QuoteItem[]>(row.items, [])),
     ownerNotes: row.owner_notes || "",
     customerMessage: row.customer_message || "",
-    carriageExVat: row.carriage_ex_vat,
-    extraChargesExVat: row.extra_charges_ex_vat,
+    carriageExVat: moneyFromStoredValue(row.carriage_ex_vat),
+    extraChargesExVat: moneyFromStoredValue(row.extra_charges_ex_vat),
     quotedAt: row.quoted_at,
     invoiceSentAt: row.invoice_sent_at || row.customer_email_sent_at || row.quoted_at,
     paidAt: row.paid_at,
@@ -602,14 +626,15 @@ export async function listPaidQuoteRecordsForExport(): Promise<QuoteRequest[]> {
 export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteRequest> {
   await ensureQuoteAccountingSchema();
   const db = await getD1();
-  const paidMonthUk = quote.status === "paid"
-    ? ukDateKey(quote.paidAt || quote.updatedAt).slice(0, 7)
+  const quoteToSave = normaliseQuoteMoney(quote);
+  const paidMonthUk = quoteToSave.status === "paid"
+    ? ukDateKey(quoteToSave.paidAt || quoteToSave.updatedAt).slice(0, 7)
     : null;
-  const totalExVat = quoteNetExVat(quote);
-  const storedWebsiteInvoiceCount = Math.max(1, Math.floor(Number(quote.websiteInvoiceCount) || 1));
-  const websiteInvoiceCount = quote.websiteInvoiceNumber
+  const totalExVat = quoteNetExVat(quoteToSave);
+  const storedWebsiteInvoiceCount = Math.max(1, Math.floor(Number(quoteToSave.websiteInvoiceCount) || 1));
+  const websiteInvoiceCount = quoteToSave.websiteInvoiceNumber
     ? storedWebsiteInvoiceCount
-    : Math.max(1, requiredWebsiteInvoiceCount(quote));
+    : Math.max(1, requiredWebsiteInvoiceCount(quoteToSave));
 
   const result = await db
     .prepare(
@@ -667,36 +692,36 @@ export async function saveQuoteRequest(quote: QuoteRequest): Promise<QuoteReques
       `
     )
     .bind(
-      quote.id,
-      quote.submittedAt,
-      quote.updatedAt,
-      quote.status,
-      JSON.stringify(quote.customer),
-      JSON.stringify(quote.items),
-      quote.ownerNotes || "",
-      quote.customerMessage || "",
-      quote.carriageExVat ?? null,
-      quote.extraChargesExVat ?? null,
-      quote.quotedAt ?? null,
-      quote.invoiceSentAt ?? null,
-      quote.paidAt ?? null,
-      quote.paymentLink || null,
-      quote.paymentMethod ?? null,
+      quoteToSave.id,
+      quoteToSave.submittedAt,
+      quoteToSave.updatedAt,
+      quoteToSave.status,
+      JSON.stringify(quoteToSave.customer),
+      JSON.stringify(quoteToSave.items),
+      quoteToSave.ownerNotes || "",
+      quoteToSave.customerMessage || "",
+      quoteToSave.carriageExVat ?? null,
+      quoteToSave.extraChargesExVat ?? null,
+      quoteToSave.quotedAt ?? null,
+      quoteToSave.invoiceSentAt ?? null,
+      quoteToSave.paidAt ?? null,
+      quoteToSave.paymentLink || null,
+      quoteToSave.paymentMethod ?? null,
       paidMonthUk,
       totalExVat,
-      quote.customerEmailSentAt ?? null,
-      quote.ownerEmailSentAt ?? null,
-      quote.includeVat === false ? 0 : 1,
-      quote.exportOrder === true ? 1 : 0,
-      quote.websiteInvoiceNumber ?? null,
+      quoteToSave.customerEmailSentAt ?? null,
+      quoteToSave.ownerEmailSentAt ?? null,
+      quoteToSave.includeVat === false ? 0 : 1,
+      quoteToSave.exportOrder === true ? 1 : 0,
+      quoteToSave.websiteInvoiceNumber ?? null,
       websiteInvoiceCount,
-      JSON.stringify(quoteRefunds(quote))
+      JSON.stringify(quoteRefunds(quoteToSave))
     )
     .run();
 
   if (result.error) throw new Error(`D1 quote_requests save failed: ${result.error}`);
 
-  const saved = await getQuoteRequest(quote.id);
+  const saved = await getQuoteRequest(quoteToSave.id);
   if (!saved) throw new Error("D1 quote_requests save failed: saved row could not be read.");
   return saved;
 }

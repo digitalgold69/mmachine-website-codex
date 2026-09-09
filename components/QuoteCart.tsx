@@ -39,6 +39,19 @@ const VAT_MULTIPLIER = 1.2;
 
 const money = catalogueMoney;
 
+function currencyPrice(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function normaliseCartItem(item: QuoteItem): QuoteItem {
+  return {
+    ...item,
+    unitPriceExVat: currencyPrice(item.unitPriceExVat),
+    unitPriceIncVat: currencyPrice(item.unitPriceIncVat),
+  };
+}
+
 const itemLabel = (item: QuoteItem | PendingItem) =>
   item.catalogue === "custom"
     ? item.custom?.projectName || item.description
@@ -118,7 +131,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw));
+      if (raw) setItems((JSON.parse(raw) as QuoteItem[]).map(normaliseCartItem));
     } catch {
       setItems([]);
     }
@@ -172,7 +185,7 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
     pendingMetalConfig?.mode === "catalogue" ||
     Boolean(pendingMetalCalculation?.ok);
   const pendingPreviewUnitPrice =
-    pendingMetalCalculation?.ok ? pendingMetalCalculation.unitPriceExVat : pending?.unitPriceExVat ?? null;
+    pendingMetalCalculation?.ok ? currencyPrice(pendingMetalCalculation.unitPriceExVat) : currencyPrice(pending?.unitPriceExVat);
   const pendingPreviewUnit =
     pendingMetalCalculation?.ok ? pendingMetalCalculation.unit : pending?.unit;
   const pendingCatalogueUnitPrice = pending?.unitPriceExVat ?? null;
@@ -278,19 +291,20 @@ export default function QuoteCartProvider({ children }: { children: ReactNode })
         ...pending,
         key: `${pending.key}-${calculation.keySuffix}`,
         unit: calculation.unit,
-        unitPriceExVat: calculation.unitPriceExVat,
-        unitPriceIncVat: calculation.unitPriceIncVat,
+        unitPriceExVat: currencyPrice(calculation.unitPriceExVat),
+        unitPriceIncVat: currencyPrice(calculation.unitPriceIncVat),
         metalDimensions: calculation.metalDimensions,
       };
     }
+    const nextItem = normaliseCartItem({ ...itemToAdd, qty: pendingQty });
     setItems((current) => {
       const existing = current.findIndex((item) => item.key === itemToAdd.key);
       if (existing >= 0) {
         return current.map((item, index) =>
-          index === existing ? { ...item, qty: item.qty + pendingQty } : item
+          index === existing ? normaliseCartItem({ ...item, qty: item.qty + pendingQty }) : item
         );
       }
-      return [...current, { ...itemToAdd, qty: pendingQty }];
+      return [...current, nextItem];
     });
     setPending(null);
     setMessage("");
