@@ -2501,26 +2501,24 @@ export default function OrdersClient({
 
                     <section className="rounded-lg border border-racing/10 p-3">
                       <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
+                        <label className="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-2 gap-y-1 rounded-md border border-racing/10 bg-cream-dark px-2.5 py-2">
                           <input
                             type="checkbox"
                             checked={quoteIncludesVat(draft)}
                             onChange={(e) => patchDraft({ includeVat: e.target.checked })}
                             className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
                           />
-                          <span>
-                            <span className="block text-sm font-semibold text-racing">Include VAT</span>
-                          </span>
+                          <span className="block whitespace-nowrap text-[13px] font-semibold leading-5 text-racing">Include VAT</span>
                         </label>
-                        <label className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 rounded-md border border-racing/10 bg-cream-dark px-3 py-2">
+                        <label className="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-2 gap-y-1 rounded-md border border-racing/10 bg-cream-dark px-2.5 py-2">
                           <input
                             type="checkbox"
                             checked={draft.exportOrder === true}
                             onChange={(e) => patchDraft({ exportOrder: e.target.checked })}
                             className="mt-1 h-4 w-4 rounded border-racing/30 text-racing accent-racing"
                           />
-                          <span className="block text-sm font-semibold text-racing">Export Order</span>
-                          <span className="col-span-2 block whitespace-nowrap text-[11px] leading-4 text-ink-muted">Shows BIC and IBAN on invoices.</span>
+                          <span className="block whitespace-nowrap text-[13px] font-semibold leading-5 text-racing">Export Order</span>
+                          <span className="col-span-2 block whitespace-nowrap text-[11px] leading-4 text-ink-muted">Shows BIC &amp; IBAN</span>
                         </label>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">

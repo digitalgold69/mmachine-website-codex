@@ -90,6 +90,9 @@ assert.match(ordersClient, /\{ value: "custom", label: "Custom Engineering" \}/,
 assert.match(ordersClient, /\{ value: "featured", label: "Misc Stock" \}/, "orders tab featured filter should be labelled Misc Stock");
 assert.doesNotMatch(ordersClient, /\{ value: "engineering", label: "Engineering" \}/, "orders tab must not label misc stock orders as engineering");
 assert.match(ordersClient, /Export Order/, "invoice editor must include the export-order checkbox");
+assert.match(ordersClient, /whitespace-nowrap[\s\S]*Export Order/, "export-order checkbox label must stay on one line");
+assert.match(ordersClient, /Shows BIC &amp; IBAN/, "export-order helper must use compact one-line copy");
+assert.doesNotMatch(ordersClient, /Shows BIC and IBAN on invoices/, "export-order helper must not use the long overflowing sentence");
 assert.match(ordersClient, /paymentSettingsRows\(paymentSettings, quote\.exportOrder === true\)/, "printed invoices must only show BIC and IBAN when export order is enabled");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(quoteRequestRoute, /orderTypeParam/, "quote request history API must accept order-type filtering");
