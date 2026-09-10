@@ -96,8 +96,16 @@ async function main() {
   assert.match(dashboardProductsPage, /Manually added/, "Dashboard products tab must include manual Mini part management");
   assert.match(dashboardProductsPage, /\/api\/manual-mini-products/, "Manual Mini products must be loaded and saved through their own API");
   assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
-  assert.match(dashboardProductsPage, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(560px,780px\)\]/, "Dashboard products tab must place catalogue uploads in the top-right heading space on wide screens");
+  assert.ok(
+    dashboardProductsPage.indexOf("Catalogue file uploads") >= 0 &&
+      dashboardProductsPage.indexOf("Catalogue file uploads") < dashboardProductsPage.indexOf("Catalogue lookup"),
+    "Dashboard products tab must show catalogue upload controls above the catalogue lookup heading"
+  );
   assert.match(dashboardProductsPage, /Catalogue file uploads/, "Dashboard products tab must clearly label the catalogue workbook upload controls");
+  assert.match(dashboardProductsPage, /Upload the latest Excel catalogue files/, "Catalogue upload copy must refer to catalogue files, not master files");
+  assert.doesNotMatch(dashboardProductsPage, /latest Excel masters/, "Catalogue upload copy must not call the uploaded catalogues masters");
+  assert.match(dashboardProductsPage, /text-lg font-bold leading-6 text-racing/, "Catalogue upload card titles should be prominent");
+  assert.match(dashboardProductsPage, /Mini Panels/, "Mini catalogue upload title should use the requested larger Mini Panels label");
   assert.match(dashboardProductsPage, /Excel catalogue file/, "Catalogue upload cards must make clear they expect Excel catalogue files");
   assert.match(dashboardProductsPage, /Choose file/, "Catalogue upload cards must use compact file picker controls");
   assert.match(dashboardProductsPage, /No file selected/, "Catalogue upload cards must show the selected workbook state");
