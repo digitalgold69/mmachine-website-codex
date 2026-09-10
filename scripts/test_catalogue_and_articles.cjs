@@ -79,6 +79,10 @@ async function main() {
   assert.match(navbar, /Custom Engineering Work/, "Header navigation should use the fuller custom engineering wording where space allows");
   assert.match(navbar, /Custom Engineering/, "Header navigation should keep a shorter desktop custom engineering label available");
 
+  const footer = read("components/Footer.tsx");
+  assert.match(footer, /https:\/\/winter\.marketing\//, "Footer must include the Winter Marketing website credit link");
+  assert.match(footer, /Website designed by Winter Marketing/, "Footer must use the requested subtle website design credit");
+
   const productsRoute = read("app/api/products/route.ts");
   assert.match(productsRoute, /getLiveMiniCatalogueProducts\(\{ includeManual: true \}\)/, "Products API must merge active manual Mini parts through the live Mini catalogue helper");
   assert.match(productsRoute, /getLiveMetalCatalogueProducts/, "Products API must read dashboard-uploaded metals before generated fallback data");

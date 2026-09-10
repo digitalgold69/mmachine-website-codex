@@ -82,7 +82,18 @@ export default function Footer() {
 
         <div className="border-t border-racing-light pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
           <p>&copy; <CurrentYear /> M-Machine &middot; Craftgrange Limited &middot; Company no. 01476185</p>
-          <p>Proudly British engineering since 1980</p>
+          <p>
+            Proudly British engineering since 1980
+            <span className="mx-2 hidden sm:inline">&middot;</span>
+            <a
+              href="https://winter.marketing/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block hover:text-gold sm:inline"
+            >
+              Website designed by Winter Marketing
+            </a>
+          </p>
         </div>
       </div>
     </footer>

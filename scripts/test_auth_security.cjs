@@ -151,6 +151,12 @@ assert.match(quotesStore, /status in \('new', 'reviewing', 'invoice_sent', 'pend
 assert.match(teamClient, /Reset Password/, "team reset button must use clear password reset wording");
 assert.doesNotMatch(teamClient, /Default fallback/, "team notification selector must not expose fallback copy");
 assert.match(teamClient, /Order Notifications/, "team notification column must be labelled for order notifications");
+assert.match(teamClient, /useRef<HTMLDivElement>\(null\)/, "team notification picker must keep a ref for outside-click handling");
+assert.match(teamClient, /document\.addEventListener\("mousedown", closeIfOutside\)/, "team notification picker must close when clicking away");
+assert.match(teamClient, /document\.addEventListener\("touchstart", closeIfOutside\)/, "team notification picker must close when tapping away");
+assert.match(teamClient, /event\.key === "Escape"/, "team notification picker must close on Escape");
+assert.match(teamClient, /if \(draftKey === originalKey\) return;/, "team notification picker save should close without posting unchanged settings");
+assert.match(teamClient, /disabled=\{disabled\}[\s\S]+onClick=\{save\}/, "team notification save button must remain clickable when unchanged so it can close");
 assert.match(teamClient, /Managed by this user/, "team tab must explain that other users manage their own 2FA");
 assert.doesNotMatch(teamClient, /Require 2FA/, "team tab must not expose a 2FA requirement button for other users");
 assert.doesNotMatch(teamClient, /Turn off 2FA/, "team tab must not let admins turn off another user's 2FA");

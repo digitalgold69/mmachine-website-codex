@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AuditLogRow, NotificationRoute, TeamInvitation, TeamUser } from "@/lib/auth";
 
 type TeamState = {
@@ -415,6 +415,7 @@ function NotificationPicker({
 }) {
   const [draft, setDraft] = useState<NotificationRoute[]>(user.notificationRoutes || []);
   const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const busyKey = `notifications-${user.id}`;
   const saving = busy === busyKey;
   const disabled = Boolean(busy) || user.status !== "active";
@@ -429,6 +430,29 @@ function NotificationPicker({
     setOpen(false);
   }, [originalKey, user.notificationRoutes]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function closeIfOutside(event: MouseEvent | TouchEvent) {
+      const target = event.target;
+      if (target instanceof Node && pickerRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeIfOutside);
+    document.addEventListener("touchstart", closeIfOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeIfOutside);
+      document.removeEventListener("touchstart", closeIfOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   function toggle(route: NotificationRoute, checked: boolean) {
     setDraft((current) => {
       const next = checked ? [...current, route] : current.filter((item) => item !== route);
@@ -438,11 +462,12 @@ function NotificationPicker({
 
   async function save() {
     setOpen(false);
+    if (draftKey === originalKey) return;
     await onSave(draft);
   }
 
   return (
-    <div className="relative">
+    <div ref={pickerRef} className="relative">
       <button
         type="button"
         className="flex h-10 w-full min-w-0 items-center justify-between gap-3 rounded-md border border-racing/10 bg-white px-3 text-left text-sm font-semibold text-racing hover:border-racing/30 disabled:opacity-60"
@@ -473,7 +498,7 @@ function NotificationPicker({
         <button
           type="button"
           className="btn-secondary mt-3 w-full justify-center px-3 py-2 text-sm"
-          disabled={disabled || draftKey === originalKey}
+          disabled={disabled}
           onClick={save}
         >
           {saving ? "Saving..." : "Save"}
