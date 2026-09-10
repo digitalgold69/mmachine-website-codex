@@ -96,7 +96,11 @@ async function main() {
   assert.match(dashboardProductsPage, /Manually added/, "Dashboard products tab must include manual Mini part management");
   assert.match(dashboardProductsPage, /\/api\/manual-mini-products/, "Manual Mini products must be loaded and saved through their own API");
   assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
-  assert.match(dashboardProductsPage, /Update catalogues/, "Dashboard products tab must include catalogue workbook upload controls");
+  assert.match(dashboardProductsPage, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(560px,780px\)\]/, "Dashboard products tab must place catalogue uploads in the top-right heading space on wide screens");
+  assert.match(dashboardProductsPage, /Catalogue file uploads/, "Dashboard products tab must clearly label the catalogue workbook upload controls");
+  assert.match(dashboardProductsPage, /Excel catalogue file/, "Catalogue upload cards must make clear they expect Excel catalogue files");
+  assert.match(dashboardProductsPage, /Choose file/, "Catalogue upload cards must use compact file picker controls");
+  assert.match(dashboardProductsPage, /No file selected/, "Catalogue upload cards must show the selected workbook state");
   assert.match(dashboardProductsPage, /Upload &amp; save/, "Catalogue upload button must use the requested label");
   assert.match(dashboardProductsPage, /\/api\/catalogue-uploads/, "Dashboard uploads must save via the catalogue upload API");
 

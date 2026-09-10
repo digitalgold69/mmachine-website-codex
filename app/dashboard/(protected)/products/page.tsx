@@ -394,75 +394,89 @@ export default function DashboardProductsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-display text-3xl text-racing">Catalogue lookup</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Check the product details and prices currently shown on the website.
-        </p>
-      </div>
-
-      <div className="mb-4 rounded-xl border border-racing/10 bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-2xl text-racing">Update catalogues</h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Upload the current Excel catalogue to update website rows and PDF downloads. Manual Mini parts stay separate.
-            </p>
-          </div>
+      <div className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(560px,780px)] xl:items-start">
+        <div>
+          <h1 className="font-display text-3xl text-racing">Catalogue lookup</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            Check the product details and prices currently shown on the website.
+          </p>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {(["mini", "metals"] as const).map((kind) => {
-            const status = uploadStatus[kind];
-            const action = uploadAction?.catalogue === kind ? uploadAction : null;
-            return (
-              <div key={kind} className="rounded-lg border border-racing/10 bg-cream p-3">
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-bold text-racing">
-                      {kind === "mini" ? "Mini panels catalogue" : "Metals catalogue"}
+
+        <section className="rounded-xl border border-racing/10 bg-white p-3 shadow-sm" aria-labelledby="catalogue-upload-heading">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 id="catalogue-upload-heading" className="text-xs font-bold uppercase tracking-[0.14em] text-racing">
+                Catalogue file uploads
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-ink-muted">
+                Upload the latest Excel masters to update website rows and PDF downloads. Manual Mini parts stay separate.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2 lg:grid-cols-2">
+            {(["mini", "metals"] as const).map((kind) => {
+              const status = uploadStatus[kind];
+              const action = uploadAction?.catalogue === kind ? uploadAction : null;
+              const selectedFile = uploadFiles[kind];
+              return (
+                <div key={kind} className="rounded-lg border border-racing/10 bg-cream p-2.5">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold leading-5 text-racing">
+                        {kind === "mini" ? "Mini panels" : "Metals"}
+                      </div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                        Excel catalogue file
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-ink-muted">
-                      {status
-                        ? `${status.productCount.toLocaleString("en-GB")} lines from ${status.sourceFilename} · ${formatUploadTime(status.uploadedAt)}`
-                        : "Using the generated catalogue until an Excel upload is saved."}
-                    </div>
+                    {status && (
+                      <span className="shrink-0 rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
+                        Live upload
+                      </span>
+                    )}
                   </div>
-                  {status && (
-                    <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
-                      Live upload
-                    </span>
+                  <div className="mb-2 min-h-[2.25rem] text-xs leading-5 text-ink-muted">
+                    {status
+                      ? `${status.productCount.toLocaleString("en-GB")} lines from ${status.sourceFilename} · ${formatUploadTime(status.uploadedAt)}`
+                      : "No dashboard upload saved yet. Using the generated catalogue."}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                    <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-racing/20 bg-white px-3 text-xs font-bold text-racing hover:bg-cream-dark">
+                      Choose file
+                      <input
+                        key={`${kind}-${uploadInputKey}`}
+                        type="file"
+                        accept=".xlsx,.xlsm,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        onChange={(event) =>
+                          setUploadFiles((current) => ({ ...current, [kind]: event.target.files?.[0] || null }))
+                        }
+                        className="sr-only"
+                      />
+                    </label>
+                    <div className="flex h-9 min-w-0 items-center rounded-md border border-racing/10 bg-white px-2 text-xs text-ink-muted">
+                      <span className="truncate">{selectedFile ? selectedFile.name : "No file selected"}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void uploadCatalogueWorkbook(kind)}
+                      disabled={action?.tone === "loading"}
+                      className="btn-primary h-9 whitespace-nowrap px-3 text-xs disabled:cursor-wait disabled:opacity-60"
+                    >
+                      Upload &amp; save
+                    </button>
+                  </div>
+                  {action && (
+                    <div className={`mt-2 text-xs font-semibold leading-5 ${
+                      action.tone === "error" ? "text-red-700" : action.tone === "success" ? "text-green-800" : "text-ink-muted"
+                    }`}>
+                      {action.text}
+                    </div>
                   )}
                 </div>
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <input
-                    key={`${kind}-${uploadInputKey}`}
-                    type="file"
-                    accept=".xlsx,.xlsm,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    onChange={(event) =>
-                      setUploadFiles((current) => ({ ...current, [kind]: event.target.files?.[0] || null }))
-                    }
-                    className="block w-full rounded-md border border-racing/20 bg-white px-3 py-2 text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-racing file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-cream hover:file:bg-racing-light"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void uploadCatalogueWorkbook(kind)}
-                    disabled={action?.tone === "loading"}
-                    className="btn-primary whitespace-nowrap px-4 py-2 text-sm disabled:cursor-wait disabled:opacity-60"
-                  >
-                    Upload &amp; save
-                  </button>
-                </div>
-                {action && (
-                  <div className={`mt-2 text-xs font-semibold ${
-                    action.tone === "error" ? "text-red-700" : action.tone === "success" ? "text-green-800" : "text-ink-muted"
-                  }`}>
-                    {action.text}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-racing/10 bg-white p-1">
