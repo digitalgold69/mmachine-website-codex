@@ -1,6 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [{
+      source: "/",
+      has: [{ type: "host", value: "mmachine-website-codex\\.muddy-silence-4f5b\\.workers\\.dev" }],
+      destination: "https://m-machine.co.uk/",
+      permanent: true,
+    }, {
+      source: "/:path*",
+      has: [{ type: "host", value: "mmachine-website-codex\\.muddy-silence-4f5b\\.workers\\.dev" }],
+      destination: "https://m-machine.co.uk/:path*",
+      permanent: true,
+    }];
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },
