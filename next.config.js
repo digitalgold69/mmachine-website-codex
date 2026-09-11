@@ -1,8 +1,10 @@
+const legacyPreviewRedirects = require("./config/legacy-preview-redirects.json");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   async redirects() {
-    return [{
+    return [...legacyPreviewRedirects, {
       source: "/",
       has: [{ type: "host", value: "mmachine-website-codex\\.muddy-silence-4f5b\\.workers\\.dev" }],
       destination: "https://m-machine.co.uk/",

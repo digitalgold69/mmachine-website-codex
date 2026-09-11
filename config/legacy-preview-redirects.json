@@ -1,0 +1,312 @@
+﻿[
+    {
+        "source":  "/contact-us",
+        "destination":  "/contact",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-panels",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-contentuploads201602mini-catalogue-february-2016-for-web-pdf",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/mini-catalogue-february-2016-for-web",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/MINI-catalogue-February-2016-for-web.pdf",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/contact-us/mailgraphic",
+        "destination":  "/contact",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2018/12/mailGraphic.jpg",
+        "destination":  "/wp-content/uploads/2018/12/mailGraphic.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/09/MINI-catalogue-February-2016-for-web.pdf",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/turtle-trading",
+        "destination":  "/wp-content/uploads/2016/02/turtle-trading.gif",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/turtle-trading.gif",
+        "destination":  "/wp-content/uploads/2016/02/turtle-trading.gif",
+        "statusCode":  301
+    },
+    {
+        "source":  "/title",
+        "destination":  "/wp-content/uploads/2016/02/title.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/title.jpg",
+        "destination":  "/wp-content/uploads/2016/02/title.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/title-768x108.jpg",
+        "destination":  "/wp-content/uploads/2016/02/title.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-panels/wp_20160224_07_56_48_pro",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/WP_20160224_07_56_48_Pro.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20160224_07_56_48_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/WP_20160224_07_56_48_Pro-768x432.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20160224_07_56_48_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-panels/wp_20150706_15_50_51_pro",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/WP_20150706_15_50_51_Pro.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20150706_15_50_51_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/WP_20150706_15_50_51_Pro-768x432.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20150706_15_50_51_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-panels/wp_20150615_17_16_49_pro",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/WP_20150615_17_16_49_Pro.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20150615_17_16_49_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/WP_20150615_17_16_49_Pro-768x432.jpg",
+        "destination":  "/wp-content/uploads/2016/02/WP_20150615_17_16_49_Pro.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-panels/img_2658",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/IMG_2658.jpg",
+        "destination":  "/wp-content/uploads/2016/02/IMG_2658.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/IMG_2658-768x576.jpg",
+        "destination":  "/wp-content/uploads/2016/02/IMG_2658.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/contact-us/capture",
+        "destination":  "/contact",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/Capture.jpg",
+        "destination":  "/wp-content/uploads/2016/02/Capture.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/Capture-768x593.jpg",
+        "destination":  "/wp-content/uploads/2016/02/Capture.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-contentuploads201602mini-catalogue-february-2016-for-web-pdf/downloadmaterialsicon",
+        "destination":  "/catalogue/metals-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/downloadMaterialsICON.jpg",
+        "destination":  "/wp-content/uploads/2016/02/downloadMaterialsICON.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-contentuploads201602mini-catalogue-february-2016-for-web-pdf/downloadpanelsicon",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/downloadPanelsICON.jpg",
+        "destination":  "/wp-content/uploads/2016/02/downloadPanelsICON.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/new-products",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/New-Products.jpg",
+        "destination":  "/wp-content/uploads/2016/02/New-Products.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/contact-us-2",
+        "destination":  "/contact",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/Contact-Us.jpg",
+        "destination":  "/wp-content/uploads/2016/02/Contact-Us.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/catalogue",
+        "destination":  "/catalogue/mini-catalogue.pdf",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/Catalogue.jpg",
+        "destination":  "/wp-content/uploads/2016/02/Catalogue.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/loaddeck-4",
+        "destination":  "/wp-content/uploads/2016/02/loaddeck-3.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/loaddeck-3.jpg",
+        "destination":  "/wp-content/uploads/2016/02/loaddeck-3.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/loaddeck-3-768x137.jpg",
+        "destination":  "/wp-content/uploads/2016/02/loaddeck-3.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/minipanels",
+        "destination":  "/catalogue/mini",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/minipanels.jpg",
+        "destination":  "/wp-content/uploads/2016/02/minipanels.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/minipanels-768x137.jpg",
+        "destination":  "/wp-content/uploads/2016/02/minipanels.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/cropped-butterfly-jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/cropped-Butterfly-270x270.jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/cropped-Butterfly-192x192.jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/cropped-Butterfly-180x180.jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/cropped-Butterfly-32x32.jpg",
+        "destination":  "/wp-content/uploads/2016/02/cropped-Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/butterfly",
+        "destination":  "/wp-content/uploads/2016/02/Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/Butterfly.jpg",
+        "destination":  "/wp-content/uploads/2016/02/Butterfly.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/img_0849",
+        "destination":  "/wp-content/uploads/2016/02/IMG_0849.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/IMG_0849.jpg",
+        "destination":  "/wp-content/uploads/2016/02/IMG_0849.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/IMG_0849-768x576.jpg",
+        "destination":  "/wp-content/uploads/2016/02/IMG_0849.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/payment-methods",
+        "destination":  "/wp-content/uploads/2016/02/payment-methods.gif",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/payment-methods.gif",
+        "destination":  "/wp-content/uploads/2016/02/payment-methods.gif",
+        "statusCode":  301
+    },
+    {
+        "source":  "/panels_icon",
+        "destination":  "/wp-content/uploads/2016/02/panels_icon.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/panels_icon.jpg",
+        "destination":  "/wp-content/uploads/2016/02/panels_icon.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/main_title",
+        "destination":  "/wp-content/uploads/2016/02/main_title.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/preview.m-machine.co.uk/wp-content/uploads/2016/02/main_title.jpg",
+        "destination":  "/wp-content/uploads/2016/02/main_title.jpg",
+        "statusCode":  301
+    },
+    {
+        "source":  "/wp-content/uploads/2016/02/main_title-768x55.jpg",
+        "destination":  "/wp-content/uploads/2016/02/main_title.jpg",
+        "statusCode":  301
+    }
+]
