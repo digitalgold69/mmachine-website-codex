@@ -12,7 +12,7 @@ import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "./quote-
 import type { QuoteCatalogue, QuoteItem, QuotePaymentMethod, QuoteRequest } from "./quote-types";
 
 const GBP = "\u00a3";
-const DEFAULT_SITE_URL = "https://m-machine-metals.co.uk";
+const DEFAULT_SITE_URL = "https://m-machine.co.uk";
 const DEFAULT_OWNER_EMAIL = "sales@m-machine.co.uk";
 const DEFAULT_FROM_EMAIL = "orders@orders.m-machine.co.uk";
 const DEFAULT_FROM_NAME = "New M Machine Order";

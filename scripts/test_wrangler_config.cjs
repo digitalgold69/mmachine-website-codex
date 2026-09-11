@@ -8,6 +8,8 @@ const packagePath = path.resolve(__dirname, "..", "package.json");
 const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
 
 assert.equal(config.keep_vars, true, "wrangler.jsonc must keep dashboard-managed Cloudflare variables");
+assert.equal(config.vars.NEXT_PUBLIC_SITE_URL, "https://m-machine.co.uk", "Production links must use the launched domain");
+assert.ok(config.routes.some(route => route.pattern === "m-machine.co.uk" && route.custom_domain === true), "Preserve the production Worker custom domain");
 
 const dashboardManagedRecipients = [
   "QUOTE_OWNER_EMAIL",

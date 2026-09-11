@@ -1,7 +1,7 @@
 import { getCloudflareEnv, type MMachineCloudflareEnv } from "./cloudflare";
 import { escapeHtml, sendQuoteEmail } from "./quote-email";
 
-const DEFAULT_SITE_URL = "https://m-machine-metals.co.uk";
+const DEFAULT_SITE_URL = "https://m-machine.co.uk";
 
 async function authSiteUrl() {
   const env: Partial<MMachineCloudflareEnv> = await getCloudflareEnv().catch(() => ({}));

@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <Link href="/" className="hover:text-racing">Home</Link> / Privacy policy
       </nav>
       <h1 className="font-display text-4xl text-racing">Privacy policy</h1>
-      <p className="mt-3 text-sm text-ink-muted">Last updated 11 July 2026</p>
+      <p className="mt-3 text-sm text-ink-muted">Last updated 11 September 2026</p>
 
       <div className="mt-9 space-y-9 text-sm leading-7 text-ink-muted">
         <section>
@@ -74,6 +74,25 @@ export default function PrivacyPage() {
             You can ask what personal information we hold about you, request corrections, or ask us to delete it
             where we are not required to retain it. You may also raise a concern with the UK Information
             Commissioner&apos;s Office.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl text-racing">Cookies and website analytics</h2>
+          <p className="mt-2">
+            Essential browser storage keeps your basket and cookie choice, and secure cookies support staff
+            sign-in. If you accept analytics, we load Google Analytics to measure visits and page views on
+            our public website. Google receives technical information such as your IP address, browser and
+            device information, along with a cookie identifier and the pages visited. Our page-view tracking
+            excludes URL query strings, form contents and dashboard pages. Advertising features are disabled.
+          </p>
+          <p className="mt-2">
+            Analytics is optional and does not load before you accept. We remember your choice for up to
+            six months and configure analytics cookies to expire after six months, refreshed by subsequent
+            visits. You can withdraw consent using Cookie settings in the footer; this stops tracking and
+            removes our Google Analytics cookies from this browser. It does not delete data already collected.
+            Google may process data outside the UK. Read more in
+            {" "}<a href="https://policies.google.com/privacy" className="underline">Google&apos;s privacy policy</a>.
           </p>
         </section>
 

@@ -12,7 +12,7 @@ function trustedPageUrl(value: unknown) {
   const raw = text(value, 800);
   if (!raw) return "";
   try {
-    const expected = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine-metals.co.uk");
+    const expected = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://m-machine.co.uk");
     const candidate = new URL(raw);
     return candidate.origin === expected.origin ? candidate.toString() : "";
   } catch {

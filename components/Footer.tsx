@@ -2,6 +2,7 @@ import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
 import { guideUrl, guides } from "@/lib/articles";
 import CurrentYear from "@/components/CurrentYear";
+import { CookieSettingsButton } from "@/components/AnalyticsConsent";
 
 export default function Footer() {
   return (
@@ -62,6 +63,7 @@ export default function Footer() {
                 </a>
               </li>
               <li><Link href="/privacy" className="hover:text-gold">Privacy policy</Link></li>
+              <li><CookieSettingsButton /></li>
             </ul>
           </div>
 

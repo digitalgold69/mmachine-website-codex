@@ -3,6 +3,8 @@
   "name": "mmachine-website-codex",
   "main": ".open-next/worker.js",
   "keep_vars": true,
+  "workers_dev": true,
+  "routes": [{ "pattern": "m-machine.co.uk", "custom_domain": true }],
   "compatibility_date": "2026-07-11",
   "compatibility_flags": [
     "nodejs_compat"
@@ -12,7 +14,7 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "NEXT_PUBLIC_SITE_URL": "https://mmachine-website-codex.muddy-silence-4f5b.workers.dev"
+    "NEXT_PUBLIC_SITE_URL": "https://m-machine.co.uk"
   },
   "d1_databases": [
     {
