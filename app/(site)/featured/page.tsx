@@ -6,12 +6,12 @@ import { absoluteUrl, breadcrumbJsonLd, jsonLdScript, openGraphImage } from "@/l
 import FeaturedWorkGrid from "@/components/FeaturedWorkGrid";
 
 export const metadata: Metadata = {
-  title: "Misc Stock",
-  description: "Order from a selection of misc stock, fabrication, machining and engineering work by M-Machine.",
+  title: "Miscellaneous Stock",
+  description: "Order from available miscellaneous stock, fabrication, machining and engineering work by M-Machine.",
   alternates: { canonical: absoluteUrl("/featured") },
   openGraph: {
-    title: "Misc Stock | M-Machine",
-    description: "Order from a selection of misc stock, fabrication, machining and engineering work by M-Machine.",
+    title: "Miscellaneous Stock | M-Machine",
+    description: "Order from available miscellaneous stock, fabrication, machining and engineering work by M-Machine.",
     url: absoluteUrl("/featured"),
     type: "website",
     images: openGraphImage("/custom-engineering/custom-fabrication-cam.jpg", "Custom engineering work at M-Machine"),
@@ -30,13 +30,13 @@ export default async function FeaturedPage() {
 
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Home", path: "/" },
-    { name: "Misc Stock", path: "/featured" },
+    { name: "Miscellaneous Stock", path: "/featured" },
   ]);
 
   const collection = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Misc Stock",
+    name: "Miscellaneous Stock",
     description: metadata.description,
     url: absoluteUrl("/featured"),
   };
@@ -48,17 +48,16 @@ export default async function FeaturedPage() {
 
       <div className="mb-10">
         <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
-        <h1 className="font-display text-4xl text-racing mt-2 mb-2">Misc Stock</h1>
+        <h1 className="font-display text-4xl text-racing mt-2 mb-2">Miscellaneous Stock</h1>
         <p className="text-ink-muted max-w-2xl">
-          Browse available misc stock, fabrication, machining and engineering work. Order an item shown here,
-          or use it as a starting point and tell us what you need changed.
+          Browse available miscellaneous stock, fabrication, machining and engineering work. Order an item shown here.
         </p>
       </div>
 
       <div className="mb-12">
         <FeaturedWorkGrid
           items={featuredWork}
-          emptyText="New Misc Stock will appear here as it is added."
+          emptyText="New miscellaneous stock will appear here as it is added."
           gridClassName="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
           cardImageClassName="aspect-[16/10]"
         />
