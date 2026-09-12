@@ -29,3 +29,12 @@ Staff accounts remain in the same D1 database. Session cookies are HttpOnly, Sec
 ## Remaining verification limits
 
 Search Console historic URL/backlink exports may identify URLs absent from the current WordPress published inventory. GA4 Realtime receipt, Business Profile URL update and end-to-end mailbox/website-email delivery require account-side confirmation; do not infer these from DNS checks alone.
+
+## Catalogue upload correction — 12 September 2026
+
+Mini full and section PDFs now preserve original Excel print pages and drawings. The bundled original was re-exported from the currently uploaded Mini workbook, including current prices; products were not reset. The earlier generated-table override is ignored for Mini PDF delivery. Future original PDF overrides use catalogue-original.pdf keys.
+
+Dashboard upload cards accept drag-and-drop and require explicit Mini Panels/Metals confirmation. Mini updates require the workbook and matching full 42-page PDF exported from Excel, in the existing page order. The API validates page count/drawing resources and workbook catalogue type before saving. Metals retains workbook-only upload with optional original PDF. Selecting files never publishes them; the owner must confirm and save.
+
+Staff notification URLs use https://m-machine.co.uk. A valid session in the same browser is retained; a different browser or the old workers.dev session still requires login. Live contact enquiries currently go to hodltid@icloud.com, sent from orders@orders.m-machine.co.uk, with customer Reply-To. Recipient changes await the owner's intended address; no test mail was sent.
+`nDeployed Worker version 66bf3c21-ab8a-4a2b-9185-eba605c18472. Build and tests passed. Live full Mini PDF SHA-256 matches the original export; section 120 was downloaded and visually checked for drawing and original table pages.

@@ -363,5 +363,13 @@ export function parseUploadedCatalogue(catalogue: CatalogueUploadKind, bytes: Ui
     bookVBA: false,
   });
 
+  const hasMiniSections = workbook.SheetNames.some((name) => /^\d{3}B$/i.test(name));
+  if (catalogue === "metals" && hasMiniSections) {
+    throw new Error("This is a Mini panels workbook. Drop it into the Mini panels box instead. Nothing has been updated.");
+  }
+  if (catalogue === "mini" && !hasMiniSections) {
+    throw new Error("This does not contain the Mini catalogue section sheets. Check that you selected the Mini panels workbook. Nothing has been updated.");
+  }
+
   return catalogue === "mini" ? parseMiniWorkbook(workbook) : parseMetalsWorkbook(workbook);
 }

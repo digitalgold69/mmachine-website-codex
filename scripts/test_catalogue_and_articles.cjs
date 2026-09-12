@@ -19,6 +19,7 @@ const {
 } = jiti("../lib/mini-section-pdfs.ts");
 const { guides } = jiti("../lib/articles.ts");
 const { parseUploadedCatalogue } = jiti("../lib/catalogue-upload-parser.ts");
+const { validateCatalogueUploadPdf } = jiti("../lib/catalogue-upload-pdf.ts");
 const {
   catalogueMoney,
   normaliseCatalogueProductPrices,
@@ -35,6 +36,14 @@ function workbookBytes(sheets) {
 async function main() {
   const pdfBytes = fs.readFileSync(path.join(root, "public/catalogue/mini-catalogue.pdf"));
   const pdf = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+  await validateCatalogueUploadPdf(pdfBytes, "mini");
+  const missingDrawings = await PDFDocument.create();
+  missingDrawings.addPage();
+  const shortPdf = await missingDrawings.save();
+  await assert.rejects(() => validateCatalogueUploadPdf(shortPdf, "mini"), /42-page/);
+  for (let index = 1; index < 42; index++) missingDrawings.addPage();
+  const blankCatalogue = await missingDrawings.save();
+  await assert.rejects(() => validateCatalogueUploadPdf(blankCatalogue, "mini"), /drawing page/);
 
   assert.equal(pdf.getPageCount(), 42, "Mini catalogue PDF page count should match the section page map");
   assert.deepEqual(miniSectionPdfPageIndexes("120"), [3, 4], "120 should extract the first two section pages");
@@ -102,7 +111,7 @@ async function main() {
     "Dashboard products tab must show catalogue upload controls above the catalogue lookup heading"
   );
   assert.match(dashboardProductsPage, /Catalogue file uploads/, "Dashboard products tab must clearly label the catalogue workbook upload controls");
-  assert.match(dashboardProductsPage, /Upload the latest Excel catalogue files/, "Catalogue upload copy must refer to catalogue files, not master files");
+  assert.match(dashboardProductsPage, /Drop your files into the correct catalogue box/, "Catalogue upload copy must explain the labelled drop areas");
   assert.doesNotMatch(dashboardProductsPage, /latest Excel masters/, "Catalogue upload copy must not call the uploaded catalogues masters");
   assert.match(dashboardProductsPage, /text-lg font-bold leading-6 text-racing/, "Catalogue upload card titles should be prominent");
   assert.match(dashboardProductsPage, /Mini Panels/, "Mini catalogue upload title should use the requested larger Mini Panels label");
@@ -118,7 +127,8 @@ async function main() {
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
   assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
-  assert.match(sectionPdfRoute, /getCatalogueOverrideProducts/, "Section PDF downloads must use uploaded Mini catalogue rows when available");
+  assert.match(sectionPdfRoute, /getCatalogueOverridePdfObject/, "Section PDFs must extract from the original uploaded PDF");
+  assert.doesNotMatch(sectionPdfRoute, /buildMiniSectionPdfBytes/, "Section PDFs must not replace original drawings with generated tables");
   assert.match(sectionPdfRoute, /staticCatalogueAssetResponse/, "Local section PDF generation must keep a static asset fallback");
   assert.match(sectionPdfRoute, /"Content-Disposition": `inline;/, "Section PDFs should render in-browser by default");
   assert.match(sectionPdfRoute, /"Cache-Control": "no-store"/, "Section PDFs should not keep stale download headers cached");
@@ -126,7 +136,7 @@ async function main() {
   const uploadRoute = read("app/api/catalogue-uploads/route.ts");
   assert.match(uploadRoute, /parseUploadedCatalogue/, "Catalogue upload API must parse Excel workbooks server-side");
   assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
-  assert.match(uploadRoute, /buildMiniCataloguePdfBytes/, "Mini workbook uploads must regenerate the live Mini PDF");
+  assert.match(uploadRoute, /pdfBytes: originalPdf!/, "Mini uploads must preserve the matching original PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
 
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
@@ -176,6 +186,7 @@ async function main() {
     new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))
   );
   assert.ok(miniUpload.products.length >= 700, "Mini workbook uploads should parse the full catalogue");
+  assert.throws(() => parseUploadedCatalogue("metals", new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))), /Mini panels workbook/, "A Mini workbook must not overwrite Metals");
   assert.equal(miniUpload.products[0].id, "p0001", "Known Mini rows should keep generated ids so product photos remain attached");
 
   const metalsUploadSource = fs.existsSync(path.join(root, "final-deliverables/Metals catalogue 2023.xlsx"))
@@ -186,6 +197,7 @@ async function main() {
     new Uint8Array(fs.readFileSync(path.join(root, metalsUploadSource)))
   );
   assert.ok(metalsUpload.products.length >= 1000, "Metals workbook uploads should parse the full catalogue");
+  assert.throws(() => parseUploadedCatalogue("mini", new Uint8Array(fs.readFileSync(path.join(root, metalsUploadSource)))), /Mini catalogue section sheets/, "A Metals workbook must not overwrite Mini");
   assert.ok(metalsUpload.products.some((product) => product.form && product.size && product.unit), "Uploaded metals rows must keep shape, size and unit fields for dimension pricing");
 
   const guideDates = guides.map((guide) => Date.parse(guide.publishedAt));

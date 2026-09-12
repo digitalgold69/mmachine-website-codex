@@ -168,6 +168,7 @@ export async function saveCatalogueOverride<T>(input: {
   catalogue: CatalogueUploadKind;
   products: T[];
   pdfBytes: Uint8Array;
+  originalPdf?: boolean;
   sourceBytes: Uint8Array;
   sourceFilename: string;
   sourceContentType?: string;
@@ -179,7 +180,7 @@ export async function saveCatalogueOverride<T>(input: {
   const version = versionId();
   const prefix = `catalogue-overrides/${input.catalogue}/${version}`;
   const productsKey = `${prefix}/products.json`;
-  const pdfKey = `${prefix}/catalogue.pdf`;
+  const pdfKey = `${prefix}/${input.originalPdf ? "catalogue-original.pdf" : "catalogue.pdf"}`;
   const sourceKey = `${prefix}/${safeName}`;
   const uploadedAt = new Date().toISOString();
   const productsBody = new TextEncoder().encode(JSON.stringify({

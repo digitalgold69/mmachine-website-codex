@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const uploaded = await getCatalogueOverridePdfObject("mini").catch(() => null);
-  if (uploaded?.object.body) {
+  if (uploaded?.object.body && uploaded.meta.pdfKey?.endsWith("/catalogue-original.pdf")) {
     const headers = new Headers();
     if (uploaded.object.writeHttpMetadata) uploaded.object.writeHttpMetadata(headers);
     headers.set("Content-Type", uploaded.object.httpMetadata?.contentType || "application/pdf");
