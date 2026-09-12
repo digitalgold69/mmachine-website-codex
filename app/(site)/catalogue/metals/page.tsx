@@ -8,7 +8,7 @@ const INITIAL_PAGE_SIZE = 120;
 export const dynamic = "force-dynamic";
 
 export default async function MetalsCataloguePage() {
-  const { products: metals } = await getLiveMetalCatalogueProducts();
+  const { products: metals, override } = await getLiveMetalCatalogueProducts();
   const categories = metalCategories.map((category) => ({
     ...category,
     count: metals.filter((metal) => metal.category === category.key).length,
@@ -27,6 +27,7 @@ export default async function MetalsCataloguePage() {
       total={metals.length}
       categories={categories}
       shapeFiltersByCategory={shapeFiltersByCategory}
+      pdfVersion={override?.version}
     />
   );
 }

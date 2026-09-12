@@ -5,4 +5,4 @@ export const metalsCatalogueVersion = "2c8399b9bd5acaaf";
 export const miniCatalogueUrl =
   `/catalogue/mini-catalogue.pdf?v=${miniCatalogueVersion}`;
 export const metalsCatalogueUrl =
-  `/catalogue/metals-catalogue.pdf?v=${metalsCatalogueVersion}`;
+  `/api/catalogue/metals/pdf?v=${metalsCatalogueVersion}`;

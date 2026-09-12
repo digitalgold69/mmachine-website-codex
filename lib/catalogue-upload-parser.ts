@@ -16,8 +16,8 @@ export type ParsedCatalogueUpload =
       warnings: string[];
     };
 
-const VAT_RATE = 1.2;
 const PART_CODE_PATTERN = /^[\d.]+\.\d{2}\.\d{2}\.\d{2}[A-Z]?$|^[A-Z0-9-]{4,}$/i;
+const VAT_RATE = 1.2;
 
 function cleanText(value: unknown, max = 500) {
   return String(value ?? "")
@@ -166,10 +166,8 @@ function parseMiniWorkbook(workbook: XLSX.WorkBook): ParsedCatalogueUpload {
         if (seen.has(key)) continue;
         seen.add(key);
 
-        const exCell = priceOrNull(row[pair.descIndex + 1]);
-        const incCell = priceOrNull(row[pair.descIndex + 2]);
-        const priceExVat = exCell ?? (incCell !== null ? round2(incCell / VAT_RATE) : null);
-        const priceIncVat = incCell ?? (priceExVat !== null ? round2(priceExVat * VAT_RATE) : null);
+        const priceExVat = priceOrNull(row[pair.descIndex + 1]);
+        const priceIncVat = priceExVat === null ? null : round2(priceExVat * VAT_RATE);
         const parsed = parseMiniDescription(name);
 
         out.push({

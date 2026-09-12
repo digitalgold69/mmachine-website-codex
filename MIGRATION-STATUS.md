@@ -56,3 +56,13 @@ Mini generated PDFs now use catalogueMoney for prices, matching website POA hand
 
 Formatting limitation: the bundled pre-upload PDF is the original Excel export. Upload-generated Mini PDFs preserve drawing pages and rebuild tables in a consistent two-column template; Metals uses its existing generated table template. Neither generator reproduces every Excel print style, merged border or original typographic detail. Do not describe these as exact Excel exports or promise arbitrary workbook-layout changes are supported.
 Deployed version 4c61b183-e706-47c3-8a4b-269a6da0b50f. Verified updated upload labels live and homepage HTTP 200. Section 140 added-row PDF was checked independently: two pages, correct row order, POA for missing prices.
+
+## Launch hardening follow-up
+
+Added a conventional /favicon.ico asset generated from the M-Machine butterfly image. The homepage still links to the PNG icon, but /favicon.ico now returns 200 for browsers and search crawlers that request it directly.
+
+Metals catalogue downloads now use the dynamic /api/catalogue/metals/pdf route, cache-busted with the active catalogue override version. This keeps the public download aligned with future Metals Excel uploads instead of leaving the link on the bundled static PDF.
+
+Mini and Metals upload parsing calculate inc VAT from the ex VAT source value, so owner-entered VAT inconsistencies in the workbook cannot create mismatched website/PDF prices. Blank or zero source prices remain POA.
+
+Deployed version b5af9b7f-d96d-4bf2-af76-f466b046cd2c. Full test suite and Cloudflare build passed. Live checks after deployment: homepage 200, /favicon.ico 200, Metals dynamic PDF 200, Metals catalogue page 200, sitemap 200, old preview PDF redirect active, and old Metals homepage redirect active.

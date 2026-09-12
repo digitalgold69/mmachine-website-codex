@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { OrderButton } from "@/components/QuoteCart";
 import type { MetalProduct } from "@/lib/metals-data";
-import { metalsCatalogueUrl } from "@/lib/catalogue-versions";
+import { metalsCatalogueVersion } from "@/lib/catalogue-versions";
 import type { MetalShapeFilter } from "@/lib/metals-filters";
 import { catalogueMoney, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
 
@@ -22,12 +22,14 @@ export default function MetalsCatalogueClient({
   total,
   categories,
   shapeFiltersByCategory,
+  pdfVersion,
 }: {
   initialProducts: MetalProduct[];
   initialCount: number;
   total: number;
   categories: Category[];
   shapeFiltersByCategory: Record<string, MetalShapeFilter[]>;
+  pdfVersion?: string;
 }) {
   const [cat, setCat] = useState("all");
   const [shape, setShape] = useState("all");
@@ -45,6 +47,8 @@ export default function MetalsCatalogueClient({
   const categoryLabel = categories.find((category) => category.key === cat)?.label ?? cat;
   const shapeOptions = cat === "all" ? [] : shapeFiltersByCategory[cat] || [];
   const selectedShapeLabel = shapeOptions.find((option) => option.key === shape)?.label || "";
+  const downloadVersion = pdfVersion || metalsCatalogueVersion;
+  const metalsCatalogueUrl = `/api/catalogue/metals/pdf?v=${encodeURIComponent(downloadVersion)}`;
 
   useEffect(() => {
     if (firstRun.current) {

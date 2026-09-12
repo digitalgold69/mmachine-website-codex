@@ -139,6 +139,14 @@ async function main() {
   assert.match(uploadRoute, /buildMiniWorkbookPdf/, "Mini uploads must preserve the matching original PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
 
+  const metalsCatalogueClient = read("app/(site)/catalogue/metals/MetalsCatalogueClient.tsx");
+  assert.match(metalsCatalogueClient, /\/api\/catalogue\/metals\/pdf\?v=/, "Metals catalogue downloads must use the dynamic uploaded PDF route");
+  assert.match(metalsCatalogueClient, /pdfVersion \|\| metalsCatalogueVersion/, "Metals catalogue downloads must cache-bust with the active uploaded version");
+
+  const metalsPdfRoute = read("app/api/catalogue/metals/pdf/route.ts");
+  assert.match(metalsPdfRoute, /getCatalogueOverridePdfObject\("metals"\)/, "Metals PDF route must serve the uploaded override PDF when available");
+  assert.match(metalsPdfRoute, /Cache-Control", "no-store"/, "Metals PDF route must avoid stale catalogue downloads");
+
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
   assert.match(ordersClient, /PaymentSettingsModal/, "Dashboard must expose editable payment method settings");
   assert.match(ordersClient, /max-h-\[calc\(100vh-2rem\)\]/, "Payment method settings modal must fit short laptop screens");
@@ -166,17 +174,45 @@ async function main() {
   assert.equal(zeroMiniUpload.products[0].priceExVat, null, "Uploaded Mini lines priced at zero must become POA");
   assert.equal(zeroMiniUpload.products[0].priceIncVat, null, "Uploaded Mini inc VAT zero prices must become POA");
 
+  const miniUploadWithOwnerVatErrors = parseUploadedCatalogue(
+    "mini",
+    workbookBytes({
+      "999B": [
+        ["Code", "Description", "Ex VAT", "Inc VAT"],
+        ["11.99.00.01", "Owner Entered VAT Test Panel", 10, 11.11],
+        ["11.99.00.02", "Blank Inc VAT Test Panel", 10, ""],
+      ],
+    })
+  );
+  assert.equal(miniUploadWithOwnerVatErrors.products[0].priceExVat, 10, "Uploaded Mini ex VAT must come from the workbook");
+  assert.equal(miniUploadWithOwnerVatErrors.products[0].priceIncVat, 12, "Uploaded Mini inc VAT must be calculated from ex VAT");
+  assert.equal(miniUploadWithOwnerVatErrors.products[1].priceIncVat, 12, "Uploaded Mini blank inc VAT must be calculated from ex VAT");
+
   const zeroMetalsUpload = parseUploadedCatalogue(
     "metals",
     workbookBytes({
       Steel: [
-        ["Shape", "Metal", "Spec", "Size", "Ex VAT", "Unit", "", "Code"],
-        ["Flat", "Steel", "EN3B", "10mm x 20mm", 0, "foot/300mm", "", "ZERO-METAL"],
+        ["Shape", "Metal", "Spec", "Size", "Ex VAT", "Unit", "Inc VAT", "Code"],
+        ["Flat", "Steel", "EN3B", "10mm x 20mm", 0, "foot/300mm", 0, "ZERO-METAL"],
       ],
     })
   );
   assert.equal(zeroMetalsUpload.products[0].priceExVat, null, "Uploaded metals lines priced at zero must become POA");
   assert.equal(zeroMetalsUpload.products[0].priceIncVat, null, "Uploaded metals inc VAT zero prices must become POA");
+
+  const metalsUploadWithOwnerVatErrors = parseUploadedCatalogue(
+    "metals",
+    workbookBytes({
+      Steel: [
+        ["Shape", "Metal", "Spec", "Size", "Ex VAT", "Unit", "Inc VAT", "Code"],
+        ["Flat", "Steel", "EN3B", "10mm x 20mm", 10, "foot/300mm", 11.11, "MANUAL-VAT"],
+        ["Flat", "Steel", "EN3B", "20mm x 30mm", 10, "foot/300mm", "", "BLANK-INC"],
+      ],
+    })
+  );
+  assert.equal(metalsUploadWithOwnerVatErrors.products[0].priceExVat, 10, "Uploaded metals ex VAT must come from the workbook");
+  assert.equal(metalsUploadWithOwnerVatErrors.products[0].priceIncVat, 12, "Uploaded metals inc VAT must be calculated from ex VAT");
+  assert.equal(metalsUploadWithOwnerVatErrors.products[1].priceIncVat, 12, "Uploaded metals blank inc VAT must be calculated from ex VAT");
 
   const miniUploadSource = fs.existsSync(path.join(root, "final-deliverables/Mini Catalogue Self Updating.xlsm"))
     ? "final-deliverables/Mini Catalogue Self Updating.xlsm"
