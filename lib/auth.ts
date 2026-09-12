@@ -5,9 +5,9 @@ import { getD1, type D1DatabaseBinding } from "./cloudflare";
 
 export type AuthRole = "admin" | "member";
 export type AuthStatus = "active" | "disabled" | "removed";
-export type NotificationRoute = "mini" | "metals" | "custom" | "featured";
+export type NotificationRoute = "mini" | "metals" | "custom" | "featured" | "contact";
 
-export const NOTIFICATION_ROUTES: NotificationRoute[] = ["mini", "metals", "custom", "featured"];
+export const NOTIFICATION_ROUTES: NotificationRoute[] = ["mini", "metals", "custom", "featured", "contact"];
 
 export type AuthUser = {
   id: string;
@@ -389,7 +389,7 @@ async function ensureAuthSchemaInner() {
     )`,
     `CREATE TABLE IF NOT EXISTS auth_notification_preferences (
       user_id TEXT NOT NULL,
-      route TEXT NOT NULL CHECK (route IN ('mini', 'metals', 'custom', 'featured')),
+      route TEXT NOT NULL CHECK (route IN ('mini', 'metals', 'custom', 'featured', 'contact')),
       created_at TEXT NOT NULL,
       PRIMARY KEY (user_id, route)
     )`,

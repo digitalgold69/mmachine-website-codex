@@ -134,31 +134,16 @@ export default function DashboardProductsPage() {
   const [uploadStatus, setUploadStatus] = useState<Record<UploadCatalogue, CatalogueUploadMeta | null>>({ mini: null, metals: null });
   const [uploadAction, setUploadAction] = useState<UploadAction>(null);
   const [uploadInputKey, setUploadInputKey] = useState(0);
-  const [uploadPdfs, setUploadPdfs] = useState<Record<UploadCatalogue, File | null>>({ mini: null, metals: null });
-  const [uploadConfirmed, setUploadConfirmed] = useState<Record<UploadCatalogue, boolean>>({ mini: false, metals: false });
   const [dragCatalogue, setDragCatalogue] = useState<UploadCatalogue | null>(null);
 
   function selectCatalogueFiles(kind: UploadCatalogue, files: File[]) {
     if (uploadAction?.tone === "loading") return;
-    setUploadConfirmed((current) => ({ ...current, [kind]: false }));
-    const workbooks = files.filter((file) => /\.(xlsx|xlsm|xls)$/i.test(file.name));
-    const pdfs = files.filter((file) => /\.pdf$/i.test(file.name));
-    if (!files.length || workbooks.length > 1 || pdfs.length > 1 || workbooks.length + pdfs.length !== files.length || files.some((file) => !file.size || file.size > 24 * 1024 * 1024)) {
-      setUploadAction({ catalogue: kind, tone: "error", text: "Choose one Excel workbook and one matching PDF, each under 24 MB. No files were changed." });
+    const file = files[0];
+    if (files.length !== 1 || !file?.size || file.size > 24 * 1024 * 1024 || !/\.(xlsx|xlsm|xls)$/i.test(file.name)) {
+      setUploadAction({ catalogue: kind, tone: "error", text: "Choose one Excel workbook under 24 MB." });
       return;
     }
-    if (files.some((file) => kind === "mini" ? /metals/i.test(file.name) : /mini/i.test(file.name))) {
-      setUploadAction({ catalogue: kind, tone: "error", text: `This filename looks like the other catalogue. Use the ${kind === "mini" ? "Metals" : "Mini panels"} upload box.` });
-      return;
-    }
-    if (workbooks[0]) {
-      setUploadFiles((current) => ({ ...current, [kind]: workbooks[0] }));
-      // A new workbook invalidates any PDF selected for an earlier workbook.
-      setUploadPdfs((current) => ({ ...current, [kind]: pdfs[0] || null }));
-    } else if (pdfs[0]) {
-      setUploadPdfs((current) => ({ ...current, [kind]: pdfs[0] }));
-    }
-    setUploadConfirmed((current) => ({ ...current, [kind]: false }));
+    setUploadFiles((current) => ({ ...current, [kind]: file }));
     setUploadAction(null);
   }
 
@@ -290,10 +275,7 @@ export default function DashboardProductsPage() {
       setUploadAction({ catalogue: kind, text: "Choose an Excel file first.", tone: "error" });
       return;
     }
-    if (!uploadConfirmed[kind] || (kind === "mini" && !uploadPdfs[kind])) {
-      setUploadAction({ catalogue: kind, text: "Check the catalogue name, add the matching PDF for Mini, and tick the confirmation before saving.", tone: "error" });
-      return;
-    }
+    if (!window.confirm(`Update ${kind === "mini" ? "MINI PANELS" : "METALS"} using "${file.name}"?`)) return;
 
     setUploadAction({ catalogue: kind, text: "Uploading and reading workbook...", tone: "loading" });
     try {
@@ -301,7 +283,6 @@ export default function DashboardProductsPage() {
       form.append("catalogue", kind);
       form.append("file", file);
       form.append("confirmedCatalogue", kind);
-      if (uploadPdfs[kind]) form.append("pdf", uploadPdfs[kind]!);
       const response = await fetch("/api/catalogue-uploads", {
         method: "POST",
         body: form,
@@ -311,8 +292,6 @@ export default function DashboardProductsPage() {
 
       setUploadStatus((current) => ({ ...current, [kind]: data.upload! }));
       setUploadFiles((current) => ({ ...current, [kind]: null }));
-      setUploadPdfs((current) => ({ ...current, [kind]: null }));
-      setUploadConfirmed((current) => ({ ...current, [kind]: false }));
       setUploadInputKey((value) => value + 1);
       await refreshLiveCatalogue(kind);
       const warningText = Array.isArray(data.warnings) && data.warnings.length
@@ -436,7 +415,7 @@ export default function DashboardProductsPage() {
               Catalogue file uploads
             </h2>
             <p className="mt-1 text-sm leading-6 text-ink-muted">
-              Drop your files into the correct catalogue box, check them, then save. Mini needs its Excel workbook and matching PDF exported from Excel to keep the original drawings and layout. Manual Mini parts stay separate.
+              Drag your Excel file into Mini Panels or Metals, then click Upload.
             </p>
           </div>
         </div>
@@ -472,39 +451,31 @@ export default function DashboardProductsPage() {
                     : "No dashboard upload saved yet. Using the generated catalogue."}
                 </div>
                 <p className="mb-3 text-sm font-bold text-racing">Drag and drop {kind === "mini" ? "Mini panels" : "Metals"} files here</p>
-                <p className="mb-3 text-xs text-ink-muted">{kind === "mini" ? "Excel workbook + matching 42-page PDF, with the existing section order. In Excel: File → Export → Create PDF, and export the entire catalogue workbook." : "Excel workbook. Add its matching PDF too if you want to preserve the Excel print layout."}</p>
                 <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
                   <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-racing/20 bg-white px-4 text-sm font-bold text-racing hover:bg-cream-dark">
-                    Choose files
+                    Choose file
                     <input
                       key={`${kind}-${uploadInputKey}`}
                       type="file"
-                      multiple
                       disabled={uploadAction?.tone === "loading"}
-                      aria-label={`Choose ${kind === "mini" ? "Mini panels" : "Metals"} workbook and PDF`}
-                      accept=".xlsx,.xlsm,.xls,.pdf"
+                      aria-label={`Choose ${kind === "mini" ? "Mini panels" : "Metals"} workbook`}
+                      accept=".xlsx,.xlsm,.xls"
                       onChange={(event) => { selectCatalogueFiles(kind, Array.from(event.target.files || [])); event.target.value = ""; }}
                       className="sr-only"
                     />
                   </label>
                   <div className="min-w-0 break-words rounded-md border border-racing/10 bg-white px-3 py-2 text-sm text-ink-muted">
                     <div>Excel: {selectedFile ? selectedFile.name : "No file selected"}</div>
-                    <div>PDF: {uploadPdfs[kind]?.name || (kind === "mini" ? "Required — add matching PDF" : "Optional")}</div>
                   </div>
                 </div>
-                <label className="my-3 flex items-start gap-2 rounded-md bg-white p-3 text-sm font-semibold text-racing">
-                  <input type="checkbox" className="mt-1" checked={uploadConfirmed[kind]} disabled={uploadAction?.tone === "loading" || !selectedFile || (kind === "mini" && !uploadPdfs[kind])}
-                    onChange={(event) => setUploadConfirmed((current) => ({ ...current, [kind]: event.target.checked }))} />
-                  <span>I am updating <strong>{kind === "mini" ? "MINI PANELS" : "METALS"}</strong>. These are the correct files{uploadPdfs[kind] ? ", and the PDF matches this workbook" : ""}.</span>
-                </label>
                 <div>
                   <button
                     type="button"
                     onClick={() => void uploadCatalogueWorkbook(kind)}
-                    disabled={uploadAction?.tone === "loading" || !selectedFile || !uploadConfirmed[kind] || (kind === "mini" && !uploadPdfs[kind])}
+                    disabled={uploadAction?.tone === "loading" || !selectedFile}
                     className="btn-primary h-10 whitespace-nowrap px-4 text-sm disabled:cursor-wait disabled:opacity-60"
                   >
-                    Upload &amp; save {kind === "mini" ? "Mini panels" : "Metals"}
+                    Upload {kind === "mini" ? "Mini panels" : "Metals"}
                   </button>
                 </div>
                 {action && (

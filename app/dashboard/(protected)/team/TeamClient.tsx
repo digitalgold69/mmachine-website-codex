@@ -28,6 +28,7 @@ const notificationOptions: { id: NotificationRoute; label: string }[] = [
   { id: "metals", label: "Metals" },
   { id: "custom", label: "Custom work" },
   { id: "featured", label: "Misc stock" },
+  { id: "contact", label: "Contact form" },
 ];
 
 export default function TeamClient({ initialTeam, initialAudit, currentUserId }: TeamClientProps) {
@@ -257,12 +258,12 @@ export default function TeamClient({ initialTeam, initialAudit, currentUserId }:
                     />
                   </ControlGroup>
 
-                  <ControlGroup label="Order Notifications">
+                  <ControlGroup label="Notifications">
                     <NotificationPicker
                       user={user}
                       busy={busy}
                       onSave={(routes) =>
-                        patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`, "Order notifications updated.")
+                        patch("notifications", { userId: user.id, routes }, `notifications-${user.id}`, "Notifications updated.")
                       }
                     />
                   </ControlGroup>

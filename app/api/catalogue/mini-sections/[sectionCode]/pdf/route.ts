@@ -1,3 +1,4 @@
+import { MINI_PAGE_MAP_PREFIX } from "@/lib/mini-workbook-pdf";
 import { PDFDocument } from "pdf-lib";
 import { getCloudflareEnv } from "@/lib/cloudflare";
 import { miniCatalogueUrl } from "@/lib/catalogue-versions";
@@ -41,12 +42,15 @@ export async function GET(
     const sourcePdf = await PDFDocument.load(await sourceResponse.arrayBuffer(), {
       updateMetadata: false,
     });
-    if (pageIndexes.some((pageIndex) => pageIndex >= sourcePdf.getPageCount())) {
+    const subject = sourcePdf.getSubject() || "";
+    const mappedPages = subject.startsWith(MINI_PAGE_MAP_PREFIX) ? JSON.parse(subject.slice(MINI_PAGE_MAP_PREFIX.length))[section.code] as number[] : pageIndexes;
+    if (!Array.isArray(mappedPages) || !mappedPages.length) throw new Error("Missing section page map");
+    if (mappedPages.some((pageIndex) => pageIndex >= sourcePdf.getPageCount())) {
       return new Response("Section pages were not found in the catalogue PDF", { status: 500 });
     }
 
     const sectionPdf = await PDFDocument.create();
-    const pages = await sectionPdf.copyPages(sourcePdf, pageIndexes);
+    const pages = await sectionPdf.copyPages(sourcePdf, mappedPages);
     pages.forEach((page) => sectionPdf.addPage(page));
 
     const pdfBytes = await sectionPdf.save();

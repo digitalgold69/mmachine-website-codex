@@ -173,6 +173,9 @@ function parseMiniWorkbook(workbook: XLSX.WorkBook): ParsedCatalogueUpload {
         const parsed = parseMiniDescription(name);
 
         out.push({
+          ...{ drawingRef: cleanText(row[pair.codeIndex - 1], 30), pdfColumn: pairs.indexOf(pair),
+            pdfExVat: typeof row[pair.descIndex + 1] === "number" ? `\u00a3${Number(row[pair.descIndex + 1]).toFixed(2)}` : cleanText(row[pair.descIndex + 1], 80),
+            pdfIncVat: typeof row[pair.descIndex + 2] === "number" ? `\u00a3${Number(row[pair.descIndex + 2]).toFixed(2)}` : cleanText(row[pair.descIndex + 2], 80) },
           id: miniProductId(section, code, out.length, usedIds),
           code,
           name,

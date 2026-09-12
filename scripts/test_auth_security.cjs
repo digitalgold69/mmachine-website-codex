@@ -150,7 +150,7 @@ assert.match(saveNoEmailSection, /next\.status = "pending_payment"/, "save-no-em
 assert.match(quotesStore, /status in \('new', 'reviewing', 'invoice_sent', 'pending_payment'\)/, "pending payment orders must stay visible on the active dashboard");
 assert.match(teamClient, /Reset Password/, "team reset button must use clear password reset wording");
 assert.doesNotMatch(teamClient, /Default fallback/, "team notification selector must not expose fallback copy");
-assert.match(teamClient, /Order Notifications/, "team notification column must be labelled for order notifications");
+assert.match(teamClient, /Notifications/, "team notification column must be labelled for order notifications");
 assert.match(teamClient, /useRef<HTMLDivElement>\(null\)/, "team notification picker must keep a ref for outside-click handling");
 assert.match(teamClient, /document\.addEventListener\("mousedown", closeIfOutside\)/, "team notification picker must close when clicking away");
 assert.match(teamClient, /document\.addEventListener\("touchstart", closeIfOutside\)/, "team notification picker must close when tapping away");

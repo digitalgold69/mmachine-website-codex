@@ -38,3 +38,14 @@ Dashboard upload cards accept drag-and-drop and require explicit Mini Panels/Met
 
 Staff notification URLs use https://m-machine.co.uk. A valid session in the same browser is retained; a different browser or the old workers.dev session still requires login. Live contact enquiries currently go to hodltid@icloud.com, sent from orders@orders.m-machine.co.uk, with customer Reply-To. Recipient changes await the owner's intended address; no test mail was sent.
 `nDeployed Worker version 66bf3c21-ab8a-4a2b-9185-eba605c18472. Build and tests passed. Live full Mini PDF SHA-256 matches the original export; section 120 was downloaded and visually checked for drawing and original table pages.
+
+## Excel-only uploads and contact routing — 12 September 2026
+
+This supersedes the paired-PDF upload workflow above. Both catalogue cards take one Excel workbook, via drop or browse, and a simple confirmation after Upload is clicked. No PDF selection or checkbox is required.
+
+Mini uploads preserve original drawing pages and rebuild the two-column parts tables from workbook values, including drawing references, codes, descriptions and printed prices. Full PDFs contain a section page map so additional rows and pages cannot shift section downloads onto the wrong section. The website retains its existing zero-price-as-POA handling; the printed Mini PDF mirrors the workbook's zero/POA cells. Metals retains automatic Excel-to-PDF generation. Workbook/PDF generation completes before publishing the new override.
+
+The Team Notifications selector now includes Contact form. Selected active team recipients replace the configured fallback, never receive a copy alongside it. Until any contact recipients are selected, the existing fallback remains active. Contact notification sender display name is M Machine Enquiry. Existing order routing is unchanged.
+
+Migration 0013 widens the notification route constraint. All 11 existing preferences were backed up and preserved on the live database. No notification recipients were chosen on the owner's behalf and no test email was sent.
+Deployed version 3e01ff5e-c1a5-4516-8384-dbd7c97735bb. Build and tests passed; final generated PDF checked against all 766 Mini rows with zero code/description/printed-price mismatches. Added-row pagination regression passed. Metals Excel parsed and generated a PDF successfully. Upload UI checked with one Excel file; no live catalogue replacement or enquiry email was submitted during verification.

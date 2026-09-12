@@ -690,13 +690,15 @@ export async function ownerQuoteRecipientsForRuntime(quote: QuoteRequest) {
   return ownerQuoteRecipients(quote, await emailRuntimeEnv());
 }
 
-export function ownerEnquiryRecipients(env: EmailEnv = process.env) {
+export function ownerEnquiryRecipients(env: EmailEnv = process.env, teamRecipients: string[] = []) {
+  if (teamRecipients.length) return uniqueRecipients(teamRecipients);
   const recipients = uniqueRecipients(splitEmailList(envValue(env, "QUOTE_ENQUIRY_OWNER_EMAIL")));
   return recipients.length > 0 ? recipients : ownerFallbackRecipients(env);
 }
 
 export async function ownerEnquiryRecipientsForRuntime() {
-  return ownerEnquiryRecipients(await emailRuntimeEnv());
+  const recipients = await teamNotificationRecipientsForRoute("contact");
+  return ownerEnquiryRecipients(await emailRuntimeEnv(), recipients);
 }
 
 function cleanEmailAddress(value: string) {

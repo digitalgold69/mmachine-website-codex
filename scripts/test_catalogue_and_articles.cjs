@@ -111,14 +111,14 @@ async function main() {
     "Dashboard products tab must show catalogue upload controls above the catalogue lookup heading"
   );
   assert.match(dashboardProductsPage, /Catalogue file uploads/, "Dashboard products tab must clearly label the catalogue workbook upload controls");
-  assert.match(dashboardProductsPage, /Drop your files into the correct catalogue box/, "Catalogue upload copy must explain the labelled drop areas");
+  assert.match(dashboardProductsPage, /Drag your Excel file/, "Catalogue upload copy must explain the labelled drop areas");
   assert.doesNotMatch(dashboardProductsPage, /latest Excel masters/, "Catalogue upload copy must not call the uploaded catalogues masters");
   assert.match(dashboardProductsPage, /text-lg font-bold leading-6 text-racing/, "Catalogue upload card titles should be prominent");
   assert.match(dashboardProductsPage, /Mini Panels/, "Mini catalogue upload title should use the requested larger Mini Panels label");
   assert.match(dashboardProductsPage, /Excel catalogue file/, "Catalogue upload cards must make clear they expect Excel catalogue files");
   assert.match(dashboardProductsPage, /Choose file/, "Catalogue upload cards must use compact file picker controls");
   assert.match(dashboardProductsPage, /No file selected/, "Catalogue upload cards must show the selected workbook state");
-  assert.match(dashboardProductsPage, /Upload &amp; save/, "Catalogue upload button must use the requested label");
+  assert.match(dashboardProductsPage, /Upload \{kind/, "Catalogue upload button must use the requested label");
   assert.match(dashboardProductsPage, /\/api\/catalogue-uploads/, "Dashboard uploads must save via the catalogue upload API");
 
   const manualProductsLib = read("lib/manual-mini-products.ts");
@@ -136,7 +136,7 @@ async function main() {
   const uploadRoute = read("app/api/catalogue-uploads/route.ts");
   assert.match(uploadRoute, /parseUploadedCatalogue/, "Catalogue upload API must parse Excel workbooks server-side");
   assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
-  assert.match(uploadRoute, /pdfBytes: originalPdf!/, "Mini uploads must preserve the matching original PDF");
+  assert.match(uploadRoute, /buildMiniWorkbookPdf/, "Mini uploads must preserve the matching original PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
 
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
@@ -185,6 +185,18 @@ async function main() {
     "mini",
     new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))
   );
+  const { buildMiniWorkbookPdf, MINI_PAGE_MAP_PREFIX } = jiti("../lib/mini-workbook-pdf.ts");
+  const expanded = [...miniUpload.products, ...Array.from({ length: 80 }, (_, index) => ({
+    ...miniUpload.products[0], id: `extra-${index}`, code: `EXTRA-${index}`, name: `Additional uploaded panel ${index}`, section: "120", pdfColumn: 0,
+  }))];
+  const rendered = await PDFDocument.load(await buildMiniWorkbookPdf(expanded, pdfBytes));
+  const map = JSON.parse(rendered.getSubject().slice(MINI_PAGE_MAP_PREFIX.length));
+  assert.ok(map["120"].length > 2, "Additional rows must extend the section rather than being dropped");
+  assert.ok(map["130"][0] > map["120"].at(-1), "Later sections must use their new page positions");
+  assert.equal(map.Apx1.length >= 1, true, "Appendix downloads must remain mapped");
+  assert.equal(rendered.getPage(map["120"][0]).getWidth(), pdf.getPage(3).getWidth(), "Original drawing page dimensions must be preserved");
+  assert.doesNotMatch(dashboardProductsPage, /uploadPdfs|uploadConfirmed|matching PDF/, "Excel-only uploads must not ask for PDFs or checkbox confirmation");
+  assert.match(dashboardProductsPage, /window.confirm/, "Upload must confirm catalogue and filename after clicking");
   assert.ok(miniUpload.products.length >= 700, "Mini workbook uploads should parse the full catalogue");
   assert.throws(() => parseUploadedCatalogue("metals", new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))), /Mini panels workbook/, "A Mini workbook must not overwrite Metals");
   assert.equal(miniUpload.products[0].id, "p0001", "Known Mini rows should keep generated ids so product photos remain attached");

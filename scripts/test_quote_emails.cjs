@@ -429,3 +429,6 @@ assert.match(paidUpdatedCustomerHtml, /Status[\s\S]*Paid/);
 assert.match(paidUpdatedCustomerHtml, /Payment method[\s\S]*BACS/);
 
 console.log("ok - quote and enquiry email templates include routed recipients, focused dashboard links, and clean invoice details");
+
+assert.deepEqual(ownerEnquiryRecipients(process.env, ["staff@example.test"]), ["staff@example.test"], "Team contact recipients replace the legacy recipient rather than adding to it");
+assert.equal(buildSesEmailInput({to: ["staff@example.test"], subject: "Enquiry", html: "Hello", fromName: "M Machine Enquiry"}).FromEmailAddress, '"M Machine Enquiry" <orders@orders.m-machine.co.uk>');

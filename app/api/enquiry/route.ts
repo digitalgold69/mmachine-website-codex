@@ -58,6 +58,7 @@ export async function POST(request: Request) {
         ? `M-Machine product enquiry: ${enquiry.product}`
         : `M-Machine website enquiry: ${enquiry.type || "General question"}`,
       html: buildOwnerEnquiryEmail(enquiry),
+      fromName: "M Machine Enquiry",
       replyTo: enquiry.email,
     });
 
