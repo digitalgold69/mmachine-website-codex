@@ -49,3 +49,10 @@ The Team Notifications selector now includes Contact form. Selected active team 
 
 Migration 0013 widens the notification route constraint. All 11 existing preferences were backed up and preserved on the live database. No notification recipients were chosen on the owner's behalf and no test email was sent.
 Deployed version 3e01ff5e-c1a5-4516-8384-dbd7c97735bb. Build and tests passed; final generated PDF checked against all 766 Mini rows with zero code/description/printed-price mismatches. Added-row pagination regression passed. Metals Excel parsed and generated a PDF successfully. Upload UI checked with one Excel file; no live catalogue replacement or enquiry email was submitted during verification.
+
+## Upload consistency follow-up
+
+Mini generated PDFs now use catalogueMoney for prices, matching website POA handling for blank/zero prices instead of retaining empty print cells. Regression tests cover replacement workbook rows, edits, missing prices, right-column insertion immediately after 21.14.24.00 in section 140 without adding a page, and overflow pagination. Upload drop labels now explicitly request the updated Mini/Metals catalogue Excel document.
+
+Formatting limitation: the bundled pre-upload PDF is the original Excel export. Upload-generated Mini PDFs preserve drawing pages and rebuild tables in a consistent two-column template; Metals uses its existing generated table template. Neither generator reproduces every Excel print style, merged border or original typographic detail. Do not describe these as exact Excel exports or promise arbitrary workbook-layout changes are supported.
+Deployed version 4c61b183-e706-47c3-8a4b-269a6da0b50f. Verified updated upload labels live and homepage HTTP 200. Section 140 added-row PDF was checked independently: two pages, correct row order, POA for missing prices.

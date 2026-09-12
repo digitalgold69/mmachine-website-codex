@@ -450,7 +450,7 @@ export default function DashboardProductsPage() {
                     ? `${status.productCount.toLocaleString("en-GB")} lines from ${status.sourceFilename} · ${formatUploadTime(status.uploadedAt)}`
                     : "No dashboard upload saved yet. Using the generated catalogue."}
                 </div>
-                <p className="mb-3 text-sm font-bold text-racing">Drag and drop {kind === "mini" ? "Mini panels" : "Metals"} files here</p>
+                <p className="mb-3 text-sm font-bold text-racing">Drag and drop Updated {kind === "mini" ? "Mini" : "Metals"} Catalogue Excel Doc Here</p>
                 <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
                   <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-racing/20 bg-white px-4 text-sm font-bold text-racing hover:bg-cream-dark">
                     Choose file

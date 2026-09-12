@@ -186,6 +186,22 @@ async function main() {
     new Uint8Array(fs.readFileSync(path.join(root, miniUploadSource)))
   );
   const { buildMiniWorkbookPdf, MINI_PAGE_MAP_PREFIX } = jiti("../lib/mini-workbook-pdf.ts");
+  const revision = parseUploadedCatalogue("mini", workbookBytes({ "140B": [
+    ["", "Code", "Description", "Ex VAT", "Inc VAT", "", "", "Code", "Description", "Ex VAT", "Inc VAT"],
+    ["", "11.14.00.17", "Updated description", 91, 109.2, "", "", "21.14.24.00", "Wood trim", 1000, 1200],
+    ["", "", "", "", "", "", "", "21.14.24.01", "New panel below wood trim", "", ""],
+  ] }));
+  assert.equal(revision.products.length, 3, "A replacement workbook must contain only its current rows");
+  assert.equal(revision.products[0].name, "Updated description");
+  assert.equal(revision.products[0].priceExVat, 91);
+  assert.equal(revision.products[2].priceExVat, null, "Blank prices must become POA");
+  assert.deepEqual(revision.products.filter(p => p.pdfColumn === 1).map(p => p.code), ["21.14.24.00", "21.14.24.01"], "Insertion must preserve the right-hand column order");
+  const oneAdded = [...miniUpload.products];
+  const insertion = oneAdded.findIndex(p => p.code === "21.14.24.00" && p.section === "140");
+  oneAdded.splice(insertion + 1, 0, { ...oneAdded[insertion], id: "new-140", code: "21.14.24.01", name: "New panel below wood trim", priceExVat: null, priceIncVat: null });
+  const insertedPdf = await PDFDocument.load(await buildMiniWorkbookPdf(oneAdded, pdfBytes));
+  const insertedMap = JSON.parse(insertedPdf.getSubject().slice(MINI_PAGE_MAP_PREFIX.length));
+  assert.equal(insertedMap["140"].length, 2, "One new right-hand row in section 140 must stay on the existing parts page");
   const expanded = [...miniUpload.products, ...Array.from({ length: 80 }, (_, index) => ({
     ...miniUpload.products[0], id: `extra-${index}`, code: `EXTRA-${index}`, name: `Additional uploaded panel ${index}`, section: "120", pdfColumn: 0,
   }))];

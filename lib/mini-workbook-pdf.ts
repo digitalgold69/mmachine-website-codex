@@ -75,7 +75,7 @@ export async function buildMiniWorkbookPdf(products: PrintProduct[], templateByt
         const start = cursors[column];
         while (cursors[column] < columns[column].length) {
           const p = columns[column][cursors[column]];
-          if (!drawRow([p.drawingRef || "", p.code, p.name, p.pdfExVat ?? catalogueMoney(p.priceExVat), p.pdfIncVat ?? catalogueMoney(p.priceIncVat)])) break;
+          if (!drawRow([p.drawingRef || "", p.code, p.name, catalogueMoney(p.priceExVat), catalogueMoney(p.priceIncVat)])) break;
           cursors[column]++;
         }
         if (cursors[column] === start && start < columns[column].length) throw new Error(`Section ${section.code} contains a description too long to fit. Nothing has been updated.`);
