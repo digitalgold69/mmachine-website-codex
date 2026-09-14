@@ -130,8 +130,11 @@ assert.match(ordersClient, /<DeliveryModePill customer=\{quote\.customer\} \/>/,
 assert.match(ordersClient, /setDraftDeliveryMode\(mode\)/, "invoice editor must let staff switch between delivery and collection");
 assert.match(ordersClient, /rememberedDeliveryAddresses/, "invoice editor must remember a delivery address when staff temporarily switch to collection");
 assert.match(ordersClient, /function updateDraftDeliveryAddress/, "delivery address edits must update the saved customer fulfilment data");
-assert.match(ordersClient, /rows=\{deliveryAddressRows\(deliveryAddress\)\}/, "delivery address box must grow with the entered address instead of scrolling internally");
+assert.match(ordersClient, /function fitTextareaToContent/, "delivery address box must measure its real rendered content height");
+assert.match(ordersClient, /useLayoutEffect[\s\S]+fitTextareaToContent\(deliveryAddressRef\.current\)/, "delivery address box must resize when an order opens or the address changes");
+assert.match(ordersClient, /ref=\{deliveryAddressRef\}/, "delivery address textarea must be wired to the auto-height ref");
 assert.match(ordersClient, /resize-none overflow-hidden text-xs leading-5/, "delivery address box must not show its own scrollbar");
+assert.doesNotMatch(ordersClient, /deliveryAddressRows/, "delivery address height must not depend on a character-count row estimate");
 assert.match(ordersClient, /mt-auto flex items-end justify-between gap-3 pt-3/, "order card item and total row must sit consistently at the bottom of the card body");
 assert.doesNotMatch(ordersClient, /Add at least one invoice line and a price for every line before emailing it to the customer/, "invoice editor must not show the old invoice-readiness warning copy");
 assert.match(quoteRequestRoute, /function safeDashboardCustomer/, "quote request API must safely persist dashboard customer fulfilment edits");

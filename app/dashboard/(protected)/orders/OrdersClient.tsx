@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -473,12 +473,10 @@ function deliverySummary(customer: QuoteRequest["customer"]): DeliverySummary {
   return { mode: "delivery", tone: "warning", label: "Delivery", text: "Delivery address was not supplied." };
 }
 
-function deliveryAddressRows(value: string) {
-  const lines = value ? value.split(/\r?\n/) : [""];
-  return Math.max(
-    2,
-    lines.reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 34)), 0)
-  );
+function fitTextareaToContent(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
 function DeliveryModePill({ customer }: { customer: QuoteCustomer }) {
@@ -1332,6 +1330,7 @@ export default function OrdersClient({
   const [paymentSettingsError, setPaymentSettingsError] = useState("");
   const historyRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const deliveryAddressRef = useRef<HTMLTextAreaElement | null>(null);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const missingDeepLinkNoticeRef = useRef("");
   const closingQuoteIdRef = useRef("");
@@ -1702,6 +1701,11 @@ export default function OrdersClient({
       }
     };
   }, [closeInvoice, draft?.id]);
+
+  useLayoutEffect(() => {
+    if (!draft || deliverySummary(draft.customer).mode !== "delivery") return;
+    fitTextareaToContent(deliveryAddressRef.current);
+  }, [draft?.id, draft?.customer.address, draft?.customer.arrangeOwnDelivery]);
 
   useEffect(() => {
     if (!monthFilter) return;
@@ -3250,11 +3254,16 @@ export default function OrdersClient({
                                 <div>
                                   <label className="sr-only" htmlFor="delivery-address">Delivery address</label>
                                   <textarea
+                                    ref={deliveryAddressRef}
                                     id="delivery-address"
                                     value={deliveryAddress}
-                                    onChange={(event) => updateDraftDeliveryAddress(event.target.value)}
-                                    rows={deliveryAddressRows(deliveryAddress)}
-                                    className={`input resize-none overflow-hidden text-xs leading-5 ${
+                                    onChange={(event) => {
+                                      updateDraftDeliveryAddress(event.target.value);
+                                      fitTextareaToContent(event.currentTarget);
+                                    }}
+                                    onInput={(event) => fitTextareaToContent(event.currentTarget)}
+                                    rows={1}
+                                    className={`input min-h-[3.25rem] resize-none overflow-hidden text-xs leading-5 ${
                                       delivery.tone === "warning" ? "border-amber-300 bg-amber-50" : "bg-white"
                                     }`}
                                     placeholder="Delivery address"
