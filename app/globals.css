@@ -230,6 +230,18 @@ body {
     line-height: 1.45 !important;
   }
 
+  body.printing-invoice .invoice-print-brand-logo {
+    height: 36px !important;
+    width: 36px !important;
+  }
+
+  body.printing-invoice .invoice-print-summary-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) !important;
+    gap: 0.75rem !important;
+    align-items: stretch !important;
+  }
+
   body.printing-invoice .invoice-print-sheet thead {
     display: table-header-group;
   }

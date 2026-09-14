@@ -41,8 +41,13 @@ assert.doesNotMatch(
 );
 assert.match(
   ordersClient,
-  /<div className="mb-4 grid gap-3 md:grid-cols-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/,
+  /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/,
   "invoice print summary should keep state, customer and delivery in one compact row"
+);
+assert.match(
+  globalsCss,
+  /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) minmax\(0, 1\.1fr\) !important;/,
+  "invoice print CSS must force the summary cards into one row during print preview"
 );
 assert.match(
   ordersClient,

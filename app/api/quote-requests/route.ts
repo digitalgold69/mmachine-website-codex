@@ -845,6 +845,7 @@ export async function PATCH(req: Request) {
 
   let body: {
     id?: string;
+    expectedUpdatedAt?: string;
     status?: QuoteStatus;
     items?: Partial<QuoteItem>[];
     ownerNotes?: string;
@@ -876,6 +877,17 @@ export async function PATCH(req: Request) {
     const current = await getQuoteRequest(body.id);
     if (!current) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
 
+    const expectedUpdatedAt = asString(body.expectedUpdatedAt, 80);
+    if (expectedUpdatedAt && expectedUpdatedAt !== current.updatedAt) {
+      return NextResponse.json(
+        {
+          error: "This order was changed in another tab or by another staff member. The latest version has been loaded; review it before saving again.",
+          quote: current,
+        },
+        { status: 409 }
+      );
+    }
+
     let next: QuoteRequest = {
       ...current,
       status: body.status ? safeStatus(body.status) : current.status,
@@ -894,7 +906,7 @@ export async function PATCH(req: Request) {
 
     next = preserveEmailedInvoiceStatus(next);
 
-    if (Array.isArray(body.items) && body.items.length > 0) {
+    if (Array.isArray(body.items)) {
       if (body.items.length > MAX_ORDER_LINES) {
         return NextResponse.json({ error: "Too many invoice lines" }, { status: 400 });
       }
@@ -939,6 +951,12 @@ export async function PATCH(req: Request) {
     }
 
     if (body.saveNoEmail && !body.emailCustomer) {
+      if (next.items.length === 0) {
+        return NextResponse.json(
+          { error: "Add at least one invoice line before saving it for payment." },
+          { status: 400 }
+        );
+      }
       const incompleteLine = next.items.find(
         (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
       );
@@ -958,6 +976,12 @@ export async function PATCH(req: Request) {
 
     let customerEmailSent = false;
     if (body.emailCustomer) {
+      if (next.items.length === 0) {
+        return NextResponse.json(
+          { error: "Add at least one invoice line before emailing the customer." },
+          { status: 400 }
+        );
+      }
       const incompleteLine = next.items.find(
         (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
       );
@@ -1007,6 +1031,12 @@ export async function PATCH(req: Request) {
     }
 
     if (body.markPaid) {
+      if (next.items.length === 0) {
+        return NextResponse.json(
+          { error: "Add at least one invoice line before marking the order as paid." },
+          { status: 400 }
+        );
+      }
       const incompleteLine = next.items.find(
         (item) => typeof item.unitPriceExVat !== "number" || item.unitPriceExVat < 0
       );

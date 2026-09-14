@@ -15,6 +15,14 @@ import {
 } from "@/lib/order-accounting";
 import { quoteCustomerWillArrangeDelivery, quoteDeliveryAddress } from "@/lib/quote-delivery";
 import { normaliseCataloguePrice } from "@/lib/catalogue-pricing";
+import {
+  calculateMetalOrderItem,
+  formatMetalDimensionForUnit,
+  getMetalOrderConfig,
+  metalDimensionUnitLabel,
+  normaliseMetalDimensionUnit,
+  type MetalDimensionUnit,
+} from "@/lib/metal-pricing";
 import type { PaymentSettings } from "@/lib/payment-settings";
 import type {
   QuoteAccountingBucket,
@@ -69,6 +77,15 @@ type ManualLineDraft = {
   item: string;
   unit: string;
   priceExVat: string;
+};
+
+type PendingMetalLine = {
+  product: CatalogueSearchProduct;
+  qty: string;
+  inputUnit: MetalDimensionUnit;
+  inputLength: string;
+  inputWidth: string;
+  error: string;
 };
 
 type RefundDraft = {
@@ -208,7 +225,7 @@ function customBrief(quote: QuoteRequest) {
 function invoiceItemTitle(item: QuoteItem) {
   if (item.catalogue === "custom") return "Custom Job";
   if (item.catalogue === "metals") {
-    return [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ") || item.description || "Metal";
+    return item.description || [item.shape, item.metal, item.spec, item.size].filter(Boolean).join(" - ") || "Metal";
   }
   return item.description || itemName(item);
 }
@@ -298,10 +315,6 @@ function defaultAddLineCatalogue(quote: QuoteRequest): AddLineCatalogue {
   return quote.items.some((item) => item.catalogue === "metals") ? "metals" : "mini";
 }
 
-function isOwnerAddedLine(item: QuoteItem) {
-  return item.key.startsWith("owner-") || item.key.startsWith("manual-");
-}
-
 function isManualLine(item: QuoteItem) {
   return item.key.startsWith("manual-");
 }
@@ -330,6 +343,21 @@ function priceFromInput(value: string) {
 
 function incVatFromExVat(value: number | null) {
   return typeof value === "number" ? Number((value * 1.2).toFixed(2)) : null;
+}
+
+function currencyPrice(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function metalCalculationMode(product: CatalogueSearchProduct) {
+  const config = getMetalOrderConfig(product);
+  return config.mode === "length" || config.mode === "sheet" || config.mode === "fixed" ? config : null;
+}
+
+function metalAddDefaultUnit(product: CatalogueSearchProduct) {
+  const config = getMetalOrderConfig(product);
+  return normaliseMetalDimensionUnit(config.mode === "length" ? config.defaultInputUnit : "metric");
 }
 
 function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
@@ -380,6 +408,32 @@ function quoteItemFromCatalogueProduct(product: CatalogueSearchProduct, catalogu
     unitPriceExVat,
     unitPriceIncVat,
   };
+}
+
+function DimensionUnitToggle({
+  value,
+  onChange,
+}: {
+  value: MetalDimensionUnit;
+  onChange: (unit: MetalDimensionUnit) => void;
+}) {
+  return (
+    <div className="inline-flex shrink-0 rounded-md border border-racing/15 bg-white p-0.5 text-[11px] font-semibold uppercase tracking-wide">
+      {(["metric", "imperial"] as const).map((unit) => (
+        <button
+          key={unit}
+          type="button"
+          onClick={() => onChange(unit)}
+          aria-pressed={value === unit}
+          className={`rounded px-2 py-1 transition ${
+            value === unit ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
+          }`}
+        >
+          {unit}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 type QuoteKind = "mini" | "metals" | "custom" | "featured" | "mixed";
@@ -927,11 +981,13 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   return (
     <div className="invoice-print-sheet">
       <div className="mb-4 flex items-start justify-between gap-6 border-b border-racing/20 pb-3">
-        <div className="flex items-start gap-3">
-          <img src="/brand/m-machine-butterfly.png" alt="M Machine butterfly logo" className="h-12 w-12 object-contain" />
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <img src="/brand/m-machine-butterfly.png" alt="M Machine butterfly logo" className="invoice-print-brand-logo h-9 w-9 object-contain" />
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-gold">M-Machine</div>
+          </div>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">M-Machine</div>
-            <h1 className="mt-1 font-display text-3xl text-racing">Invoice {quoteDisplayRef(quote)}</h1>
+            <h1 className="font-display text-3xl text-racing">Invoice {quoteDisplayRef(quote)}</h1>
             <p className="mt-1 text-sm text-ink-muted">Submitted {formatDateTime(quote.submittedAt)}</p>
           </div>
         </div>
@@ -943,7 +999,7 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 md:grid-cols-3">
+      <div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-3">
         <section className="rounded-lg border border-racing/10 bg-cream-dark p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
           <dl className="grid grid-cols-2 gap-2">
@@ -1112,6 +1168,7 @@ export default function OrdersClient({
   const [addLineLoading, setAddLineLoading] = useState(false);
   const [addLineError, setAddLineError] = useState("");
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
+  const [pendingMetalLine, setPendingMetalLine] = useState<PendingMetalLine | null>(null);
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(initialPaymentSettings);
@@ -1161,6 +1218,27 @@ export default function OrdersClient({
     () => Boolean(draft && selected && quoteSnapshot(draft) !== quoteSnapshot(selected)),
     [draft, selected]
   );
+  const pendingMetalConfig = useMemo(
+    () => (pendingMetalLine ? getMetalOrderConfig(pendingMetalLine.product) : null),
+    [pendingMetalLine]
+  );
+  const pendingMetalNeedsDimensions =
+    pendingMetalConfig?.mode === "length" || pendingMetalConfig?.mode === "sheet";
+  const pendingMetalCalculation = useMemo(() => {
+    if (!pendingMetalLine || !pendingMetalConfig) return null;
+    if (pendingMetalConfig.mode !== "length" && pendingMetalConfig.mode !== "sheet" && pendingMetalConfig.mode !== "fixed") {
+      return null;
+    }
+    return calculateMetalOrderItem(
+      pendingMetalLine.product,
+      {
+        inputUnit: pendingMetalLine.inputUnit,
+        inputLength: pendingMetalLine.inputLength,
+        inputWidth: pendingMetalLine.inputWidth,
+      },
+      clampQty(pendingMetalLine.qty)
+    );
+  }, [pendingMetalConfig, pendingMetalLine]);
 
   const pageCount = Math.max(1, Math.ceil(historyCount / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -1292,6 +1370,7 @@ export default function OrdersClient({
     setAddLineCount(0);
     setAddLineError("");
     setAddLineNotice(null);
+    setPendingMetalLine(null);
     setManualLine(BLANK_MANUAL_LINE);
     setRefundDraft(blankRefundDraft());
   }, [draft?.id]);
@@ -1537,6 +1616,35 @@ export default function OrdersClient({
 
   function addCatalogueLine(product: CatalogueSearchProduct) {
     if (!draft) return;
+
+    if (addLineCatalogue === "metals") {
+      const config = metalCalculationMode(product);
+      if (config?.mode === "length" || config?.mode === "sheet") {
+        setPendingMetalLine({
+          product,
+          qty: "1",
+          inputUnit: metalAddDefaultUnit(product),
+          inputLength: "",
+          inputWidth: "",
+          error: "",
+        });
+        setAddLineError("");
+        setAddLineNotice(null);
+        return;
+      }
+
+      if (config?.mode === "fixed") {
+        addCalculatedMetalLine(product, {
+          qty: "1",
+          inputUnit: "metric",
+          inputLength: "",
+          inputWidth: "",
+          error: "",
+        });
+        return;
+      }
+    }
+
     const item = quoteItemFromCatalogueProduct(product, addLineCatalogue);
     const existingIndex = draft.items.findIndex((current) => isCatalogueProductLine(current, addLineCatalogue, product));
     if (existingIndex >= 0) {
@@ -1556,6 +1664,78 @@ export default function OrdersClient({
     setAddLineNotice({ catalogue: addLineCatalogue, productId: product.id, text: "Added" });
     setAddLineError("");
     setActionNotice(null);
+  }
+
+  function addCalculatedMetalLine(
+    product: CatalogueSearchProduct,
+    input: Omit<PendingMetalLine, "product">
+  ) {
+    if (!draft) return;
+    const qty = clampQty(input.qty);
+    const calculated = calculateMetalOrderItem(
+      product,
+      {
+        inputUnit: input.inputUnit,
+        inputLength: input.inputLength,
+        inputWidth: input.inputWidth,
+      },
+      qty
+    );
+
+    if (!calculated.ok) {
+      setPendingMetalLine((current) => current?.product.id === product.id
+        ? { ...current, error: calculated.error }
+        : {
+            product,
+            qty: String(qty),
+            inputUnit: input.inputUnit,
+            inputLength: input.inputLength,
+            inputWidth: input.inputWidth,
+            error: calculated.error,
+          });
+      return;
+    }
+
+    const baseItem = quoteItemFromCatalogueProduct(product, "metals");
+    const item: QuoteItem = {
+      ...baseItem,
+      key: `${baseItem.key}-${calculated.keySuffix}`,
+      qty,
+      unit: calculated.unit,
+      unitPriceExVat: currencyPrice(calculated.unitPriceExVat),
+      unitPriceIncVat: currencyPrice(calculated.unitPriceIncVat),
+      metalDimensions: calculated.metalDimensions,
+    };
+    const existingIndex = draft.items.findIndex((current) =>
+      current.catalogue === "metals" &&
+      current.productId === product.id &&
+      current.unit === item.unit &&
+      current.metalDimensions?.display === item.metalDimensions?.display
+    );
+
+    setDraft({
+      ...draft,
+      items: existingIndex >= 0
+        ? draft.items.map((current, index) =>
+            index === existingIndex ? { ...current, qty: clampQty(current.qty + qty) } : current
+          )
+        : [...draft.items, item],
+    });
+    setPendingMetalLine(null);
+    setAddLineNotice({ catalogue: "metals", productId: product.id, text: existingIndex >= 0 ? "Qty +1" : "Added" });
+    setAddLineError("");
+    setActionNotice(null);
+  }
+
+  function confirmPendingMetalLine() {
+    if (!pendingMetalLine) return;
+    addCalculatedMetalLine(pendingMetalLine.product, {
+      qty: pendingMetalLine.qty,
+      inputUnit: pendingMetalLine.inputUnit,
+      inputLength: pendingMetalLine.inputLength,
+      inputWidth: pendingMetalLine.inputWidth,
+      error: "",
+    });
   }
 
   function addManualLine() {
@@ -1588,7 +1768,7 @@ export default function OrdersClient({
   function removeDraftLine(index: number) {
     if (!draft) return;
     const item = draft.items[index];
-    if (!item || !isOwnerAddedLine(item)) return;
+    if (!item) return;
     setDraft({ ...draft, items: draft.items.filter((_, i) => i !== index) });
   }
 
@@ -1623,10 +1803,16 @@ export default function OrdersClient({
       const res = await fetch("/api/quote-requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...quote, status: "reviewing" }),
+        body: JSON.stringify({ ...quote, expectedUpdatedAt: quote.updatedAt, status: "reviewing" }),
       });
       const data = await res.json() as { error?: string; quote?: QuoteRequest };
-      if (!res.ok) throw new Error(data.error || "Could not mark viewed");
+      if (!res.ok) {
+        if (data.quote) {
+          updateQuote(data.quote);
+          if (res.status === 409) return;
+        }
+        throw new Error(data.error || "Could not mark viewed");
+      }
 
       if (!data.quote) throw new Error("Could not load the updated order.");
       updateQuote(data.quote);
@@ -1649,6 +1835,7 @@ export default function OrdersClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...quote,
+          expectedUpdatedAt: quote.updatedAt,
           emailCustomer: Boolean(options.emailCustomer),
           markPaid: Boolean(options.markPaid),
           saveNoEmail: Boolean(options.saveNoEmail),
@@ -1787,6 +1974,7 @@ export default function OrdersClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
           refund: {
             reason: refundDraft.reason,
             lines,
@@ -1794,7 +1982,10 @@ export default function OrdersClient({
         }),
       });
       const data = await res.json() as { error?: string; quote?: QuoteRequest };
-      if (!res.ok) throw new Error(data.error || "Refund could not be saved.");
+      if (!res.ok) {
+        if (data.quote) updateQuote(data.quote);
+        throw new Error(data.error || "Refund could not be saved.");
+      }
       if (!data.quote) throw new Error("Refund saved without returning the order.");
       updateQuote(data.quote);
       setRefundDraft(blankRefundDraft());
@@ -1815,7 +2006,7 @@ export default function OrdersClient({
   const draftCustomerInvoiceWasSent = draft ? Boolean(draft.customerEmailSentAt) : false;
   const draftInvoiceWasMarkedPending = draft ? dashboardStatus(draft) === "pending_payment" : false;
   const invoiceReady = draft
-    ? draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
+    ? draft.items.length > 0 && draft.items.every((item) => typeof item.unitPriceExVat === "number" && item.unitPriceExVat >= 0)
     : false;
   const isSaving = Boolean(savingAction);
   const showingFrom = historyCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -2261,26 +2452,19 @@ export default function OrdersClient({
                       <div className="divide-y divide-racing/10">
                         {draft.items.map((item, index) => {
                           const manualLine = isManualLine(item);
-                          const ownerAdded = isOwnerAddedLine(item);
                           return (
                             <div key={item.key} className="grid gap-3 p-3 lg:grid-cols-[72px_minmax(0,1fr)_92px_132px] lg:items-start">
                               <div>
                                 <label className="label lg:hidden" htmlFor={`qty-${draft.id}-${index}`}>Qty</label>
-                                {manualLine ? (
-                                  <input
-                                    id={`qty-${draft.id}-${index}`}
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    value={item.qty}
-                                    onChange={(e) => patchItem(index, { qty: clampQty(e.target.value) })}
-                                    className="input text-center font-semibold text-racing"
-                                  />
-                                ) : (
-                                  <div className="rounded-md border border-racing/10 bg-cream-dark px-3 py-2 text-center font-semibold text-racing">
-                                    {item.qty}
-                                  </div>
-                                )}
+                                <input
+                                  id={`qty-${draft.id}-${index}`}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={item.qty}
+                                  onChange={(e) => patchItem(index, { qty: clampQty(e.target.value) })}
+                                  className="input text-center font-semibold text-racing"
+                                />
                               </div>
 
                               <div className="min-w-0">
@@ -2294,8 +2478,14 @@ export default function OrdersClient({
                                     className="input min-h-[74px] resize-y text-sm leading-5"
                                   />
                                 ) : (
-                                  <div className="rounded-md border border-racing/10 bg-white px-3 py-2">
-                                    <div className="font-semibold leading-5 text-racing">{invoiceItemTitle(item)}</div>
+                                  <div className="space-y-2">
+                                    <textarea
+                                      id={`description-${draft.id}-${index}`}
+                                      value={item.description}
+                                      onChange={(e) => patchItem(index, { description: e.target.value })}
+                                      rows={2}
+                                      className="input min-h-[74px] resize-y text-sm font-semibold leading-5 text-racing"
+                                    />
                                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
                                       <span>{invoiceLineSubtitle(item)}</span>
                                       {invoiceLineDimension(item) && (
@@ -2310,18 +2500,12 @@ export default function OrdersClient({
 
                               <div>
                                 <label className="label lg:hidden" htmlFor={`unit-${draft.id}-${index}`}>Unit</label>
-                                {manualLine ? (
-                                  <input
-                                    id={`unit-${draft.id}-${index}`}
-                                    value={item.unit || ""}
-                                    onChange={(e) => patchItem(index, { unit: e.target.value })}
-                                    className="input"
-                                  />
-                                ) : (
-                                  <div className="truncate whitespace-nowrap rounded-md border border-racing/10 bg-cream-dark px-2 py-2 text-center text-[11px] font-semibold leading-5 text-racing">
-                                    {item.unit || "each"}
-                                  </div>
-                                )}
+                                <input
+                                  id={`unit-${draft.id}-${index}`}
+                                  value={item.unit || ""}
+                                  onChange={(e) => patchItem(index, { unit: e.target.value })}
+                                  className="input"
+                                />
                               </div>
 
                               <div>
@@ -2344,15 +2528,13 @@ export default function OrdersClient({
                                 <div className="mt-1 text-right text-xs font-semibold text-ink-muted">
                                   Line {invoiceMoney(lineExVat(item))}
                                 </div>
-                                {ownerAdded && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeDraftLine(index)}
-                                    className="mt-1 text-xs font-semibold text-red-700 hover:underline"
-                                  >
-                                    Remove line
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeDraftLine(index)}
+                                  className="mt-1 text-xs font-semibold text-red-700 hover:underline"
+                                >
+                                  Remove line
+                                </button>
                               </div>
                             </div>
                           );
@@ -2391,6 +2573,7 @@ export default function OrdersClient({
                                 onChange={(event) => {
                                   setAddLineCatalogue(event.target.value as AddLineCatalogue);
                                   setAddLineQuery("");
+                                  setPendingMetalLine(null);
                                 }}
                                 className="input"
                               >
@@ -2416,6 +2599,131 @@ export default function OrdersClient({
                               {addLineError}
                             </div>
                           )}
+
+                          {pendingMetalLine && (() => {
+                            const product = pendingMetalLine.product;
+                            const config = pendingMetalConfig;
+                            const unitLabel = metalDimensionUnitLabel(pendingMetalLine.inputUnit);
+                            const dimensionStep = pendingMetalLine.inputUnit === "imperial" ? "0.001" : "0.1";
+                            const maxLengthMm = config && "maxLengthMm" in config && typeof config.maxLengthMm === "number"
+                              ? config.maxLengthMm
+                              : undefined;
+                            const maxWidthMm = config && "maxWidthMm" in config && typeof config.maxWidthMm === "number"
+                              ? config.maxWidthMm
+                              : undefined;
+                            const lengthMax = typeof maxLengthMm === "number"
+                              ? pendingMetalLine.inputUnit === "imperial"
+                                ? maxLengthMm / 25.4
+                                : maxLengthMm
+                              : undefined;
+                            const widthMax = config?.mode === "sheet" && typeof maxWidthMm === "number"
+                              ? pendingMetalLine.inputUnit === "imperial"
+                                ? maxWidthMm / 25.4
+                                : maxWidthMm
+                              : undefined;
+                            const calculation = pendingMetalCalculation;
+                            const previewText = calculation?.ok
+                              ? `${calculation.unit} · ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
+                              : pendingMetalLine.error || calculation?.error || "Enter the required measurements.";
+                            const maxText = config?.mode === "length" && typeof maxLengthMm === "number"
+                              ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)}.`
+                              : config?.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
+                                ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} × ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
+                                : "";
+
+                            return (
+                              <div className="rounded-md border border-racing/15 bg-cream-dark p-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Metal measurements</div>
+                                    <div className="mt-1 font-semibold text-racing">{catalogueResultTitle(product, "metals")}</div>
+                                    <div className="mt-0.5 text-xs text-ink-muted">{catalogueResultSubtitle(product, "metals")}</div>
+                                  </div>
+                                  <DimensionUnitToggle
+                                    value={pendingMetalLine.inputUnit}
+                                    onChange={(unit) =>
+                                      setPendingMetalLine((current) =>
+                                        current ? { ...current, inputUnit: unit, error: "" } : current
+                                      )
+                                    }
+                                  />
+                                </div>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-[72px_1fr_1fr_auto] lg:items-end">
+                                  <div>
+                                    <label className="label" htmlFor="metal-line-qty">Qty</label>
+                                    <input
+                                      id="metal-line-qty"
+                                      value={pendingMetalLine.qty}
+                                      onChange={(event) =>
+                                        setPendingMetalLine((current) =>
+                                          current ? { ...current, qty: event.target.value, error: "" } : current
+                                        )
+                                      }
+                                      className="input text-center font-semibold text-racing"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                    />
+                                  </div>
+                                  {pendingMetalNeedsDimensions && (
+                                    <div>
+                                      <label className="label" htmlFor="metal-line-length">Length ({unitLabel})</label>
+                                      <input
+                                        id="metal-line-length"
+                                        type="number"
+                                        min="0"
+                                        max={lengthMax}
+                                        step={dimensionStep}
+                                        value={pendingMetalLine.inputLength}
+                                        onChange={(event) =>
+                                          setPendingMetalLine((current) =>
+                                            current ? { ...current, inputLength: event.target.value, error: "" } : current
+                                          )
+                                        }
+                                        className="input"
+                                        placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
+                                      />
+                                    </div>
+                                  )}
+                                  {config?.mode === "sheet" && (
+                                    <div>
+                                      <label className="label" htmlFor="metal-line-width">Width ({unitLabel})</label>
+                                      <input
+                                        id="metal-line-width"
+                                        type="number"
+                                        min="0"
+                                        max={widthMax}
+                                        step={dimensionStep}
+                                        value={pendingMetalLine.inputWidth}
+                                        onChange={(event) =>
+                                          setPendingMetalLine((current) =>
+                                            current ? { ...current, inputWidth: event.target.value, error: "" } : current
+                                          )
+                                        }
+                                        className="input"
+                                        placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 12" : "e.g. 300"}
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <button type="button" onClick={confirmPendingMetalLine} className="btn-primary px-4 py-2 text-sm">
+                                      Add measured line
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPendingMetalLine(null)}
+                                      className="btn-secondary px-4 py-2 text-sm"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className={`mt-2 text-xs font-semibold ${calculation?.ok ? "text-racing" : "text-amber-800"}`}>
+                                  {previewText}
+                                </div>
+                                {maxText && <div className="mt-1 text-xs text-ink-muted">{maxText}</div>}
+                              </div>
+                            );
+                          })()}
 
                           <div className="rounded-md border border-racing/10">
                             <div className="flex items-center justify-between gap-3 border-b border-racing/10 bg-cream-dark px-3 py-2 text-xs text-ink-muted">
@@ -2825,7 +3133,7 @@ export default function OrdersClient({
 
                     {!invoiceReady && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        Add a price to every invoice line before emailing it to the customer.
+                        Add at least one invoice line and a price for every line before emailing it to the customer.
                         {draft && quoteIncludesVat(draft) ? " VAT is added automatically." : ""}
                       </div>
                     )}
