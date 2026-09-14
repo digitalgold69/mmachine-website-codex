@@ -125,6 +125,13 @@ assert.match(ordersClient, /lg:col-span-4[\s\S]+renderMetalLineMeasurementEditor
 assert.match(ordersClient, /Recalculated unit price/, "metal measurement edits must show the recalculated unit price");
 assert.doesNotMatch(ordersClient, /Maximum single length/, "invoice editor must not show maximum-length helper dialogue around metal measurement fields");
 assert.match(ordersClient, /deliverySummary\(draft\.customer\)/, "delivery details must be compactly shown in the invoice state sidebar");
+assert.match(ordersClient, /function DeliveryModePill/, "quote cards must show a compact delivery or collection pill");
+assert.match(ordersClient, /<DeliveryModePill customer=\{quote\.customer\} \/>/, "delivery or collection pill must appear on dashboard cards without adding a new card row");
+assert.match(ordersClient, /setDraftDeliveryMode\(mode\)/, "invoice editor must let staff switch between delivery and collection");
+assert.match(ordersClient, /patchDraftCustomer\(\{ address: event\.target\.value, arrangeOwnDelivery: false \}\)/, "delivery address edits must update the saved customer fulfilment data");
+assert.doesNotMatch(ordersClient, /Add at least one invoice line and a price for every line before emailing it to the customer/, "invoice editor must not show the old invoice-readiness warning copy");
+assert.match(quoteRequestRoute, /function safeDashboardCustomer/, "quote request API must safely persist dashboard customer fulfilment edits");
+assert.match(quoteRequestRoute, /customer: body\.customer \? safeDashboardCustomer\(current\.customer, body\.customer\) : current\.customer/, "quote request PATCH must save customer delivery or collection edits");
 assert.match(ordersClient, /Remove line/, "invoice editor must let the owner remove invoice lines");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(ordersClient, /Save & Close/, "invoice editor close action must save changed drafts before closing");

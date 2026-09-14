@@ -26,6 +26,7 @@ import {
 import type { PaymentSettings } from "@/lib/payment-settings";
 import type {
   QuoteAccountingBucket,
+  QuoteCustomer,
   QuoteItem,
   QuotePaymentMethod,
   QuoteRequest,
@@ -96,7 +97,9 @@ type MetalLineDraft = {
 };
 
 type DeliverySummary = {
+  mode: "delivery" | "collection";
   tone: "normal" | "warning";
+  label: "Delivery" | "Collection";
   text: string;
 };
 
@@ -463,9 +466,25 @@ function editableMetalOrderConfig(item: QuoteItem) {
 
 function deliverySummary(customer: QuoteRequest["customer"]): DeliverySummary {
   const deliveryAddress = quoteDeliveryAddress(customer);
-  if (deliveryAddress) return { tone: "normal", text: deliveryAddress };
-  if (quoteCustomerWillArrangeDelivery(customer)) return { tone: "normal", text: "Customer will arrange delivery / collection." };
-  return { tone: "warning", text: "Delivery address was not supplied. Contact the customer before arranging carriage." };
+  if (deliveryAddress) return { mode: "delivery", tone: "normal", label: "Delivery", text: deliveryAddress };
+  if (quoteCustomerWillArrangeDelivery(customer)) {
+    return { mode: "collection", tone: "normal", label: "Collection", text: "Customer will arrange collection." };
+  }
+  return { mode: "delivery", tone: "warning", label: "Delivery", text: "Delivery address was not supplied." };
+}
+
+function DeliveryModePill({ customer }: { customer: QuoteCustomer }) {
+  const delivery = deliverySummary(customer);
+  const className = delivery.mode === "collection"
+    ? "bg-cream-dark text-racing"
+    : delivery.tone === "warning"
+      ? "bg-amber-100 text-amber-900"
+      : "bg-green-50 text-green-800";
+  return (
+    <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${className}`}>
+      {delivery.label}
+    </span>
+  );
 }
 
 function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
@@ -693,7 +712,7 @@ function StatusPill({ quote }: { quote: QuoteRequest }) {
 function OrderTypePill({ quote }: { quote: QuoteRequest }) {
   const kind = quoteKind(quote);
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${KIND_STYLES[kind]}`}>
+    <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${KIND_STYLES[kind]}`}>
       {KIND_LABELS[kind]}
     </span>
   );
@@ -822,7 +841,10 @@ function OrderCard({
         aria-current={selectedId === quote.id ? "true" : undefined}
       >
         <div className="flex items-center justify-between gap-2">
-          <OrderTypePill quote={quote} />
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+            <OrderTypePill quote={quote} />
+            <DeliveryModePill customer={quote.customer} />
+          </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <StatusPill quote={quote} />
             {sentDateText && (
@@ -1689,6 +1711,25 @@ export default function OrdersClient({
   function patchDraft(patch: Partial<QuoteRequest>) {
     if (!draft) return;
     setDraft({ ...draft, ...patch });
+  }
+
+  function patchDraftCustomer(patch: Partial<QuoteCustomer>) {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      customer: {
+        ...draft.customer,
+        ...patch,
+      },
+    });
+  }
+
+  function setDraftDeliveryMode(mode: "delivery" | "collection") {
+    if (!draft) return;
+    patchDraftCustomer({
+      arrangeOwnDelivery: mode === "collection",
+      address: mode === "collection" ? "" : quoteDeliveryAddress(draft.customer),
+    });
   }
 
   function patchItem(index: number, patch: Partial<QuoteItem>) {
@@ -2686,6 +2727,7 @@ export default function OrdersClient({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <OrderTypePill quote={draft} />
+                      <DeliveryModePill customer={draft.customer} />
                     </div>
                     <h2 id="invoice-editor-title" className="mt-1 truncate font-display text-2xl text-racing">
                       {draft.customer.name}
@@ -3153,12 +3195,48 @@ export default function OrdersClient({
                           return (
                             <div className="mt-3 border-t border-racing/10 pt-3">
                               <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Delivery</span>
+                                <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Fulfilment</span>
                                 {delivery.tone === "warning" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">Check</span>}
                               </div>
-                              <p className={`whitespace-pre-wrap text-xs leading-5 ${delivery.tone === "warning" ? "font-semibold text-amber-800" : "text-ink"}`}>
-                                {delivery.text}
-                              </p>
+                              <div className="mb-2 grid grid-cols-2 gap-1.5">
+                                {(["delivery", "collection"] as const).map((mode) => {
+                                  const active = delivery.mode === mode;
+                                  return (
+                                    <button
+                                      key={mode}
+                                      type="button"
+                                      onClick={() => setDraftDeliveryMode(mode)}
+                                      className={`rounded-md border px-2 py-1.5 text-xs font-semibold transition ${
+                                        active
+                                          ? "border-racing bg-racing text-cream"
+                                          : "border-racing/15 bg-white text-racing hover:bg-cream"
+                                      }`}
+                                      aria-pressed={active}
+                                    >
+                                      {mode === "delivery" ? "Delivery" : "Collection"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {delivery.mode === "delivery" ? (
+                                <div>
+                                  <label className="sr-only" htmlFor="delivery-address">Delivery address</label>
+                                  <textarea
+                                    id="delivery-address"
+                                    value={quoteDeliveryAddress(draft.customer)}
+                                    onChange={(event) => patchDraftCustomer({ address: event.target.value, arrangeOwnDelivery: false })}
+                                    rows={3}
+                                    className={`input min-h-[4.75rem] resize-none text-xs leading-5 ${
+                                      delivery.tone === "warning" ? "border-amber-300 bg-amber-50" : "bg-white"
+                                    }`}
+                                    placeholder="Delivery address"
+                                  />
+                                </div>
+                              ) : (
+                                <p className="rounded-md bg-white px-2.5 py-2 text-xs font-medium leading-5 text-racing">
+                                  Customer will arrange collection.
+                                </p>
+                              )}
                             </div>
                           );
                         })()}
@@ -3419,12 +3497,6 @@ export default function OrdersClient({
                       </div>
                     )}
 
-                    {!invoiceReady && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        Add at least one invoice line and a price for every line before emailing it to the customer.
-                        {draft && quoteIncludesVat(draft) ? " VAT is added automatically." : ""}
-                      </div>
-                    )}
                   </aside>
                 </div>
               </div>

@@ -254,6 +254,26 @@ function safeStatus(value: unknown): QuoteStatus {
   return "new";
 }
 
+function safeDashboardCustomer(current: QuoteCustomer, raw: Partial<QuoteCustomer> & { deliveryMode?: unknown }): QuoteCustomer {
+  return {
+    ...current,
+    ...normaliseQuoteDelivery({
+      address: raw.address ?? current.address,
+      arrangeOwnDelivery: raw.arrangeOwnDelivery ?? current.arrangeOwnDelivery,
+      deliveryMode: raw.deliveryMode,
+    }),
+    name: asString(raw.name ?? current.name, 160),
+    email: asString(raw.email ?? current.email, 220),
+    phone: asString(raw.phone ?? current.phone, 80),
+    company: asString(raw.company ?? current.company, 180),
+    vehicleYear: asString(raw.vehicleYear ?? current.vehicleYear, 40),
+    vehicleModel: raw.vehicleModel === undefined
+      ? current.vehicleModel
+      : normaliseMiniVehicleModel(raw.vehicleModel),
+    message: asString(raw.message ?? current.message, 2000),
+  };
+}
+
 function preserveEmailedInvoiceStatus(quote: QuoteRequest): QuoteRequest {
   if (!quote.customerEmailSentAt) return quote;
   if (quote.status === "paid" || quote.status === "closed") return quote;
@@ -847,6 +867,7 @@ export async function PATCH(req: Request) {
     id?: string;
     expectedUpdatedAt?: string;
     status?: QuoteStatus;
+    customer?: Partial<QuoteCustomer> & { deliveryMode?: unknown };
     items?: Partial<QuoteItem>[];
     ownerNotes?: string;
     customerMessage?: string;
@@ -891,6 +912,7 @@ export async function PATCH(req: Request) {
     let next: QuoteRequest = {
       ...current,
       status: body.status ? safeStatus(body.status) : current.status,
+      customer: body.customer ? safeDashboardCustomer(current.customer, body.customer) : current.customer,
       ownerNotes: asString(body.ownerNotes ?? current.ownerNotes, 3000),
       customerMessage: asString(body.customerMessage ?? current.customerMessage, 3000),
       carriageExVat: body.carriageExVat === undefined ? current.carriageExVat : asMoneyOrNull(body.carriageExVat),
