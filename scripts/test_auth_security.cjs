@@ -96,8 +96,10 @@ assert.match(ordersClient, /whitespace-nowrap[\s\S]*Export Order/, "export-order
 assert.match(ordersClient, /Shows BIC &amp; IBAN/, "export-order helper must use compact one-line copy");
 assert.doesNotMatch(ordersClient, /Shows BIC and IBAN on invoices/, "export-order helper must not use the long overflowing sentence");
 assert.match(ordersClient, /paymentSettingsRows\(paymentSettings, quote\.exportOrder === true\)/, "printed invoices must only show BIC and IBAN when export order is enabled");
-assert.match(ordersClient, /const printStateRows = \[[\s\S]+Paid by[\s\S]+paymentMethodLabel\(quote\.paymentMethod\)/, "printed paid invoices must show the payment method inside the invoice state block");
+assert.match(ordersClient, /const printPaymentRow = \{[\s\S]+Paid by[\s\S]+paymentMethodLabel\(quote\.paymentMethod\)[\s\S]+\};/, "printed paid invoices must show the payment method inside the invoice state block");
 assert.match(ordersClient, /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-2">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/, "printed invoice state, customer and delivery sections must share one compact row");
+assert.match(ordersClient, /invoice-print-state-grid[\s\S]+grid grid-cols-\[minmax\(0,1fr\)_auto\][\s\S]+justify-self-end text-right/, "printed invoice status and paid-by values must be right aligned");
+assert.match(ordersClient, /<dd className="mt-0\.5 whitespace-nowrap font-semibold text-racing">\{left\.value\}<\/dd>/, "printed invoice reference and paid/submitted values must not use truncation");
 assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 0\.95fr\) minmax\(0, 1\.05fr\) minmax\(0, 1\.15fr\) !important;/, "printed invoice summary row must be forced in print CSS");
 assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-card[\s\S]*overflow-wrap: anywhere !important;/, "printed invoice summary cards must wrap long text instead of overlapping");
 assert.doesNotMatch(ordersClient, /mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, "printed invoice customer and delivery cards must not be stretched into an orphan third-card grid");

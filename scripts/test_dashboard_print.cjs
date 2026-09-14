@@ -45,6 +45,16 @@ assert.match(
   "invoice print summary should keep state, customer and delivery in one compact row"
 );
 assert.match(
+  ordersClient,
+  /invoice-print-state-grid[\s\S]+grid grid-cols-\[minmax\(0,1fr\)_auto\][\s\S]+justify-self-end text-right/,
+  "invoice print state card should right-align status and paid-by/payment values"
+);
+assert.match(
+  ordersClient,
+  /<dd className="mt-0\.5 whitespace-nowrap font-semibold text-racing">\{left\.value\}<\/dd>/,
+  "invoice print reference and paid/submitted values should not be truncated"
+);
+assert.match(
   globalsCss,
   /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 0\.95fr\) minmax\(0, 1\.05fr\) minmax\(0, 1\.15fr\) !important;/,
   "invoice print CSS must force the summary cards into one row during print preview"

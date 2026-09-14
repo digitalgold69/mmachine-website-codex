@@ -972,12 +972,16 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   const invoiceCompanyNumber = companyNumber(paymentSettings);
   const invoiceVatNumber = vatNumber(paymentSettings);
   const printedStatus = statusLabel(dashboardStatus(quote));
-  const printStateRows = [
-    { label: "Reference", value: websiteInvoiceDisplay(quote) },
-    { label: "Status", value: printedStatus },
-    { label: isPaidQuote(quote) ? "Paid" : "Submitted", value: formatDateTime(isPaidQuote(quote) ? quote.paidAt || quote.updatedAt : quote.submittedAt) },
-    { label: isPaidQuote(quote) ? "Paid by" : "Payment", value: isPaidQuote(quote) ? paymentMethodLabel(quote.paymentMethod) : "Awaiting" },
-  ];
+  const printReferenceRow = { label: "Reference", value: websiteInvoiceDisplay(quote) };
+  const printStatusRow = { label: "Status", value: printedStatus };
+  const printDateRow = {
+    label: isPaidQuote(quote) ? "Paid" : "Submitted",
+    value: formatDateTime(isPaidQuote(quote) ? quote.paidAt || quote.updatedAt : quote.submittedAt),
+  };
+  const printPaymentRow = {
+    label: isPaidQuote(quote) ? "Paid by" : "Payment",
+    value: isPaidQuote(quote) ? paymentMethodLabel(quote.paymentMethod) : "Awaiting",
+  };
   return (
     <div className="invoice-print-sheet">
       <div className="mb-4 flex items-start justify-between gap-6 border-b border-racing/20 pb-3">
@@ -1002,11 +1006,20 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
       <div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-2">
         <section className="invoice-print-summary-card min-w-0 overflow-hidden rounded-lg border border-racing/10 bg-cream-dark p-2 text-xs leading-tight">
           <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
-          <dl className="grid grid-cols-2 gap-x-2 gap-y-1">
-            {printStateRows.map((row) => (
-              <div key={row.label} className="min-w-0">
-                <dt className="text-[9px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
-                <dd className="mt-0.5 truncate font-semibold text-racing">{row.value}</dd>
+          <dl className="invoice-print-state-grid space-y-1">
+            {[
+              [printReferenceRow, printStatusRow],
+              [printDateRow, printPaymentRow],
+            ].map(([left, right]) => (
+              <div key={`${left.label}-${right.label}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2">
+                <div className="min-w-0">
+                  <dt className="text-[9px] uppercase tracking-wider text-ink-muted">{left.label}</dt>
+                  <dd className="mt-0.5 whitespace-nowrap font-semibold text-racing">{left.value}</dd>
+                </div>
+                <div className="min-w-0 justify-self-end text-right">
+                  <dt className="text-[9px] uppercase tracking-wider text-ink-muted">{right.label}</dt>
+                  <dd className="mt-0.5 whitespace-nowrap font-semibold text-racing">{right.value}</dd>
+                </div>
               </div>
             ))}
           </dl>
