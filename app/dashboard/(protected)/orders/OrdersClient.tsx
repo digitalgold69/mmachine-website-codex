@@ -473,6 +473,14 @@ function deliverySummary(customer: QuoteRequest["customer"]): DeliverySummary {
   return { mode: "delivery", tone: "warning", label: "Delivery", text: "Delivery address was not supplied." };
 }
 
+function deliveryAddressRows(value: string) {
+  const lines = value ? value.split(/\r?\n/) : [""];
+  return Math.max(
+    2,
+    lines.reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 34)), 0)
+  );
+}
+
 function DeliveryModePill({ customer }: { customer: QuoteCustomer }) {
   const delivery = deliverySummary(customer);
   const className = delivery.mode === "collection"
@@ -865,7 +873,7 @@ function OrderCard({
           ))}
         </div>
         {bodyDateText && <div className="mt-2 text-xs text-ink-muted">{bodyDateText}</div>}
-        <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="mt-auto flex items-end justify-between gap-3 pt-3">
           <div className="text-xs text-ink-muted">
             {itemQuantity} {itemQuantity === 1 ? "item" : "items"}
           </div>
@@ -1314,6 +1322,7 @@ export default function OrdersClient({
   const [pendingMetalLine, setPendingMetalLine] = useState<PendingMetalLine | null>(null);
   const [metalLineDrafts, setMetalLineDrafts] = useState<Record<string, MetalLineDraft>>({});
   const [openMetalMeasurementKeys, setOpenMetalMeasurementKeys] = useState<Record<string, boolean>>({});
+  const [rememberedDeliveryAddresses, setRememberedDeliveryAddresses] = useState<Record<string, string>>({});
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(initialPaymentSettings);
@@ -1429,10 +1438,16 @@ export default function OrdersClient({
   }, [pathname, router]);
 
   const openInvoice = useCallback((quote: QuoteRequest, syncUrl = true) => {
+    const deliveryAddress = quoteDeliveryAddress(quote.customer);
     closingQuoteIdRef.current = "";
     activeQuoteIdRef.current = quote.id;
     setSelectedId(quote.id);
     setDraft(cloneQuote(quote));
+    if (deliveryAddress) {
+      setRememberedDeliveryAddresses((current) =>
+        current[quote.id] === deliveryAddress ? current : { ...current, [quote.id]: deliveryAddress }
+      );
+    }
     setMetalLineDrafts({});
     setOpenMetalMeasurementKeys({});
     setPendingMetalLine(null);
@@ -1724,12 +1739,24 @@ export default function OrdersClient({
     });
   }
 
+  function updateDraftDeliveryAddress(address: string) {
+    if (!draft) return;
+    setRememberedDeliveryAddresses((current) => ({ ...current, [draft.id]: address }));
+    patchDraftCustomer({ address, arrangeOwnDelivery: false });
+  }
+
   function setDraftDeliveryMode(mode: "delivery" | "collection") {
     if (!draft) return;
+    const currentAddress = quoteDeliveryAddress(draft.customer);
     patchDraftCustomer({
       arrangeOwnDelivery: mode === "collection",
-      address: mode === "collection" ? "" : quoteDeliveryAddress(draft.customer),
+      address: mode === "collection"
+        ? ""
+        : currentAddress || rememberedDeliveryAddresses[draft.id] || "",
     });
+    if (mode === "collection" && currentAddress) {
+      setRememberedDeliveryAddresses((current) => ({ ...current, [draft.id]: currentAddress }));
+    }
   }
 
   function patchItem(index: number, patch: Partial<QuoteItem>) {
@@ -3192,6 +3219,7 @@ export default function OrdersClient({
                         )}
                         {(() => {
                           const delivery = deliverySummary(draft.customer);
+                          const deliveryAddress = quoteDeliveryAddress(draft.customer);
                           return (
                             <div className="mt-3 border-t border-racing/10 pt-3">
                               <div className="mb-1 flex items-center justify-between gap-2">
@@ -3223,10 +3251,10 @@ export default function OrdersClient({
                                   <label className="sr-only" htmlFor="delivery-address">Delivery address</label>
                                   <textarea
                                     id="delivery-address"
-                                    value={quoteDeliveryAddress(draft.customer)}
-                                    onChange={(event) => patchDraftCustomer({ address: event.target.value, arrangeOwnDelivery: false })}
-                                    rows={3}
-                                    className={`input min-h-[4.75rem] resize-none text-xs leading-5 ${
+                                    value={deliveryAddress}
+                                    onChange={(event) => updateDraftDeliveryAddress(event.target.value)}
+                                    rows={deliveryAddressRows(deliveryAddress)}
+                                    className={`input resize-none overflow-hidden text-xs leading-5 ${
                                       delivery.tone === "warning" ? "border-amber-300 bg-amber-50" : "bg-white"
                                     }`}
                                     placeholder="Delivery address"

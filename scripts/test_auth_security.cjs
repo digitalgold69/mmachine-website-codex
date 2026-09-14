@@ -128,7 +128,11 @@ assert.match(ordersClient, /deliverySummary\(draft\.customer\)/, "delivery detai
 assert.match(ordersClient, /function DeliveryModePill/, "quote cards must show a compact delivery or collection pill");
 assert.match(ordersClient, /<DeliveryModePill customer=\{quote\.customer\} \/>/, "delivery or collection pill must appear on dashboard cards without adding a new card row");
 assert.match(ordersClient, /setDraftDeliveryMode\(mode\)/, "invoice editor must let staff switch between delivery and collection");
-assert.match(ordersClient, /patchDraftCustomer\(\{ address: event\.target\.value, arrangeOwnDelivery: false \}\)/, "delivery address edits must update the saved customer fulfilment data");
+assert.match(ordersClient, /rememberedDeliveryAddresses/, "invoice editor must remember a delivery address when staff temporarily switch to collection");
+assert.match(ordersClient, /function updateDraftDeliveryAddress/, "delivery address edits must update the saved customer fulfilment data");
+assert.match(ordersClient, /rows=\{deliveryAddressRows\(deliveryAddress\)\}/, "delivery address box must grow with the entered address instead of scrolling internally");
+assert.match(ordersClient, /resize-none overflow-hidden text-xs leading-5/, "delivery address box must not show its own scrollbar");
+assert.match(ordersClient, /mt-auto flex items-end justify-between gap-3 pt-3/, "order card item and total row must sit consistently at the bottom of the card body");
 assert.doesNotMatch(ordersClient, /Add at least one invoice line and a price for every line before emailing it to the customer/, "invoice editor must not show the old invoice-readiness warning copy");
 assert.match(quoteRequestRoute, /function safeDashboardCustomer/, "quote request API must safely persist dashboard customer fulfilment edits");
 assert.match(quoteRequestRoute, /customer: body\.customer \? safeDashboardCustomer\(current\.customer, body\.customer\) : current\.customer/, "quote request PATCH must save customer delivery or collection edits");
