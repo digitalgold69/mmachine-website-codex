@@ -8,7 +8,7 @@ import { buildMiniWorkbookPdf } from "@/lib/mini-workbook-pdf";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_WORKBOOK_SIZE = 24 * 1024 * 1024;
+const MAX_WORKBOOK_SIZE = 100 * 1024 * 1024;
 
 function safeCatalogue(value: FormDataEntryValue | null): CatalogueUploadKind | null {
   return value === "mini" || value === "metals" ? value : null;
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Choose an Excel catalogue file first." }, { status: 400 });
     }
     if (file.size > MAX_WORKBOOK_SIZE) {
-      return NextResponse.json({ error: "Upload a catalogue workbook under 24 MB." }, { status: 400 });
+      return NextResponse.json({ error: "Upload a catalogue workbook under 100 MB." }, { status: 400 });
     }
     if (!workbookAllowed(file)) {
       return NextResponse.json({ error: "Upload an .xlsx, .xlsm or .xls workbook." }, { status: 400 });

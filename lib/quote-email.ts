@@ -571,7 +571,7 @@ export function buildCustomerInvoiceEmail(
 
           ${paymentMethodsBlock(quote, paymentSettings)}
           <div style="margin:24px 0 0;padding-top:18px;border-top:1px solid #eadfca;font-size:12px;line-height:1.6;color:#6b5a46">
-            <strong style="display:block;color:#0f3d2e">M-Machine / Craftgrange Limited</strong>
+            <strong style="display:block;color:#0f3d2e">Craftgrange Limited, Trading as M Machine</strong>
             Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br>
             Metals &amp; Engineering: 01325 381302 &nbsp; Mini Panels &amp; Accounts: 01325 381300<br>
             sales@m-machine.co.uk${companyNumber ? ` &nbsp; Company no. ${escapeHtml(companyNumber)}` : ""}

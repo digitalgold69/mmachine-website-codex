@@ -96,8 +96,13 @@ assert.match(ordersClient, /Shows BIC &amp; IBAN/, "export-order helper must use
 assert.doesNotMatch(ordersClient, /Shows BIC and IBAN on invoices/, "export-order helper must not use the long overflowing sentence");
 assert.match(ordersClient, /paymentSettingsRows\(paymentSettings, quote\.exportOrder === true\)/, "printed invoices must only show BIC and IBAN when export order is enabled");
 assert.match(ordersClient, /const printStateRows = \[[\s\S]+Paid by[\s\S]+paymentMethodLabel\(quote\.paymentMethod\)/, "printed paid invoices must show the payment method inside the invoice state block");
-assert.match(ordersClient, /<section className="mb-5 rounded-lg border border-racing\/10 bg-cream-dark p-3">[\s\S]+Invoice state[\s\S]+md:grid-cols-4/, "printed invoice state must be a compact status band above the customer details");
+assert.match(ordersClient, /<div className="mb-4 grid gap-3 md:grid-cols-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/, "printed invoice state, customer and delivery sections must share one compact row");
 assert.doesNotMatch(ordersClient, /mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, "printed invoice customer and delivery cards must not be stretched into an orphan third-card grid");
+assert.match(ordersClient, /src="\/brand\/m-machine-butterfly\.png"/, "printed invoice header must show the M Machine butterfly logo");
+assert.match(ordersClient, /<strong className="block text-racing">M Machine<\/strong>/, "printed invoice header must show M Machine rather than the legal company name");
+assert.match(ordersClient, /Craftgrange Limited, Trading as M Machine/, "printed invoice footer must use the requested trading-as wording");
+assert.match(ordersClient, /if \(quote\.customerEmailSentAt\) return "invoice_sent"/, "emailed invoices must display as invoice sent even if an old row says reviewing");
+assert.match(quoteRequestRoute, /function preserveEmailedInvoiceStatus/, "API must prevent emailed invoices from being saved back to reviewing");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(ordersClient, /Save & Close/, "invoice editor close action must save changed drafts before closing");
 assert.doesNotMatch(ordersClient, /Save changes/, "invoice editor must not keep a second overlapping save-changes footer action");

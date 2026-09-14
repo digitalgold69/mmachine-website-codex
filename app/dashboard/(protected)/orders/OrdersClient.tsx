@@ -27,6 +27,7 @@ import type {
 const GBP = "\u00a3";
 const PAGE_SIZE = 8;
 const TZ = "Europe/London";
+const TRADING_NAME = "Craftgrange Limited, Trading as M Machine";
 
 type TimeFilter = "all" | "today" | "7d" | "month" | "year";
 type AddLineCatalogue = "mini" | "metals";
@@ -459,6 +460,7 @@ function statusLabel(status: QuoteStatus) {
 
 function dashboardStatus(quote: QuoteRequest): QuoteStatus {
   if (isPaidQuote(quote)) return "paid";
+  if (quote.customerEmailSentAt) return "invoice_sent";
   if (quote.status === "pending_payment") return "pending_payment";
   if (quote.status === "invoice_sent" && !quote.customerEmailSentAt) return "pending_payment";
   return quote.status;
@@ -924,33 +926,35 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
   ];
   return (
     <div className="invoice-print-sheet">
-      <div className="mb-6 flex items-start justify-between gap-6 border-b border-racing/20 pb-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">M-Machine</div>
-          <h1 className="mt-1 font-display text-3xl text-racing">Invoice {quoteDisplayRef(quote)}</h1>
-          <p className="mt-1 text-sm text-ink-muted">Submitted {formatDateTime(quote.submittedAt)}</p>
+      <div className="mb-4 flex items-start justify-between gap-6 border-b border-racing/20 pb-3">
+        <div className="flex items-start gap-3">
+          <img src="/brand/m-machine-butterfly.png" alt="M Machine butterfly logo" className="h-12 w-12 object-contain" />
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">M-Machine</div>
+            <h1 className="mt-1 font-display text-3xl text-racing">Invoice {quoteDisplayRef(quote)}</h1>
+            <p className="mt-1 text-sm text-ink-muted">Submitted {formatDateTime(quote.submittedAt)}</p>
+          </div>
         </div>
         <div className="text-right text-sm text-ink-muted">
-          <strong className="block text-racing">Craftgrange Limited</strong>
+          <strong className="block text-racing">M Machine</strong>
           Unit 6 Forge Way<br />
           Cleveland Trading Estate<br />
           Darlington, DL1 2PJ
         </div>
       </div>
 
-      <section className="mb-5 rounded-lg border border-racing/10 bg-cream-dark p-3">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {printStateRows.map((row) => (
-            <div key={row.label} className="min-w-0">
-              <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
-              <dd className="mt-0.5 truncate font-semibold text-racing">{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <div className="mb-5 grid gap-4 sm:grid-cols-2">
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <section className="rounded-lg border border-racing/10 bg-cream-dark p-3">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
+          <dl className="grid grid-cols-2 gap-2">
+            {printStateRows.map((row) => (
+              <div key={row.label} className="min-w-0">
+                <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
+                <dd className="mt-0.5 truncate font-semibold text-racing">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
         <section className="rounded-lg border border-racing/10 p-3">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
           <div className="font-semibold text-racing">{quote.customer.name}</div>
@@ -1034,7 +1038,7 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
       </section>
 
       <div className="mt-4 border-t border-racing/10 pt-3 text-xs leading-5 text-ink-muted">
-        <strong className="block text-racing">M-Machine / Craftgrange Limited</strong>
+        <strong className="block text-racing">{TRADING_NAME}</strong>
         Unit 6 Forge Way, Cleveland Trading Estate, Darlington, County Durham, DL1 2PJ<br />
         Metals &amp; Engineering: 01325 381302 &nbsp; Mini Panels &amp; Accounts: 01325 381300<br />
         sales@m-machine.co.uk{invoiceCompanyNumber ? `  Company no. ${invoiceCompanyNumber}` : ""}
@@ -2111,7 +2115,7 @@ export default function OrdersClient({
                       <label className="label !mb-1 text-[11px]" htmlFor="status">Status</label>
                       <select
                         id="status"
-                        value={draft.status}
+                        value={dashboardStatus(draft)}
                         onChange={(e) => patchDraft({ status: e.target.value as QuoteStatus })}
                         className="input min-h-0 py-2 text-sm leading-tight"
                       >

@@ -59,6 +59,9 @@ type ManualDraft = {
   active: boolean;
 };
 
+const MAX_CATALOGUE_WORKBOOK_SIZE = 100 * 1024 * 1024;
+const MAX_CATALOGUE_WORKBOOK_MB = Math.round(MAX_CATALOGUE_WORKBOOK_SIZE / 1024 / 1024);
+
 const EMPTY_MANUAL_DRAFT: ManualDraft = {
   id: "",
   code: "",
@@ -139,8 +142,8 @@ export default function DashboardProductsPage() {
   function selectCatalogueFiles(kind: UploadCatalogue, files: File[]) {
     if (uploadAction?.tone === "loading") return;
     const file = files[0];
-    if (files.length !== 1 || !file?.size || file.size > 24 * 1024 * 1024 || !/\.(xlsx|xlsm|xls)$/i.test(file.name)) {
-      setUploadAction({ catalogue: kind, tone: "error", text: "Choose one Excel workbook under 24 MB." });
+    if (files.length !== 1 || !file?.size || file.size > MAX_CATALOGUE_WORKBOOK_SIZE || !/\.(xlsx|xlsm|xls)$/i.test(file.name)) {
+      setUploadAction({ catalogue: kind, tone: "error", text: `Choose one Excel workbook under ${MAX_CATALOGUE_WORKBOOK_MB} MB.` });
       return;
     }
     setUploadFiles((current) => ({ ...current, [kind]: file }));

@@ -354,7 +354,7 @@ assert.match(customerHtml, /Payment methods/);
 assert.match(customerHtml, /Card over the phone/);
 assert.match(customerHtml, /01325 381302/);
 assert.match(customerHtml, /BACS/);
-assert.match(customerHtml, /Craftgrange Limited/);
+assert.match(customerHtml, /Craftgrange Limited, Trading as M Machine/);
 assert.match(customerHtml, /12-34-56/);
 assert.doesNotMatch(customerHtml, /LOYDGB2L/);
 assert.doesNotMatch(customerHtml, /GB29 LOYD 6016 1331 9268 19/);

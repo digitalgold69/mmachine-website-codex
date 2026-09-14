@@ -39,5 +39,15 @@ assert.doesNotMatch(
   /body \*\s*\{\s*visibility: hidden !important;/,
   "dashboard print CSS must not leave hidden dashboard content consuming extra printed pages"
 );
+assert.match(
+  ordersClient,
+  /<div className="mb-4 grid gap-3 md:grid-cols-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/,
+  "invoice print summary should keep state, customer and delivery in one compact row"
+);
+assert.match(
+  ordersClient,
+  /src="\/brand\/m-machine-butterfly\.png"/,
+  "invoice print header should include the M Machine butterfly logo"
+);
 
 console.log("ok - dashboard invoice print mode prints one flowing invoice document");

@@ -138,6 +138,8 @@ async function main() {
   assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
   assert.match(uploadRoute, /buildMiniWorkbookPdf/, "Mini uploads must preserve the matching original PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
+  assert.match(uploadRoute, /100 \* 1024 \* 1024/, "Catalogue uploads must allow current owner workbooks larger than 24 MB");
+  assert.match(dashboardProductsPage, /MAX_CATALOGUE_WORKBOOK_MB/, "Dashboard upload copy must follow the server-side workbook size limit");
 
   const metalsCatalogueClient = read("app/(site)/catalogue/metals/MetalsCatalogueClient.tsx");
   assert.match(metalsCatalogueClient, /\/api\/catalogue\/metals\/pdf\?v=/, "Metals catalogue downloads must use the dynamic uploaded PDF route");

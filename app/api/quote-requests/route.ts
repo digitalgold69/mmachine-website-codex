@@ -254,6 +254,17 @@ function safeStatus(value: unknown): QuoteStatus {
   return "new";
 }
 
+function preserveEmailedInvoiceStatus(quote: QuoteRequest): QuoteRequest {
+  if (!quote.customerEmailSentAt) return quote;
+  if (quote.status === "paid" || quote.status === "closed") return quote;
+  return {
+    ...quote,
+    status: "invoice_sent",
+    quotedAt: quote.quotedAt || quote.customerEmailSentAt,
+    invoiceSentAt: quote.invoiceSentAt || quote.customerEmailSentAt,
+  };
+}
+
 function safeRefundBucket(value: unknown): QuoteAccountingBucket | null {
   return ACCOUNTING_BUCKETS.find((bucket) => bucket === value) || null;
 }
@@ -881,6 +892,8 @@ export async function PATCH(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
+    next = preserveEmailedInvoiceStatus(next);
+
     if (Array.isArray(body.items) && body.items.length > 0) {
       if (body.items.length > MAX_ORDER_LINES) {
         return NextResponse.json({ error: "Too many invoice lines" }, { status: 400 });
@@ -1013,6 +1026,8 @@ export async function PATCH(req: Request) {
     if (next.websiteInvoiceNumber) {
       next = await ensureWebsiteInvoiceNumber(next);
     }
+
+    next = preserveEmailedInvoiceStatus(next);
 
     const saved = await saveQuoteRequest(next);
     return NextResponse.json({ ok: true, quote: saved, customerEmailSent });
