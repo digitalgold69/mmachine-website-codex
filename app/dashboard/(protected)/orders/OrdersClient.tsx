@@ -88,6 +88,13 @@ type PendingMetalLine = {
   error: string;
 };
 
+type MetalLineDraft = {
+  inputUnit: MetalDimensionUnit;
+  inputLength: string;
+  inputWidth: string;
+  error: string;
+};
+
 type RefundDraft = {
   open: boolean;
   reason: string;
@@ -358,6 +365,95 @@ function metalCalculationMode(product: CatalogueSearchProduct) {
 function metalAddDefaultUnit(product: CatalogueSearchProduct) {
   const config = getMetalOrderConfig(product);
   return normaliseMetalDimensionUnit(config.mode === "length" ? config.defaultInputUnit : "metric");
+}
+
+const MM_PER_INCH_FOR_INPUTS = 25.4;
+const MM_PER_FOOT_FOR_AREA = 304.8;
+
+function decimalInput(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  const rounded = Math.round((value + Number.EPSILON) * 1000) / 1000;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function convertDimensionInput(value: string, fromUnit: MetalDimensionUnit, toUnit: MetalDimensionUnit) {
+  if (fromUnit === toUnit || !value.trim()) return value;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return value;
+  const mm = fromUnit === "imperial" ? parsed * MM_PER_INCH_FOR_INPUTS : parsed;
+  return decimalInput(toUnit === "imperial" ? mm / MM_PER_INCH_FOR_INPUTS : mm);
+}
+
+function metalLineDraftFromItem(item: QuoteItem): MetalLineDraft {
+  const dimensions = item.metalDimensions;
+  const inputUnit = normaliseMetalDimensionUnit(dimensions?.inputUnit);
+  const inputLength = typeof dimensions?.inputLength === "number"
+    ? decimalInput(dimensions.inputLength)
+    : typeof dimensions?.lengthMm === "number"
+      ? decimalInput(inputUnit === "imperial" ? dimensions.lengthMm / MM_PER_INCH_FOR_INPUTS : dimensions.lengthMm)
+      : "";
+  const inputWidth = typeof dimensions?.inputWidth === "number"
+    ? decimalInput(dimensions.inputWidth)
+    : typeof dimensions?.widthMm === "number"
+      ? decimalInput(inputUnit === "imperial" ? dimensions.widthMm / MM_PER_INCH_FOR_INPUTS : dimensions.widthMm)
+      : "";
+
+  return { inputUnit, inputLength, inputWidth, error: "" };
+}
+
+function derivedMetalBasePriceExVat(item: QuoteItem) {
+  const currentPrice = normaliseCataloguePrice(item.unitPriceExVat);
+  if (currentPrice === null) return null;
+
+  const dimensions = item.metalDimensions;
+  if (!dimensions) return currentPrice;
+
+  const config = getMetalOrderConfig({
+    ...item,
+    unit: dimensions.pricedFromUnit || item.unit || "",
+    stockSize: dimensions.stockSize || item.stockSize || "",
+    priceExVat: currentPrice,
+  });
+
+  let multiplier: number | null = null;
+  if (dimensions.mode === "length" && config.mode === "length" && typeof dimensions.lengthMm === "number" && typeof config.unitLengthMm === "number") {
+    multiplier = dimensions.lengthMm / config.unitLengthMm;
+  }
+
+  if (dimensions.mode === "sheet" && config.mode === "sheet" && typeof dimensions.lengthMm === "number" && typeof dimensions.widthMm === "number" && typeof config.unitAreaSqFt === "number") {
+    const areaSqFt = (dimensions.lengthMm / MM_PER_FOOT_FOR_AREA) * (dimensions.widthMm / MM_PER_FOOT_FOR_AREA);
+    multiplier = areaSqFt / config.unitAreaSqFt;
+  }
+
+  if (dimensions.mode === "fixed" && config.mode === "fixed" && typeof config.fixedLengthMm === "number" && typeof config.unitLengthMm === "number") {
+    multiplier = config.fixedLengthMm / config.unitLengthMm;
+  }
+
+  return multiplier && multiplier > 0 ? currencyPrice(currentPrice / multiplier) : currentPrice;
+}
+
+function metalProductForInvoiceItem(item: QuoteItem): CatalogueSearchProduct {
+  const priceExVat = derivedMetalBasePriceExVat(item);
+  return {
+    id: item.productId,
+    code: item.code || "",
+    name: item.description,
+    description: item.description,
+    form: item.shape,
+    metal: item.metal,
+    spec: item.spec,
+    size: item.size,
+    unit: item.metalDimensions?.pricedFromUnit || item.unit || "",
+    stockSize: item.metalDimensions?.stockSize || item.stockSize || "",
+    priceExVat,
+    priceIncVat: incVatFromExVat(priceExVat),
+  };
+}
+
+function editableMetalOrderConfig(item: QuoteItem) {
+  if (item.catalogue !== "metals" || isManualLine(item)) return null;
+  const config = getMetalOrderConfig(metalProductForInvoiceItem(item));
+  return config.mode === "length" || config.mode === "sheet" ? config : null;
 }
 
 function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
@@ -1182,6 +1278,7 @@ export default function OrdersClient({
   const [addLineError, setAddLineError] = useState("");
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [pendingMetalLine, setPendingMetalLine] = useState<PendingMetalLine | null>(null);
+  const [metalLineDrafts, setMetalLineDrafts] = useState<Record<string, MetalLineDraft>>({});
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(initialPaymentSettings);
@@ -1301,6 +1398,8 @@ export default function OrdersClient({
     activeQuoteIdRef.current = quote.id;
     setSelectedId(quote.id);
     setDraft(cloneQuote(quote));
+    setMetalLineDrafts({});
+    setPendingMetalLine(null);
     setMessage("");
     setActionNotice(null);
     if (syncUrl) replaceQuoteParam(quote.id);
@@ -1311,6 +1410,8 @@ export default function OrdersClient({
     activeQuoteIdRef.current = "";
     setSelectedId("");
     setDraft(null);
+    setMetalLineDrafts({});
+    setPendingMetalLine(null);
     setActionNotice(null);
     replaceQuoteParam(null);
   }, [replaceQuoteParam]);
@@ -1583,6 +1684,151 @@ export default function OrdersClient({
     });
   }
 
+  function currentMetalLineDraft(item: QuoteItem) {
+    return metalLineDrafts[item.key] ?? metalLineDraftFromItem(item);
+  }
+
+  function updateMetalLineMeasurement(index: number, patch: Partial<MetalLineDraft>) {
+    if (!draft) return;
+    const item = draft.items[index];
+    if (!item || !editableMetalOrderConfig(item)) return;
+
+    const nextDraft = {
+      ...currentMetalLineDraft(item),
+      ...patch,
+      error: "",
+    };
+    const calculation = calculateMetalOrderItem(
+      metalProductForInvoiceItem(item),
+      {
+        inputUnit: nextDraft.inputUnit,
+        inputLength: nextDraft.inputLength,
+        inputWidth: nextDraft.inputWidth,
+      },
+      clampQty(item.qty)
+    );
+
+    if (!calculation.ok) {
+      setMetalLineDrafts((current) => ({
+        ...current,
+        [item.key]: { ...nextDraft, error: calculation.error },
+      }));
+      return;
+    }
+
+    setMetalLineDrafts((current) => ({
+      ...current,
+      [item.key]: nextDraft,
+    }));
+    patchItem(index, {
+      unit: calculation.unit,
+      unitPriceExVat: currencyPrice(calculation.unitPriceExVat),
+      unitPriceIncVat: currencyPrice(calculation.unitPriceIncVat),
+      metalDimensions: calculation.metalDimensions,
+    });
+    setActionNotice(null);
+  }
+
+  function renderMetalLineMeasurementEditor(item: QuoteItem, index: number) {
+    const config = editableMetalOrderConfig(item);
+    if (!config) return null;
+
+    const lineDraft = currentMetalLineDraft(item);
+    const unitLabel = metalDimensionUnitLabel(lineDraft.inputUnit);
+    const dimensionStep = lineDraft.inputUnit === "imperial" ? "0.001" : "0.1";
+    const maxLengthMm = "maxLengthMm" in config && typeof config.maxLengthMm === "number"
+      ? config.maxLengthMm
+      : undefined;
+    const maxWidthMm = config.mode === "sheet" && "maxWidthMm" in config && typeof config.maxWidthMm === "number"
+      ? config.maxWidthMm
+      : undefined;
+    const lengthMax = typeof maxLengthMm === "number"
+      ? lineDraft.inputUnit === "imperial"
+        ? maxLengthMm / MM_PER_INCH_FOR_INPUTS
+        : maxLengthMm
+      : undefined;
+    const widthMax = config.mode === "sheet" && typeof maxWidthMm === "number"
+      ? lineDraft.inputUnit === "imperial"
+        ? maxWidthMm / MM_PER_INCH_FOR_INPUTS
+        : maxWidthMm
+      : undefined;
+    const calculation = calculateMetalOrderItem(
+      metalProductForInvoiceItem(item),
+      {
+        inputUnit: lineDraft.inputUnit,
+        inputLength: lineDraft.inputLength,
+        inputWidth: lineDraft.inputWidth,
+      },
+      clampQty(item.qty)
+    );
+    const previewText = calculation.ok
+      ? `${calculation.metalDimensions.display} - ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
+      : lineDraft.error || calculation.error;
+    const maxText = config.mode === "length" && typeof maxLengthMm === "number"
+      ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, lineDraft.inputUnit)}.`
+      : config.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
+        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, lineDraft.inputUnit)} x ${formatMetalDimensionForUnit(maxWidthMm, lineDraft.inputUnit)}.`
+        : "";
+
+    return (
+      <div className="mt-2 rounded-md border border-racing/10 bg-cream-dark p-3 text-sm">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Measurements</div>
+            <div className="text-sm font-semibold text-racing">Edit customer measurements and price</div>
+          </div>
+          <DimensionUnitToggle
+            value={lineDraft.inputUnit}
+            onChange={(unit) =>
+              updateMetalLineMeasurement(index, {
+                inputUnit: unit,
+                inputLength: convertDimensionInput(lineDraft.inputLength, lineDraft.inputUnit, unit),
+                inputWidth: convertDimensionInput(lineDraft.inputWidth, lineDraft.inputUnit, unit),
+              })
+            }
+          />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(12rem,auto)] xl:items-end">
+          <div>
+            <label className="label !mb-1 text-[11px]" htmlFor={`line-length-${draft?.id}-${index}`}>Length ({unitLabel})</label>
+            <input
+              id={`line-length-${draft?.id}-${index}`}
+              type="number"
+              min="0"
+              max={lengthMax}
+              step={dimensionStep}
+              value={lineDraft.inputLength}
+              onChange={(event) => updateMetalLineMeasurement(index, { inputLength: event.target.value })}
+              className="input min-h-0 py-2 text-sm"
+              placeholder={lineDraft.inputUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
+            />
+          </div>
+          {config.mode === "sheet" && (
+            <div>
+              <label className="label !mb-1 text-[11px]" htmlFor={`line-width-${draft?.id}-${index}`}>Width ({unitLabel})</label>
+              <input
+                id={`line-width-${draft?.id}-${index}`}
+                type="number"
+                min="0"
+                max={widthMax}
+                step={dimensionStep}
+                value={lineDraft.inputWidth}
+                onChange={(event) => updateMetalLineMeasurement(index, { inputWidth: event.target.value })}
+                className="input min-h-0 py-2 text-sm"
+                placeholder={lineDraft.inputUnit === "imperial" ? "e.g. 12" : "e.g. 300"}
+              />
+            </div>
+          )}
+          <div className={config.mode === "sheet" ? "rounded-md border border-racing/10 bg-white px-3 py-2" : "rounded-md border border-racing/10 bg-white px-3 py-2 sm:col-span-2 xl:col-span-1"}>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">Recalculated unit price</div>
+            <div className={`mt-0.5 text-sm font-semibold ${calculation.ok ? "text-racing" : "text-amber-800"}`}>{previewText}</div>
+          </div>
+        </div>
+        {maxText && <div className="mt-2 text-xs text-ink-muted">{maxText}</div>}
+      </div>
+    );
+  }
+
   function openPaymentSettings() {
     setPaymentSettingsDraft(paymentSettings);
     setPaymentSettingsError("");
@@ -1775,16 +2021,16 @@ export default function OrdersClient({
       : undefined;
     const calculation = pendingMetalCalculation;
     const previewText = calculation?.ok
-      ? `${calculation.unit} · ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
+      ? `${calculation.unit} - ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
       : pendingMetalLine.error || calculation?.error || "Enter the required measurements.";
     const maxText = config?.mode === "length" && typeof maxLengthMm === "number"
       ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)}.`
       : config?.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
-        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} × ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
+        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} x ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
         : "";
 
     return (
-      <div className="border-t border-racing/10 bg-cream-dark px-3 py-2 text-sm">
+      <div className="border-t border-racing/10 bg-cream-dark px-4 py-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Measurements for this line</div>
@@ -1799,7 +2045,7 @@ export default function OrdersClient({
             }
           />
         </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[64px_1fr_1fr_auto] lg:items-end">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-[72px_minmax(11rem,1fr)_minmax(11rem,1fr)_auto] xl:items-end">
           <div>
             <label className="label !mb-1 text-[11px]" htmlFor={`metal-line-qty-${product.id}`}>Qty</label>
             <input
@@ -1855,7 +2101,7 @@ export default function OrdersClient({
               />
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" onClick={confirmPendingMetalLine} className="btn-primary px-3 py-2 text-sm">
               Add measured line
             </button>
@@ -2420,7 +2666,7 @@ export default function OrdersClient({
               role="dialog"
               aria-modal="true"
               aria-labelledby="invoice-editor-title"
-              className="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:h-[calc(100vh-2.5rem)]"
+              className="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-[92rem] flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:h-[calc(100vh-2.5rem)]"
             >
               <div className="shrink-0 border-b border-racing/10 px-4 py-3 sm:px-5">
                 <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
@@ -2477,7 +2723,7 @@ export default function OrdersClient({
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
                   <div className="min-w-0 space-y-4">
                     {hasMiniItems(draft) && (
                       <section className="rounded-lg border border-racing/10 p-3 text-sm">
@@ -2632,6 +2878,7 @@ export default function OrdersClient({
                                         </span>
                                       )}
                                     </div>
+                                    {renderMetalLineMeasurementEditor(item, index)}
                                   </div>
                                 )}
                               </div>
@@ -2702,7 +2949,7 @@ export default function OrdersClient({
 
                       {addLineOpen && (
                         <div className="mt-3 space-y-3 border-t border-racing/10 pt-3">
-                          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+                          <div className="grid gap-3 md:grid-cols-[190px_minmax(0,1fr)]">
                             <div>
                               <label className="label" htmlFor="add-line-catalogue">Part type</label>
                               <select
@@ -2751,7 +2998,7 @@ export default function OrdersClient({
                                 </button>
                               )}
                             </div>
-                            <div className="max-h-56 overflow-y-auto divide-y divide-racing/10">
+                            <div className="max-h-[34rem] overflow-y-auto divide-y divide-racing/10">
                               {addLineResults.map((product) => (
                                 (() => {
                                   const activeNotice = addLineNotice?.catalogue === addLineCatalogue && addLineNotice.productId === product.id
@@ -2763,7 +3010,7 @@ export default function OrdersClient({
                                       <button
                                         type="button"
                                         onClick={() => addCatalogueLine(product)}
-                                        className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
+                                        className="grid w-full gap-3 px-4 py-3 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem] sm:items-center"
                                         aria-label={`Add ${catalogueResultTitle(product, addLineCatalogue)} to invoice`}
                                       >
                                         <span className="min-w-0">

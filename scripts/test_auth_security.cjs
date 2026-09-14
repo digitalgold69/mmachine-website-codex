@@ -114,6 +114,12 @@ assert.match(quoteRequestRoute, /status: 409/, "stale invoice saves must return 
 assert.match(ordersClient, /calculateMetalOrderItem/, "owner-added metal lines must use the shared metal measurement calculator");
 assert.match(ordersClient, /Measurements for this line/, "owner-added metal lines must ask for the required dimensions next to the selected row");
 assert.match(ordersClient, /renderPendingMetalLinePanel\(product\)/, "owner-added metal dimension inputs must render underneath the selected search result");
+assert.match(ordersClient, /max-w-\[92rem\]/, "invoice editor modal must use the available screen width for line editing");
+assert.match(ordersClient, /max-h-\[34rem\]/, "add-line catalogue results must have enough height for metal measurement entry");
+assert.match(ordersClient, /function updateMetalLineMeasurement/, "existing metal invoice lines must expose measurement edits");
+assert.match(ordersClient, /derivedMetalBasePriceExVat/, "measurement edits must derive the original catalogue price before recalculating");
+assert.match(ordersClient, /renderMetalLineMeasurementEditor\(item, index\)/, "metal measurement controls must render directly underneath the edited invoice row");
+assert.match(ordersClient, /Recalculated unit price/, "metal measurement edits must show the recalculated unit price");
 assert.match(ordersClient, /Remove line/, "invoice editor must let the owner remove invoice lines");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(ordersClient, /Save & Close/, "invoice editor close action must save changed drafts before closing");
