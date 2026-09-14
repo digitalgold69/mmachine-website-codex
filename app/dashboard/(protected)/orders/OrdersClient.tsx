@@ -95,6 +95,11 @@ type MetalLineDraft = {
   error: string;
 };
 
+type DeliverySummary = {
+  tone: "normal" | "warning";
+  text: string;
+};
+
 type RefundDraft = {
   open: boolean;
   reason: string;
@@ -454,6 +459,13 @@ function editableMetalOrderConfig(item: QuoteItem) {
   if (item.catalogue !== "metals" || isManualLine(item)) return null;
   const config = getMetalOrderConfig(metalProductForInvoiceItem(item));
   return config.mode === "length" || config.mode === "sheet" ? config : null;
+}
+
+function deliverySummary(customer: QuoteRequest["customer"]): DeliverySummary {
+  const deliveryAddress = quoteDeliveryAddress(customer);
+  if (deliveryAddress) return { tone: "normal", text: deliveryAddress };
+  if (quoteCustomerWillArrangeDelivery(customer)) return { tone: "normal", text: "Customer will arrange delivery / collection." };
+  return { tone: "warning", text: "Delivery address was not supplied. Contact the customer before arranging carriage." };
 }
 
 function catalogueResultTitle(product: CatalogueSearchProduct, catalogue: AddLineCatalogue) {
@@ -1279,6 +1291,7 @@ export default function OrdersClient({
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [pendingMetalLine, setPendingMetalLine] = useState<PendingMetalLine | null>(null);
   const [metalLineDrafts, setMetalLineDrafts] = useState<Record<string, MetalLineDraft>>({});
+  const [openMetalMeasurementKeys, setOpenMetalMeasurementKeys] = useState<Record<string, boolean>>({});
   const [manualLine, setManualLine] = useState<ManualLineDraft>(BLANK_MANUAL_LINE);
   const [refundDraft, setRefundDraft] = useState<RefundDraft>(() => blankRefundDraft());
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(initialPaymentSettings);
@@ -1399,6 +1412,7 @@ export default function OrdersClient({
     setSelectedId(quote.id);
     setDraft(cloneQuote(quote));
     setMetalLineDrafts({});
+    setOpenMetalMeasurementKeys({});
     setPendingMetalLine(null);
     setMessage("");
     setActionNotice(null);
@@ -1411,6 +1425,7 @@ export default function OrdersClient({
     setSelectedId("");
     setDraft(null);
     setMetalLineDrafts({});
+    setOpenMetalMeasurementKeys({});
     setPendingMetalLine(null);
     setActionNotice(null);
     replaceQuoteParam(null);
@@ -1501,7 +1516,7 @@ export default function OrdersClient({
           catalogue: addLineCatalogue,
           q: addLineQuery.trim(),
           offset: "0",
-          limit: "8",
+          limit: "30",
         });
         if (addLineCatalogue === "metals") params.set("category", "all");
         const response = await fetch(`/api/products?${params}`, { signal: controller.signal });
@@ -1688,6 +1703,13 @@ export default function OrdersClient({
     return metalLineDrafts[item.key] ?? metalLineDraftFromItem(item);
   }
 
+  function toggleMetalMeasurementEditor(key: string) {
+    setOpenMetalMeasurementKeys((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  }
+
   function updateMetalLineMeasurement(index: number, patch: Partial<MetalLineDraft>) {
     if (!draft) return;
     const item = draft.items[index];
@@ -1731,7 +1753,7 @@ export default function OrdersClient({
 
   function renderMetalLineMeasurementEditor(item: QuoteItem, index: number) {
     const config = editableMetalOrderConfig(item);
-    if (!config) return null;
+    if (!config || !openMetalMeasurementKeys[item.key]) return null;
 
     const lineDraft = currentMetalLineDraft(item);
     const unitLabel = metalDimensionUnitLabel(lineDraft.inputUnit);
@@ -1764,31 +1786,13 @@ export default function OrdersClient({
     const previewText = calculation.ok
       ? `${calculation.metalDimensions.display} - ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
       : lineDraft.error || calculation.error;
-    const maxText = config.mode === "length" && typeof maxLengthMm === "number"
-      ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, lineDraft.inputUnit)}.`
-      : config.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
-        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, lineDraft.inputUnit)} x ${formatMetalDimensionForUnit(maxWidthMm, lineDraft.inputUnit)}.`
-        : "";
+    const editorGridClass = config.mode === "sheet"
+      ? "grid gap-2 md:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(13rem,1.25fr)_auto_auto] md:items-end"
+      : "grid gap-2 md:grid-cols-[minmax(9rem,1fr)_minmax(15rem,1.4fr)_auto_auto] md:items-end";
 
     return (
-      <div className="mt-2 rounded-md border border-racing/10 bg-cream-dark p-3 text-sm">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Measurements</div>
-            <div className="text-sm font-semibold text-racing">Edit customer measurements and price</div>
-          </div>
-          <DimensionUnitToggle
-            value={lineDraft.inputUnit}
-            onChange={(unit) =>
-              updateMetalLineMeasurement(index, {
-                inputUnit: unit,
-                inputLength: convertDimensionInput(lineDraft.inputLength, lineDraft.inputUnit, unit),
-                inputWidth: convertDimensionInput(lineDraft.inputWidth, lineDraft.inputUnit, unit),
-              })
-            }
-          />
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(12rem,auto)] xl:items-end">
+      <div className="rounded-md border border-racing/10 bg-cream-dark px-3 py-2 text-sm">
+        <div className={editorGridClass}>
           <div>
             <label className="label !mb-1 text-[11px]" htmlFor={`line-length-${draft?.id}-${index}`}>Length ({unitLabel})</label>
             <input
@@ -1819,12 +1823,28 @@ export default function OrdersClient({
               />
             </div>
           )}
-          <div className={config.mode === "sheet" ? "rounded-md border border-racing/10 bg-white px-3 py-2" : "rounded-md border border-racing/10 bg-white px-3 py-2 sm:col-span-2 xl:col-span-1"}>
+          <div className="rounded-md border border-racing/10 bg-white px-3 py-2">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">Recalculated unit price</div>
-            <div className={`mt-0.5 text-sm font-semibold ${calculation.ok ? "text-racing" : "text-amber-800"}`}>{previewText}</div>
+            <div className={`mt-0.5 whitespace-nowrap text-sm font-semibold ${calculation.ok ? "text-racing" : "text-amber-800"}`}>{previewText}</div>
           </div>
+          <DimensionUnitToggle
+            value={lineDraft.inputUnit}
+            onChange={(unit) =>
+              updateMetalLineMeasurement(index, {
+                inputUnit: unit,
+                inputLength: convertDimensionInput(lineDraft.inputLength, lineDraft.inputUnit, unit),
+                inputWidth: convertDimensionInput(lineDraft.inputWidth, lineDraft.inputUnit, unit),
+              })
+            }
+          />
+          <button
+            type="button"
+            onClick={() => toggleMetalMeasurementEditor(item.key)}
+            className="btn-secondary min-h-0 px-3 py-2 text-xs"
+          >
+            Done
+          </button>
         </div>
-        {maxText && <div className="mt-2 text-xs text-ink-muted">{maxText}</div>}
       </div>
     );
   }
@@ -2023,12 +2043,6 @@ export default function OrdersClient({
     const previewText = calculation?.ok
       ? `${calculation.unit} - ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
       : pendingMetalLine.error || calculation?.error || "Enter the required measurements.";
-    const maxText = config?.mode === "length" && typeof maxLengthMm === "number"
-      ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)}.`
-      : config?.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
-        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} x ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
-        : "";
-
     return (
       <div className="border-t border-racing/10 bg-cream-dark px-4 py-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2117,7 +2131,6 @@ export default function OrdersClient({
         <div className={`mt-1 text-xs font-semibold ${calculation?.ok ? "text-racing" : "text-amber-800"}`}>
           {previewText}
         </div>
-        {maxText && <div className="mt-1 text-xs text-ink-muted">{maxText}</div>}
       </div>
     );
   }
@@ -2741,24 +2754,6 @@ export default function OrdersClient({
                       </section>
                     )}
 
-                    <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
-                      <div className="label !mb-1">Delivery</div>
-                      {(() => {
-                        const deliveryAddress = quoteDeliveryAddress(draft.customer);
-                        if (deliveryAddress) {
-                          return <p className="whitespace-pre-wrap">{deliveryAddress}</p>;
-                        }
-                        if (quoteCustomerWillArrangeDelivery(draft.customer)) {
-                          return <p>Customer will arrange delivery / collection.</p>;
-                        }
-                        return (
-                          <p className="font-semibold text-amber-800">
-                            Delivery address was not supplied. Contact the customer before arranging carriage.
-                          </p>
-                        );
-                      })()}
-                    </section>
-
                     {quoteKind(draft) === "custom" && (
                       <section className="rounded-lg border border-racing/10 p-3">
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -2836,6 +2831,8 @@ export default function OrdersClient({
                       <div className="divide-y divide-racing/10">
                         {draft.items.map((item, index) => {
                           const manualLine = isManualLine(item);
+                          const canEditMetalMeasurements = Boolean(editableMetalOrderConfig(item));
+                          const metalMeasurementsOpen = Boolean(openMetalMeasurementKeys[item.key]);
                           return (
                             <div key={item.key} className="grid gap-3 p-3 lg:grid-cols-[72px_minmax(0,1fr)_92px_132px] lg:items-start">
                               <div>
@@ -2877,8 +2874,17 @@ export default function OrdersClient({
                                           {invoiceLineDimension(item)}
                                         </span>
                                       )}
+                                      {canEditMetalMeasurements && (
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleMetalMeasurementEditor(item.key)}
+                                          aria-expanded={metalMeasurementsOpen}
+                                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${metalMeasurementsOpen ? "border-racing bg-racing text-cream" : "border-racing/20 bg-white text-racing hover:bg-cream-dark"}`}
+                                        >
+                                          {metalMeasurementsOpen ? "Hide edit" : "Edit"}
+                                        </button>
+                                      )}
                                     </div>
-                                    {renderMetalLineMeasurementEditor(item, index)}
                                   </div>
                                 )}
                               </div>
@@ -2921,6 +2927,11 @@ export default function OrdersClient({
                                   Remove line
                                 </button>
                               </div>
+                              {metalMeasurementsOpen && (
+                                <div className="lg:col-span-4">
+                                  {renderMetalLineMeasurementEditor(item, index)}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -2998,7 +3009,7 @@ export default function OrdersClient({
                                 </button>
                               )}
                             </div>
-                            <div className="max-h-[34rem] overflow-y-auto divide-y divide-racing/10">
+                            <div className="max-h-[22rem] overflow-y-auto overscroll-contain divide-y divide-racing/10">
                               {addLineResults.map((product) => (
                                 (() => {
                                   const activeNotice = addLineNotice?.catalogue === addLineCatalogue && addLineNotice.productId === product.id
@@ -3137,6 +3148,20 @@ export default function OrdersClient({
                             </strong>
                           </div>
                         )}
+                        {(() => {
+                          const delivery = deliverySummary(draft.customer);
+                          return (
+                            <div className="mt-3 border-t border-racing/10 pt-3">
+                              <div className="mb-1 flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Delivery</span>
+                                {delivery.tone === "warning" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">Check</span>}
+                              </div>
+                              <p className={`whitespace-pre-wrap text-xs leading-5 ${delivery.tone === "warning" ? "font-semibold text-amber-800" : "text-ink"}`}>
+                                {delivery.text}
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </section>
 
