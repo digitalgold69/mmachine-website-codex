@@ -999,28 +999,28 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         </div>
       </div>
 
-      <div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-3">
-        <section className="rounded-lg border border-racing/10 bg-cream-dark p-3">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
-          <dl className="grid grid-cols-2 gap-2">
+      <div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-2">
+        <section className="invoice-print-summary-card min-w-0 overflow-hidden rounded-lg border border-racing/10 bg-cream-dark p-2 text-xs leading-tight">
+          <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Invoice state</h2>
+          <dl className="grid grid-cols-2 gap-x-2 gap-y-1">
             {printStateRows.map((row) => (
               <div key={row.label} className="min-w-0">
-                <dt className="text-[11px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
+                <dt className="text-[9px] uppercase tracking-wider text-ink-muted">{row.label}</dt>
                 <dd className="mt-0.5 truncate font-semibold text-racing">{row.value}</dd>
               </div>
             ))}
           </dl>
         </section>
-        <section className="rounded-lg border border-racing/10 p-3">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
+        <section className="invoice-print-summary-card min-w-0 overflow-hidden rounded-lg border border-racing/10 p-2 text-xs leading-tight">
+          <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Customer</h2>
           <div className="font-semibold text-racing">{quote.customer.name}</div>
           {quote.customer.company && <div>{quote.customer.company}</div>}
-          <div>{quote.customer.email}</div>
+          <div className="break-all">{quote.customer.email}</div>
           <div>{quote.customer.phone}</div>
         </section>
-        <section className="rounded-lg border border-racing/10 p-3">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-muted">Delivery</h2>
-          <div className="whitespace-pre-wrap">
+        <section className="invoice-print-summary-card min-w-0 overflow-hidden rounded-lg border border-racing/10 p-2 text-xs leading-tight">
+          <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Delivery</h2>
+          <div className="whitespace-pre-wrap break-words">
             {quoteDeliveryAddress(quote.customer) ||
               (quoteCustomerWillArrangeDelivery(quote.customer)
                 ? "Customer will arrange delivery / collection."
@@ -1736,6 +1736,131 @@ export default function OrdersClient({
       inputWidth: pendingMetalLine.inputWidth,
       error: "",
     });
+  }
+
+  function renderPendingMetalLinePanel(product: CatalogueSearchProduct) {
+    if (!pendingMetalLine || pendingMetalLine.product.id !== product.id) return null;
+
+    const config = pendingMetalConfig;
+    const unitLabel = metalDimensionUnitLabel(pendingMetalLine.inputUnit);
+    const dimensionStep = pendingMetalLine.inputUnit === "imperial" ? "0.001" : "0.1";
+    const maxLengthMm = config && "maxLengthMm" in config && typeof config.maxLengthMm === "number"
+      ? config.maxLengthMm
+      : undefined;
+    const maxWidthMm = config && "maxWidthMm" in config && typeof config.maxWidthMm === "number"
+      ? config.maxWidthMm
+      : undefined;
+    const lengthMax = typeof maxLengthMm === "number"
+      ? pendingMetalLine.inputUnit === "imperial"
+        ? maxLengthMm / 25.4
+        : maxLengthMm
+      : undefined;
+    const widthMax = config?.mode === "sheet" && typeof maxWidthMm === "number"
+      ? pendingMetalLine.inputUnit === "imperial"
+        ? maxWidthMm / 25.4
+        : maxWidthMm
+      : undefined;
+    const calculation = pendingMetalCalculation;
+    const previewText = calculation?.ok
+      ? `${calculation.unit} · ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
+      : pendingMetalLine.error || calculation?.error || "Enter the required measurements.";
+    const maxText = config?.mode === "length" && typeof maxLengthMm === "number"
+      ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)}.`
+      : config?.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
+        ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} × ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
+        : "";
+
+    return (
+      <div className="border-t border-racing/10 bg-cream-dark px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Measurements for this line</div>
+            <div className="truncate font-semibold text-racing">{catalogueResultTitle(product, "metals")}</div>
+          </div>
+          <DimensionUnitToggle
+            value={pendingMetalLine.inputUnit}
+            onChange={(unit) =>
+              setPendingMetalLine((current) =>
+                current ? { ...current, inputUnit: unit, error: "" } : current
+              )
+            }
+          />
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[64px_1fr_1fr_auto] lg:items-end">
+          <div>
+            <label className="label !mb-1 text-[11px]" htmlFor={`metal-line-qty-${product.id}`}>Qty</label>
+            <input
+              id={`metal-line-qty-${product.id}`}
+              value={pendingMetalLine.qty}
+              onChange={(event) =>
+                setPendingMetalLine((current) =>
+                  current ? { ...current, qty: event.target.value, error: "" } : current
+                )
+              }
+              className="input min-h-0 py-2 text-center text-sm font-semibold text-racing"
+              inputMode="numeric"
+              pattern="[0-9]*"
+            />
+          </div>
+          {pendingMetalNeedsDimensions && (
+            <div>
+              <label className="label !mb-1 text-[11px]" htmlFor={`metal-line-length-${product.id}`}>Length ({unitLabel})</label>
+              <input
+                id={`metal-line-length-${product.id}`}
+                type="number"
+                min="0"
+                max={lengthMax}
+                step={dimensionStep}
+                value={pendingMetalLine.inputLength}
+                onChange={(event) =>
+                  setPendingMetalLine((current) =>
+                    current ? { ...current, inputLength: event.target.value, error: "" } : current
+                  )
+                }
+                className="input min-h-0 py-2 text-sm"
+                placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
+              />
+            </div>
+          )}
+          {config?.mode === "sheet" && (
+            <div>
+              <label className="label !mb-1 text-[11px]" htmlFor={`metal-line-width-${product.id}`}>Width ({unitLabel})</label>
+              <input
+                id={`metal-line-width-${product.id}`}
+                type="number"
+                min="0"
+                max={widthMax}
+                step={dimensionStep}
+                value={pendingMetalLine.inputWidth}
+                onChange={(event) =>
+                  setPendingMetalLine((current) =>
+                    current ? { ...current, inputWidth: event.target.value, error: "" } : current
+                  )
+                }
+                className="input min-h-0 py-2 text-sm"
+                placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 12" : "e.g. 300"}
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={confirmPendingMetalLine} className="btn-primary px-3 py-2 text-sm">
+              Add measured line
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingMetalLine(null)}
+              className="btn-secondary px-3 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+        <div className={`mt-1 text-xs font-semibold ${calculation?.ok ? "text-racing" : "text-amber-800"}`}>
+          {previewText}
+        </div>
+        {maxText && <div className="mt-1 text-xs text-ink-muted">{maxText}</div>}
+      </div>
+    );
   }
 
   function addManualLine() {
@@ -2600,131 +2725,6 @@ export default function OrdersClient({
                             </div>
                           )}
 
-                          {pendingMetalLine && (() => {
-                            const product = pendingMetalLine.product;
-                            const config = pendingMetalConfig;
-                            const unitLabel = metalDimensionUnitLabel(pendingMetalLine.inputUnit);
-                            const dimensionStep = pendingMetalLine.inputUnit === "imperial" ? "0.001" : "0.1";
-                            const maxLengthMm = config && "maxLengthMm" in config && typeof config.maxLengthMm === "number"
-                              ? config.maxLengthMm
-                              : undefined;
-                            const maxWidthMm = config && "maxWidthMm" in config && typeof config.maxWidthMm === "number"
-                              ? config.maxWidthMm
-                              : undefined;
-                            const lengthMax = typeof maxLengthMm === "number"
-                              ? pendingMetalLine.inputUnit === "imperial"
-                                ? maxLengthMm / 25.4
-                                : maxLengthMm
-                              : undefined;
-                            const widthMax = config?.mode === "sheet" && typeof maxWidthMm === "number"
-                              ? pendingMetalLine.inputUnit === "imperial"
-                                ? maxWidthMm / 25.4
-                                : maxWidthMm
-                              : undefined;
-                            const calculation = pendingMetalCalculation;
-                            const previewText = calculation?.ok
-                              ? `${calculation.unit} · ${money(currencyPrice(calculation.unitPriceExVat))} ex VAT`
-                              : pendingMetalLine.error || calculation?.error || "Enter the required measurements.";
-                            const maxText = config?.mode === "length" && typeof maxLengthMm === "number"
-                              ? `Maximum single length ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)}.`
-                              : config?.mode === "sheet" && typeof maxLengthMm === "number" && typeof maxWidthMm === "number"
-                                ? `Maximum sheet ${formatMetalDimensionForUnit(maxLengthMm, pendingMetalLine.inputUnit)} × ${formatMetalDimensionForUnit(maxWidthMm, pendingMetalLine.inputUnit)}.`
-                                : "";
-
-                            return (
-                              <div className="rounded-md border border-racing/15 bg-cream-dark p-3">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Metal measurements</div>
-                                    <div className="mt-1 font-semibold text-racing">{catalogueResultTitle(product, "metals")}</div>
-                                    <div className="mt-0.5 text-xs text-ink-muted">{catalogueResultSubtitle(product, "metals")}</div>
-                                  </div>
-                                  <DimensionUnitToggle
-                                    value={pendingMetalLine.inputUnit}
-                                    onChange={(unit) =>
-                                      setPendingMetalLine((current) =>
-                                        current ? { ...current, inputUnit: unit, error: "" } : current
-                                      )
-                                    }
-                                  />
-                                </div>
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-[72px_1fr_1fr_auto] lg:items-end">
-                                  <div>
-                                    <label className="label" htmlFor="metal-line-qty">Qty</label>
-                                    <input
-                                      id="metal-line-qty"
-                                      value={pendingMetalLine.qty}
-                                      onChange={(event) =>
-                                        setPendingMetalLine((current) =>
-                                          current ? { ...current, qty: event.target.value, error: "" } : current
-                                        )
-                                      }
-                                      className="input text-center font-semibold text-racing"
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                    />
-                                  </div>
-                                  {pendingMetalNeedsDimensions && (
-                                    <div>
-                                      <label className="label" htmlFor="metal-line-length">Length ({unitLabel})</label>
-                                      <input
-                                        id="metal-line-length"
-                                        type="number"
-                                        min="0"
-                                        max={lengthMax}
-                                        step={dimensionStep}
-                                        value={pendingMetalLine.inputLength}
-                                        onChange={(event) =>
-                                          setPendingMetalLine((current) =>
-                                            current ? { ...current, inputLength: event.target.value, error: "" } : current
-                                          )
-                                        }
-                                        className="input"
-                                        placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 30" : "e.g. 750"}
-                                      />
-                                    </div>
-                                  )}
-                                  {config?.mode === "sheet" && (
-                                    <div>
-                                      <label className="label" htmlFor="metal-line-width">Width ({unitLabel})</label>
-                                      <input
-                                        id="metal-line-width"
-                                        type="number"
-                                        min="0"
-                                        max={widthMax}
-                                        step={dimensionStep}
-                                        value={pendingMetalLine.inputWidth}
-                                        onChange={(event) =>
-                                          setPendingMetalLine((current) =>
-                                            current ? { ...current, inputWidth: event.target.value, error: "" } : current
-                                          )
-                                        }
-                                        className="input"
-                                        placeholder={pendingMetalLine.inputUnit === "imperial" ? "e.g. 12" : "e.g. 300"}
-                                      />
-                                    </div>
-                                  )}
-                                  <div className="flex gap-2">
-                                    <button type="button" onClick={confirmPendingMetalLine} className="btn-primary px-4 py-2 text-sm">
-                                      Add measured line
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPendingMetalLine(null)}
-                                      className="btn-secondary px-4 py-2 text-sm"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className={`mt-2 text-xs font-semibold ${calculation?.ok ? "text-racing" : "text-amber-800"}`}>
-                                  {previewText}
-                                </div>
-                                {maxText && <div className="mt-1 text-xs text-ink-muted">{maxText}</div>}
-                              </div>
-                            );
-                          })()}
-
                           <div className="rounded-md border border-racing/10">
                             <div className="flex items-center justify-between gap-3 border-b border-racing/10 bg-cream-dark px-3 py-2 text-xs text-ink-muted">
                               <span>{addLineLoading ? "Searching..." : `${addLineResults.length} of ${addLineCount} matches`}</span>
@@ -2744,29 +2744,32 @@ export default function OrdersClient({
                                   const activeNotice = addLineNotice?.catalogue === addLineCatalogue && addLineNotice.productId === product.id
                                     ? addLineNotice.text
                                     : "";
+                                  const pendingForProduct = pendingMetalLine?.product.id === product.id;
                                   return (
-                                    <button
-                                      type="button"
-                                      key={`${addLineCatalogue}-${product.id}`}
-                                      onClick={() => addCatalogueLine(product)}
-                                      className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
-                                      aria-label={`Add ${catalogueResultTitle(product, addLineCatalogue)} to invoice`}
-                                    >
-                                      <span className="min-w-0">
-                                        <span className="block truncate text-sm font-semibold text-racing">
-                                          {catalogueResultTitle(product, addLineCatalogue)}
+                                    <div key={`${addLineCatalogue}-${product.id}`}>
+                                      <button
+                                        type="button"
+                                        onClick={() => addCatalogueLine(product)}
+                                        className="grid w-full gap-3 px-3 py-2 text-left hover:bg-cream-dark sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center"
+                                        aria-label={`Add ${catalogueResultTitle(product, addLineCatalogue)} to invoice`}
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm font-semibold text-racing">
+                                            {catalogueResultTitle(product, addLineCatalogue)}
+                                          </span>
+                                          <span className="block truncate text-xs text-ink-muted">
+                                            {catalogueResultSubtitle(product, addLineCatalogue)}
+                                          </span>
                                         </span>
-                                        <span className="block truncate text-xs text-ink-muted">
-                                          {catalogueResultSubtitle(product, addLineCatalogue)}
+                                        <span className="text-sm font-semibold text-racing sm:text-right">
+                                          {money(product.priceExVat)}
                                         </span>
-                                      </span>
-                                      <span className="text-sm font-semibold text-racing sm:text-right">
-                                        {money(product.priceExVat)}
-                                      </span>
-                                      <span className={`rounded-md px-3 py-1 text-center text-xs font-semibold ${activeNotice ? "bg-green-50 text-green-800" : "bg-racing text-cream"}`}>
-                                        {activeNotice || "Add"}
-                                      </span>
-                                    </button>
+                                        <span className={`rounded-md px-3 py-1 text-center text-xs font-semibold ${pendingForProduct || activeNotice ? "bg-green-50 text-green-800" : "bg-racing text-cream"}`}>
+                                          {pendingForProduct ? "Selected" : activeNotice || "Add"}
+                                        </span>
+                                      </button>
+                                      {renderPendingMetalLinePanel(product)}
+                                    </div>
                                   );
                                 })()
                               ))}

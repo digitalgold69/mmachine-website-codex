@@ -97,8 +97,9 @@ assert.match(ordersClient, /Shows BIC &amp; IBAN/, "export-order helper must use
 assert.doesNotMatch(ordersClient, /Shows BIC and IBAN on invoices/, "export-order helper must not use the long overflowing sentence");
 assert.match(ordersClient, /paymentSettingsRows\(paymentSettings, quote\.exportOrder === true\)/, "printed invoices must only show BIC and IBAN when export order is enabled");
 assert.match(ordersClient, /const printStateRows = \[[\s\S]+Paid by[\s\S]+paymentMethodLabel\(quote\.paymentMethod\)/, "printed paid invoices must show the payment method inside the invoice state block");
-assert.match(ordersClient, /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/, "printed invoice state, customer and delivery sections must share one compact row");
-assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) minmax\(0, 1\.1fr\) !important;/, "printed invoice summary row must be forced in print CSS");
+assert.match(ordersClient, /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-2">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/, "printed invoice state, customer and delivery sections must share one compact row");
+assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 0\.95fr\) minmax\(0, 1\.05fr\) minmax\(0, 1\.15fr\) !important;/, "printed invoice summary row must be forced in print CSS");
+assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-card[\s\S]*overflow-wrap: anywhere !important;/, "printed invoice summary cards must wrap long text instead of overlapping");
 assert.doesNotMatch(ordersClient, /mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, "printed invoice customer and delivery cards must not be stretched into an orphan third-card grid");
 assert.match(ordersClient, /src="\/brand\/m-machine-butterfly\.png"/, "printed invoice header must show the M Machine butterfly logo");
 assert.match(ordersClient, /<strong className="block text-racing">M Machine<\/strong>/, "printed invoice header must show M Machine rather than the legal company name");
@@ -109,7 +110,8 @@ assert.match(ordersClient, /expectedUpdatedAt: quote\.updatedAt/, "dashboard sav
 assert.match(quoteRequestRoute, /expectedUpdatedAt && expectedUpdatedAt !== current\.updatedAt/, "quote request API must reject stale invoice saves");
 assert.match(quoteRequestRoute, /status: 409/, "stale invoice saves must return a conflict response");
 assert.match(ordersClient, /calculateMetalOrderItem/, "owner-added metal lines must use the shared metal measurement calculator");
-assert.match(ordersClient, /Metal measurements/, "owner-added metal lines must ask for the required dimensions before adding");
+assert.match(ordersClient, /Measurements for this line/, "owner-added metal lines must ask for the required dimensions next to the selected row");
+assert.match(ordersClient, /renderPendingMetalLinePanel\(product\)/, "owner-added metal dimension inputs must render underneath the selected search result");
 assert.match(ordersClient, /Remove line/, "invoice editor must let the owner remove invoice lines");
 assert.match(ordersClient, /params\.set\("orderType", orderRequestFilter\)/, "orders tab must send the selected order type to paid history");
 assert.match(ordersClient, /Save & Close/, "invoice editor close action must save changed drafts before closing");

@@ -41,13 +41,18 @@ assert.doesNotMatch(
 );
 assert.match(
   ordersClient,
-  /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-3">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/,
+  /<div className="invoice-print-summary-row mb-4 grid grid-cols-3 gap-2">[\s\S]+Invoice state[\s\S]+Customer[\s\S]+Delivery/,
   "invoice print summary should keep state, customer and delivery in one compact row"
 );
 assert.match(
   globalsCss,
-  /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) minmax\(0, 1\.1fr\) !important;/,
+  /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 0\.95fr\) minmax\(0, 1\.05fr\) minmax\(0, 1\.15fr\) !important;/,
   "invoice print CSS must force the summary cards into one row during print preview"
+);
+assert.match(
+  globalsCss,
+  /body\.printing-invoice \.invoice-print-summary-card[\s\S]*overflow-wrap: anywhere !important;/,
+  "invoice print summary cards must wrap long emails and addresses instead of overlapping"
 );
 assert.match(
   ordersClient,
