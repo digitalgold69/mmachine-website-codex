@@ -21,6 +21,16 @@ assert.match(
 );
 assert.match(
   ordersClient,
+  /const previousTitle = document\.title;[\s\S]+document\.title = "\\u00a0";[\s\S]+document\.title = previousTitle;/,
+  "print mode must blank the document title while the print dialog is open so Chrome does not print the dashboard title"
+);
+assert.match(
+  ordersClient,
+  /const previousUrl = `\$\{window\.location\.pathname\}\$\{window\.location\.search\}\$\{window\.location\.hash\}`;[\s\S]+window\.history\.replaceState\(window\.history\.state, "", window\.location\.pathname\);[\s\S]+window\.history\.replaceState\(window\.history\.state, "", previousUrl\);/,
+  "print mode must temporarily remove query strings from the browser print footer URL and restore them after printing"
+);
+assert.match(
+  ordersClient,
   /className = "invoice-print-root"/,
   "invoice print portal must use the print root targeted by print CSS"
 );
@@ -68,6 +78,16 @@ assert.match(
   ordersClient,
   /src="\/brand\/m-machine-butterfly\.png"/,
   "invoice print header should include the M Machine butterfly logo"
+);
+assert.match(
+  ordersClient,
+  /invoice-print-payment[\s\S]+<strong>Card:<\/strong>[\s\S]+<strong>BACS<\/strong>[\s\S]+<strong>Cash:<\/strong>/,
+  "invoice print payment methods should use compact labels"
+);
+assert.match(
+  globalsCss,
+  /body\.printing-invoice \.invoice-print-payment[\s\S]*font-size: 8\.5pt !important;[\s\S]*line-height: 1\.18 !important;/,
+  "invoice print CSS must reduce the payment methods section size"
 );
 
 console.log("ok - dashboard invoice print mode prints one flowing invoice document");

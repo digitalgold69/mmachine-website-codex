@@ -257,6 +257,22 @@ body {
     margin-bottom: 0.18rem !important;
   }
 
+  body.printing-invoice .invoice-print-payment {
+    padding: 0.35rem 0.45rem !important;
+    font-size: 8.5pt !important;
+    line-height: 1.18 !important;
+  }
+
+  body.printing-invoice .invoice-print-payment h2 {
+    font-size: 7.5pt !important;
+    letter-spacing: 0.08em !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  body.printing-invoice .invoice-print-payment > div {
+    gap: 0.15rem 1rem !important;
+  }
+
   body.printing-invoice .invoice-print-sheet thead {
     display: table-header-group;
   }

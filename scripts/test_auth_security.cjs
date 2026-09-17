@@ -102,6 +102,9 @@ assert.match(ordersClient, /invoice-print-state-grid[\s\S]+grid grid-cols-\[minm
 assert.match(ordersClient, /<dd className="mt-0\.5 whitespace-nowrap font-semibold text-racing">\{left\.value\}<\/dd>/, "printed invoice reference and paid/submitted values must not use truncation");
 assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-row[\s\S]*grid-template-columns: minmax\(0, 0\.95fr\) minmax\(0, 1\.05fr\) minmax\(0, 1\.15fr\) !important;/, "printed invoice summary row must be forced in print CSS");
 assert.match(globalsCss, /body\.printing-invoice \.invoice-print-summary-card[\s\S]*overflow-wrap: anywhere !important;/, "printed invoice summary cards must wrap long text instead of overlapping");
+assert.match(globalsCss, /body\.printing-invoice \.invoice-print-payment[\s\S]*font-size: 8\.5pt !important;[\s\S]*line-height: 1\.18 !important;/, "printed invoice payment methods must be compact");
+assert.match(ordersClient, /document\.title = "\\u00a0";/, "printed invoice must suppress the browser title header while the print dialog is open");
+assert.match(ordersClient, /window\.history\.replaceState\(window\.history\.state, "", window\.location\.pathname\);[\s\S]+window\.history\.replaceState\(window\.history\.state, "", previousUrl\);/, "printed invoice must temporarily remove query strings from the browser print footer and restore them");
 assert.doesNotMatch(ordersClient, /mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, "printed invoice customer and delivery cards must not be stretched into an orphan third-card grid");
 assert.match(ordersClient, /src="\/brand\/m-machine-butterfly\.png"/, "printed invoice header must show the M Machine butterfly logo");
 assert.match(ordersClient, /<strong className="block text-racing">M Machine<\/strong>/, "printed invoice header must show M Machine rather than the legal company name");

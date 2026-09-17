@@ -1222,24 +1222,26 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
         )}
       </div>
 
-      <section className="rounded-lg border border-racing/10 bg-cream-dark p-3 text-sm">
-        <h2 className="mb-2 font-semibold text-racing">Payment methods</h2>
-        <div><strong>Card over the phone:</strong> Call 01325 381302 to pay by card.</div>
-        {bacs.length > 0 && (
-          <div className="mt-2">
-            <strong>BACS:</strong>
-            <div className="mt-1 grid gap-1">
-              {bacs.map((row) => (
-                <div key={row.label} className="flex gap-2">
-                  <span className="min-w-28 text-ink-muted">{row.label}</span>
-                  <span className="font-semibold text-racing">{row.value}</span>
-                </div>
-              ))}
+      <section className="invoice-print-payment rounded-lg border border-racing/10 bg-cream-dark p-2 text-xs leading-tight">
+        <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-racing">Payment methods</h2>
+        <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2">
+          <div><strong>Card:</strong> Call 01325 381302 to pay by card.</div>
+          {bacs.length > 0 && (
+            <div>
+              <strong>BACS</strong>
+              <div className="mt-0.5 grid gap-x-2 gap-y-0.5">
+                {bacs.map((row) => (
+                  <div key={row.label} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2">
+                    <span className="text-ink-muted">{row.label}</span>
+                    <span className="font-semibold text-racing">{row.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {paymentLink && <div className="mt-2"><strong>Pay online:</strong> {paymentLink}</div>}
-        <div className="mt-2"><strong>Cash on collection:</strong> Call to arrange cash payment on collection.</div>
+          )}
+          {paymentLink && <div><strong>Pay online:</strong> {paymentLink}</div>}
+          <div><strong>Cash:</strong> Call to arrange cash payment on collection.</div>
+        </div>
       </section>
 
       <div className="mt-4 border-t border-racing/10 pt-3 text-xs leading-5 text-ink-muted">
@@ -1952,16 +1954,33 @@ export default function OrdersClient({
   }
 
   function printInvoice() {
+    const previousTitle = document.title;
+    const previousUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    let cleanedUp = false;
+    let fallbackCleanup: number | undefined;
+
     document.body.classList.add("printing-invoice");
+    document.title = "\u00a0";
+    if (window.location.search || window.location.hash) {
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+    }
 
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      document.title = previousTitle;
+      if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== previousUrl) {
+        window.history.replaceState(window.history.state, "", previousUrl);
+      }
       document.body.classList.remove("printing-invoice");
       window.removeEventListener("afterprint", cleanup);
+      if (fallbackCleanup) window.clearTimeout(fallbackCleanup);
     };
 
     window.addEventListener("afterprint", cleanup);
     window.requestAnimationFrame(() => {
       window.print();
+      fallbackCleanup = window.setTimeout(cleanup, 60000);
     });
   }
 
