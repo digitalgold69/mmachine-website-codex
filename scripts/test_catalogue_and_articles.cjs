@@ -107,6 +107,8 @@ async function main() {
   assert.match(dashboardProductsPage, /manualEditDraft/, "Manual Mini product edits must use dedicated row-level edit state");
   assert.match(dashboardProductsPage, /setManualEditDraft\(manualDraftFromProduct\(product\)\)/, "Clicking Edit on a manual Mini product must edit the selected row instead of loading the add form");
   assert.match(dashboardProductsPage, /<td colSpan=\{8\}[\s\S]+className="w-full rounded-xl[\s\S]+Save changes[\s\S]+Cancel[\s\S]+manual-edit-code-\$\{product\.id\}[\s\S]+manual-edit-name-\$\{product\.id\}[\s\S]+manual-edit-price-\$\{product\.id\}/, "Manual Mini product row edit mode must open a full-row-width drawer below the selected row with visible controls");
+  assert.match(dashboardProductsPage, /justify-between gap-3[\s\S]+ml-auto flex shrink-0 flex-wrap justify-end gap-2[\s\S]+Save changes[\s\S]+Cancel/, "Manual Mini product edit actions must stay right-aligned in the drawer header");
+  assert.match(dashboardProductsPage, /manual-edit-price-\$\{product\.id\}[\s\S]+placeholder="POA"[\s\S]+<div>\s*<div className="mb-1 text-right text-\[11px\] font-semibold text-ink-muted">Inc VAT \{money\(editPriceIncVat\)\}<\/div>[\s\S]+checked=\{editDraft\.active\}/, "Manual Mini product edit inc VAT text must sit above the Active checkbox column");
   assert.doesNotMatch(dashboardProductsPage, /Edit manual Mini part/, "Manual Mini product edit mode must not reuse the add-new-part form heading");
   assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
   assert.ok(

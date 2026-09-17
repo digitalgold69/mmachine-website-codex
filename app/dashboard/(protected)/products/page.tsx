@@ -730,12 +730,12 @@ export default function DashboardProductsPage() {
                         <tr className="border-t border-racing/5 bg-cream-dark/30">
                           <td colSpan={8} className="px-4 pb-4 pt-0">
                             <div className="w-full rounded-xl border border-racing/10 bg-white p-3 shadow-sm">
-                              <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-racing/10 pb-2">
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-racing/10 pb-2">
                                 <div className="min-w-0">
                                   <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Editing manual Mini part</div>
                                   <div className="truncate text-sm font-semibold text-racing">{product.code} · {product.name}</div>
                                 </div>
-                                <div className="flex shrink-0 flex-wrap gap-2">
+                                <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-2">
                                   <button
                                     type="button"
                                     onClick={() => void saveManualProduct(editDraft, "edit")}
@@ -814,17 +814,19 @@ export default function DashboardProductsPage() {
                                     inputMode="decimal"
                                     placeholder="POA"
                                   />
-                                  <div className="mt-1 text-right text-[11px] font-semibold text-ink-muted">Inc VAT {money(editPriceIncVat)}</div>
                                 </div>
-                                <label className="flex min-h-[46px] items-center justify-center gap-2 rounded-md border border-racing/10 bg-cream-dark px-3 text-xs font-semibold text-racing">
-                                  <input
-                                    type="checkbox"
-                                    checked={editDraft.active}
-                                    onChange={(event) => patchManualEditDraft(product.id, { active: event.target.checked })}
-                                    className="h-4 w-4 accent-racing"
-                                  />
-                                  {editDraft.active ? "Active" : "Hidden"}
-                                </label>
+                                <div>
+                                  <div className="mb-1 text-right text-[11px] font-semibold text-ink-muted">Inc VAT {money(editPriceIncVat)}</div>
+                                  <label className="flex min-h-[46px] items-center justify-center gap-2 rounded-md border border-racing/10 bg-cream-dark px-3 text-xs font-semibold text-racing">
+                                    <input
+                                      type="checkbox"
+                                      checked={editDraft.active}
+                                      onChange={(event) => patchManualEditDraft(product.id, { active: event.target.checked })}
+                                      className="h-4 w-4 accent-racing"
+                                    />
+                                    {editDraft.active ? "Active" : "Hidden"}
+                                  </label>
+                                </div>
                               </div>
                               {rowAction && (
                                 <div className={`mt-2 text-sm font-semibold ${rowAction.tone === "error" ? "text-red-700" : rowAction.tone === "success" ? "text-green-800" : "text-ink-muted"}`}>
