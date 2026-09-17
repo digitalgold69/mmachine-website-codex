@@ -131,6 +131,8 @@ export default function DashboardProductsPage() {
   const [manualProducts, setManualProducts] = useState<ManualMiniProduct[]>([]);
   const [manualDraft, setManualDraft] = useState<ManualDraft>(EMPTY_MANUAL_DRAFT);
   const [manualAction, setManualAction] = useState<{ text: string; tone: "loading" | "success" | "error" } | null>(null);
+  const [manualEditDraft, setManualEditDraft] = useState<ManualDraft | null>(null);
+  const [manualEditAction, setManualEditAction] = useState<{ productId: string; text: string; tone: "loading" | "success" | "error" } | null>(null);
   const [imagePreview, setImagePreview] = useState<ProductPreviewImage | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>(null);
   const [uploadFiles, setUploadFiles] = useState<Record<UploadCatalogue, File | null>>({ mini: null, metals: null });
@@ -355,13 +357,33 @@ export default function DashboardProductsPage() {
     }
   }
 
-  async function saveManualProduct() {
-    setManualAction({ text: "Saving...", tone: "loading" });
+  function manualDraftFromProduct(product: ManualMiniProduct): ManualDraft {
+    return {
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      section: product.section,
+      fits: product.fits || "",
+      priceExVat: product.priceExVat && product.priceExVat > 0 ? product.priceExVat.toFixed(2) : "",
+      active: product.active !== false,
+    };
+  }
+
+  async function saveManualProduct(draftToSave = manualDraft, source: "add" | "edit" = "add") {
+    const setAction = (text: string, tone: "loading" | "success" | "error") => {
+      if (source === "edit") {
+        setManualEditAction({ productId: draftToSave.id, text, tone });
+      } else {
+        setManualAction({ text, tone });
+      }
+    };
+
+    setAction("Saving...", "loading");
     try {
       const response = await fetch("/api/manual-mini-products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(manualDraft),
+        body: JSON.stringify(draftToSave),
       });
       const data = await response.json() as { product?: ManualMiniProduct; error?: string };
       if (!response.ok || !data.product) throw new Error(data.error || "Manual Mini part could not be saved.");
@@ -370,10 +392,15 @@ export default function DashboardProductsPage() {
         const withoutExisting = current.filter((product) => product.id !== data.product!.id);
         return [data.product!, ...withoutExisting];
       });
-      setManualDraft(EMPTY_MANUAL_DRAFT);
-      setManualAction({ text: "Saved", tone: "success" });
+      if (source === "edit") {
+        setManualEditDraft(null);
+        setManualEditAction({ productId: data.product.id, text: "Saved", tone: "success" });
+      } else {
+        setManualDraft(EMPTY_MANUAL_DRAFT);
+        setManualAction({ text: "Saved", tone: "success" });
+      }
     } catch (error) {
-      setManualAction({ text: (error as Error).message || "Save failed", tone: "error" });
+      setAction((error as Error).message || "Save failed", "error");
     }
   }
 
@@ -390,6 +417,8 @@ export default function DashboardProductsPage() {
 
       setManualProducts((current) => current.filter((product) => product.id !== productId));
       if (manualDraft.id === productId) setManualDraft(EMPTY_MANUAL_DRAFT);
+      if (manualEditDraft?.id === productId) setManualEditDraft(null);
+      if (manualEditAction?.productId === productId) setManualEditAction(null);
       setManualAction({ text: "Removed", tone: "success" });
     } catch (error) {
       setManualAction({ text: (error as Error).message || "Remove failed", tone: "error" });
@@ -397,16 +426,12 @@ export default function DashboardProductsPage() {
   }
 
   function editManualProduct(product: ManualMiniProduct) {
-    setManualDraft({
-      id: product.id,
-      code: product.code,
-      name: product.name,
-      section: product.section,
-      fits: product.fits || "",
-      priceExVat: product.priceExVat && product.priceExVat > 0 ? product.priceExVat.toFixed(2) : "",
-      active: product.active !== false,
-    });
-    setManualAction(null);
+    setManualEditDraft(manualDraftFromProduct(product));
+    setManualEditAction(null);
+  }
+
+  function patchManualEditDraft(productId: string, patch: Partial<ManualDraft>) {
+    setManualEditDraft((draft) => (draft?.id === productId ? { ...draft, ...patch } : draft));
   }
 
   return (
@@ -537,17 +562,12 @@ export default function DashboardProductsPage() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl text-racing">
-                {manualDraft.id ? "Edit manual Mini part" : "Add manual Mini part"}
+                Add manual Mini part
               </h2>
               <p className="text-sm text-ink-muted">
                 These parts are stored in the dashboard and are not overwritten by the daily Excel sync.
               </p>
             </div>
-            {manualDraft.id && (
-              <button type="button" onClick={() => setManualDraft(EMPTY_MANUAL_DRAFT)} className="btn-secondary text-sm">
-                New part
-              </button>
-            )}
           </div>
           <div className="grid gap-3 lg:grid-cols-[140px_1fr_220px_140px]">
             <div>
@@ -587,7 +607,7 @@ export default function DashboardProductsPage() {
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => void saveManualProduct()} className="btn-primary">
-              {manualDraft.id ? "Save changes" : "Add part"}
+              Add part
             </button>
             {manualAction && (
               <span className={`text-sm font-semibold ${manualAction.tone === "error" ? "text-red-700" : manualAction.tone === "success" ? "text-green-800" : "text-ink-muted"}`}>
@@ -621,17 +641,41 @@ export default function DashboardProductsPage() {
                 {manualRows.slice(0, limit).map((product) => {
                   const image = miniProductImages[product.id];
                   const action = imageAction?.productId === product.id ? imageAction : null;
+                  const rowAction = manualEditAction?.productId === product.id ? manualEditAction : null;
+                  const isEditing = manualEditDraft?.id === product.id;
+                  const editDraft = isEditing ? manualEditDraft : null;
+                  const editPriceNumber = editDraft?.priceExVat.trim() ? Number(editDraft.priceExVat) : NaN;
+                  const editPriceExVat = editDraft && editDraft.priceExVat.trim() && Number.isFinite(editPriceNumber) && editPriceNumber > 0
+                    ? Number(editPriceNumber.toFixed(2))
+                    : null;
+                  const editPriceIncVat = typeof editPriceExVat === "number" ? Number((editPriceExVat * 1.2).toFixed(2)) : null;
+                  const rowSaving = rowAction?.tone === "loading";
                   return (
-                    <tr key={product.id} className="border-t border-racing/5 align-middle">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-racing">{product.code}</td>
+                    <tr key={product.id} className={`border-t border-racing/5 ${editDraft ? "bg-cream-dark/40 align-top" : "align-middle"}`}>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {editDraft ? (
+                          <div>
+                            <label className="label" htmlFor={`manual-edit-code-${product.id}`}>Part no.</label>
+                            <input
+                              id={`manual-edit-code-${product.id}`}
+                              value={editDraft.code}
+                              onChange={(event) => patchManualEditDraft(product.id, { code: event.target.value })}
+                              className="input min-w-[110px] font-mono text-xs text-racing"
+                              placeholder="Part no."
+                            />
+                          </div>
+                        ) : (
+                          <span className="font-mono text-xs text-racing">{product.code}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           {image ? (
                             <button
                               type="button"
-                              onClick={() => setImagePreview({ ...image, alt: product.name })}
+                              onClick={() => setImagePreview({ ...image, alt: editDraft?.name || product.name })}
                               className="h-11 w-11 shrink-0 overflow-hidden rounded-md border border-racing/10 bg-cream-dark"
-                              aria-label={`View photo for ${product.name}`}
+                              aria-label={`View photo for ${editDraft?.name || product.name}`}
                             >
                               <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                             </button>
@@ -671,24 +715,136 @@ export default function DashboardProductsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-racing">{product.name}</div>
-                        {product.fits && <div className="text-xs text-ink-muted">{product.fits}</div>}
+                        {editDraft ? (
+                          <div className="grid min-w-[260px] gap-2">
+                            <div>
+                              <label className="label" htmlFor={`manual-edit-name-${product.id}`}>Description</label>
+                              <input
+                                id={`manual-edit-name-${product.id}`}
+                                value={editDraft.name}
+                                onChange={(event) => patchManualEditDraft(product.id, { name: event.target.value })}
+                                className="input font-semibold text-racing"
+                                placeholder="Part description"
+                              />
+                            </div>
+                            <div>
+                              <label className="label" htmlFor={`manual-edit-fits-${product.id}`}>Fitment / notes</label>
+                              <input
+                                id={`manual-edit-fits-${product.id}`}
+                                value={editDraft.fits}
+                                onChange={(event) => patchManualEditDraft(product.id, { fits: event.target.value })}
+                                className="input text-sm"
+                                placeholder="Optional fitment note"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-medium text-racing">{product.name}</div>
+                            {product.fits && <div className="text-xs text-ink-muted">{product.fits}</div>}
+                          </>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-ink-muted">{sectionLabel(product.section)}</td>
+                      <td className="px-4 py-3 text-sm text-ink-muted">
+                        {editDraft ? (
+                          <div>
+                            <label className="label" htmlFor={`manual-edit-section-${product.id}`}>Section</label>
+                            <select
+                              id={`manual-edit-section-${product.id}`}
+                              value={editDraft.section}
+                              onChange={(event) => patchManualEditDraft(product.id, { section: event.target.value })}
+                              className="input min-w-[190px]"
+                            >
+                              {sections.map((section) => (
+                                <option key={section.code} value={section.code}>{section.code} - {section.label}</option>
+                              ))}
+                              <option value={MANUAL_MINI_SECTION_CODE}>Other</option>
+                            </select>
+                          </div>
+                        ) : (
+                          sectionLabel(product.section)
+                        )}
+                      </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${product.active === false ? "bg-cream-dark text-ink-muted" : "bg-green-50 text-green-800"}`}>
-                          {product.active === false ? "Hidden" : "Active"}
-                        </span>
+                        {editDraft ? (
+                          <label className="inline-flex min-h-[42px] items-center gap-2 rounded-md border border-racing/10 bg-white px-3 text-xs font-semibold text-racing">
+                            <input
+                              type="checkbox"
+                              checked={editDraft.active}
+                              onChange={(event) => patchManualEditDraft(product.id, { active: event.target.checked })}
+                              className="h-4 w-4 accent-racing"
+                            />
+                            {editDraft.active ? "Active" : "Hidden"}
+                          </label>
+                        ) : (
+                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${product.active === false ? "bg-cream-dark text-ink-muted" : "bg-green-50 text-green-800"}`}>
+                            {product.active === false ? "Hidden" : "Active"}
+                          </span>
+                        )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceExVat)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">{money(product.priceIncVat)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">
+                        {editDraft ? (
+                          <div>
+                            <label className="label text-left" htmlFor={`manual-edit-price-${product.id}`}>Ex VAT</label>
+                            <input
+                              id={`manual-edit-price-${product.id}`}
+                              value={editDraft.priceExVat}
+                              onChange={(event) => patchManualEditDraft(product.id, { priceExVat: event.target.value })}
+                              className="input min-w-[110px] text-right"
+                              inputMode="decimal"
+                              placeholder="POA"
+                            />
+                          </div>
+                        ) : (
+                          money(product.priceExVat)
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-racing">
+                        {editDraft ? money(editPriceIncVat) : money(product.priceIncVat)}
+                      </td>
                       <td className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => editManualProduct(product)} className="text-sm font-semibold text-racing hover:underline">
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => void deleteManualProduct(product.id)} className="ml-4 text-sm font-semibold text-red-700 hover:underline">
-                          Remove
-                        </button>
+                        <div className="flex flex-col items-end gap-2">
+                          {editDraft ? (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void saveManualProduct(editDraft, "edit")}
+                                disabled={rowSaving}
+                                className="btn-primary px-3 py-1.5 text-xs disabled:opacity-60"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setManualEditDraft(null);
+                                  setManualEditAction(null);
+                                }}
+                                disabled={rowSaving}
+                                className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => editManualProduct(product)} className="text-sm font-semibold text-racing hover:underline">
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void deleteManualProduct(product.id)}
+                            disabled={rowSaving}
+                            className="text-sm font-semibold text-red-700 hover:underline disabled:opacity-60"
+                          >
+                            Remove
+                          </button>
+                          {rowAction && (
+                            <span className={`text-xs font-semibold ${rowAction.tone === "error" ? "text-red-700" : rowAction.tone === "success" ? "text-green-800" : "text-ink-muted"}`}>
+                              {rowAction.text}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
