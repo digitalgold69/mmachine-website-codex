@@ -106,7 +106,7 @@ async function main() {
   assert.match(dashboardProductsPage, /\/api\/manual-mini-products/, "Manual Mini products must be loaded and saved through their own API");
   assert.match(dashboardProductsPage, /manualEditDraft/, "Manual Mini product edits must use dedicated row-level edit state");
   assert.match(dashboardProductsPage, /setManualEditDraft\(manualDraftFromProduct\(product\)\)/, "Clicking Edit on a manual Mini product must edit the selected row instead of loading the add form");
-  assert.match(dashboardProductsPage, /<td colSpan=\{8\}[\s\S]+sticky left-4[\s\S]+Save changes[\s\S]+Cancel[\s\S]+manual-edit-code-\$\{product\.id\}[\s\S]+manual-edit-name-\$\{product\.id\}[\s\S]+manual-edit-price-\$\{product\.id\}/, "Manual Mini product row edit mode must open a full-width drawer below the selected row with visible controls");
+  assert.match(dashboardProductsPage, /<td colSpan=\{8\}[\s\S]+className="w-full rounded-xl[\s\S]+Save changes[\s\S]+Cancel[\s\S]+manual-edit-code-\$\{product\.id\}[\s\S]+manual-edit-name-\$\{product\.id\}[\s\S]+manual-edit-price-\$\{product\.id\}/, "Manual Mini product row edit mode must open a full-row-width drawer below the selected row with visible controls");
   assert.doesNotMatch(dashboardProductsPage, /Edit manual Mini part/, "Manual Mini product edit mode must not reuse the add-new-part form heading");
   assert.match(dashboardProductsPage, /NoImageIcon/, "Dashboard Mini product rows should show the no-image icon where no photo exists");
   assert.ok(

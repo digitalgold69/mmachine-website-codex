@@ -729,8 +729,8 @@ export default function DashboardProductsPage() {
                       {editDraft && (
                         <tr className="border-t border-racing/5 bg-cream-dark/30">
                           <td colSpan={8} className="px-4 pb-4 pt-0">
-                            <div className="sticky left-4 w-[calc(100vw-4rem)] max-w-[980px] rounded-xl border border-racing/10 bg-white p-3 shadow-sm">
-                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-racing/10 pb-2">
+                            <div className="w-full rounded-xl border border-racing/10 bg-white p-3 shadow-sm">
+                              <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-racing/10 pb-2">
                                 <div className="min-w-0">
                                   <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Editing manual Mini part</div>
                                   <div className="truncate text-sm font-semibold text-racing">{product.code} · {product.name}</div>
