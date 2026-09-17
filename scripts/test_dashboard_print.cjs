@@ -81,13 +81,23 @@ assert.match(
 );
 assert.match(
   ordersClient,
-  /invoice-print-payment[\s\S]+<strong>Card:<\/strong>[\s\S]+<strong>BACS<\/strong>[\s\S]+<strong>Cash:<\/strong>/,
-  "invoice print payment methods should use compact labels"
+  /invoice-print-payment[\s\S]+space-y-1 text-left[\s\S]+<strong>Cash:<\/strong>[\s\S]+<strong>Card:<\/strong>[\s\S]+<strong>BACS:<\/strong>/,
+  "invoice print payment methods should be stacked left in cash, card, BACS order"
+);
+assert.doesNotMatch(
+  ordersClient,
+  /invoice-print-payment[\s\S]{0,500}sm:grid-cols-2/,
+  "invoice print payment methods must not use a two-column layout"
 );
 assert.match(
   globalsCss,
   /body\.printing-invoice \.invoice-print-payment[\s\S]*font-size: 8\.5pt !important;[\s\S]*line-height: 1\.18 !important;/,
   "invoice print CSS must reduce the payment methods section size"
+);
+assert.match(
+  globalsCss,
+  /body\.printing-invoice \.invoice-print-payment > div[\s\S]*text-align: left !important;/,
+  "invoice print CSS must keep the payment method stack left aligned"
 );
 
 console.log("ok - dashboard invoice print mode prints one flowing invoice document");

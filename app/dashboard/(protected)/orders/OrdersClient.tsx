@@ -1224,11 +1224,13 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
 
       <section className="invoice-print-payment rounded-lg border border-racing/10 bg-cream-dark p-2 text-xs leading-tight">
         <h2 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-racing">Payment methods</h2>
-        <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2">
+        <div className="space-y-1 text-left">
+          <div><strong>Cash:</strong> Call to arrange cash payment on collection.</div>
           <div><strong>Card:</strong> Call 01325 381302 to pay by card.</div>
+          {paymentLink && <div><strong>Pay online:</strong> {paymentLink}</div>}
           {bacs.length > 0 && (
             <div>
-              <strong>BACS</strong>
+              <strong>BACS:</strong>
               <div className="mt-0.5 grid gap-x-2 gap-y-0.5">
                 {bacs.map((row) => (
                   <div key={row.label} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2">
@@ -1239,8 +1241,6 @@ function InvoicePrintSheet({ quote, paymentSettings }: { quote: QuoteRequest; pa
               </div>
             </div>
           )}
-          {paymentLink && <div><strong>Pay online:</strong> {paymentLink}</div>}
-          <div><strong>Cash:</strong> Call to arrange cash payment on collection.</div>
         </div>
       </section>
 

@@ -270,7 +270,12 @@ body {
   }
 
   body.printing-invoice .invoice-print-payment > div {
-    gap: 0.15rem 1rem !important;
+    display: block !important;
+    text-align: left !important;
+  }
+
+  body.printing-invoice .invoice-print-payment > div > div + div {
+    margin-top: 0.15rem !important;
   }
 
   body.printing-invoice .invoice-print-sheet thead {
