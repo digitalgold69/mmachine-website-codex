@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, requireLogin } from "@/lib/auth";
 import { listCatalogueOverrideMetas, saveCatalogueOverride } from "@/lib/catalogue-overrides";
 import { parseUploadedCatalogue, type CatalogueUploadKind } from "@/lib/catalogue-upload-parser";
-import { staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
+import { buildMetalsCataloguePdfBytes, staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
 import { buildMiniWorkbookPdf } from "@/lib/mini-workbook-pdf";
 
 export const runtime = "nodejs";
@@ -73,8 +73,11 @@ export async function POST(request: Request) {
       miniPdf = await buildMiniWorkbookPdf(parsed.products, new Uint8Array(await template.arrayBuffer()));
     } else {
       const template = await staticCatalogueAssetResponse(request, "/catalogue/metals-catalogue.pdf");
-      if (!template.ok) throw new Error("The original Metals catalogue PDF could not be loaded. The website prices have not been updated.");
-      metalsPdf = new Uint8Array(await template.arrayBuffer());
+      if (!template.ok) throw new Error("The original Metals catalogue PDF front matter could not be loaded. The website prices have not been updated.");
+      metalsPdf = await buildMetalsCataloguePdfBytes(
+        parsed.products,
+        new Uint8Array(await template.arrayBuffer())
+      );
     }
     const user = await getCurrentUser();
     const upload = parsed.catalogue === "mini"
