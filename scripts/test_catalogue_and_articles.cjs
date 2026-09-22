@@ -143,7 +143,9 @@ async function main() {
   assert.match(uploadRoute, /parseUploadedCatalogue/, "Catalogue upload API must parse Excel workbooks server-side");
   assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
   assert.match(uploadRoute, /buildMiniWorkbookPdf/, "Mini uploads must preserve the matching original PDF");
-  assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the live Metals PDF");
+  assert.doesNotMatch(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must not replace the original-format catalogue with a stripped generated PDF");
+  assert.match(uploadRoute, /staticCatalogueAssetResponse\(request, "\/catalogue\/metals-catalogue\.pdf"\)/, "Metals workbook uploads must keep an original-format PDF asset alongside the parsed products");
+  assert.match(uploadRoute, /catalogue: "metals"[\s\S]+pdfBytes: metalsPdf![\s\S]+originalPdf: true/, "Metals workbook uploads must mark the saved PDF as original-format so download routes can serve it safely");
   assert.match(uploadRoute, /100 \* 1024 \* 1024/, "Catalogue uploads must allow current owner workbooks larger than 24 MB");
   assert.match(dashboardProductsPage, /MAX_CATALOGUE_WORKBOOK_MB/, "Dashboard upload copy must follow the server-side workbook size limit");
 
@@ -152,8 +154,14 @@ async function main() {
   assert.match(metalsCatalogueClient, /pdfVersion \|\| metalsCatalogueVersion/, "Metals catalogue downloads must cache-bust with the active uploaded version");
 
   const metalsPdfRoute = read("app/api/catalogue/metals/pdf/route.ts");
-  assert.match(metalsPdfRoute, /getCatalogueOverridePdfObject\("metals"\)/, "Metals PDF route must serve the uploaded override PDF when available");
+  assert.match(metalsPdfRoute, /getCatalogueOverridePdfObject\("metals"\)/, "Metals PDF route must check uploaded catalogue metadata");
+  assert.match(metalsPdfRoute, /pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\)/, "Metals PDF route must only serve uploaded PDFs that preserve the original catalogue format");
   assert.match(metalsPdfRoute, /Cache-Control", "no-store"/, "Metals PDF route must avoid stale catalogue downloads");
+  const metalsStaticPdfRoute = read("app/catalogue/metals-catalogue.pdf/route.ts");
+  assert.match(metalsStaticPdfRoute, /pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\)/, "Static Metals PDF route must not serve stripped generated override PDFs");
+
+  const cataloguePdfLib = read("lib/catalogue-pdf.ts");
+  assert.doesNotMatch(cataloguePdfLib, /Generated[\\s\\S]+new Date/, "Catalogue PDF fallback generator must not print a generated date on customer PDFs");
 
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
   assert.match(ordersClient, /PaymentSettingsModal/, "Dashboard must expose editable payment method settings");

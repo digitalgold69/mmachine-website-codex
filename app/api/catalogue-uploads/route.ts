@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, requireLogin } from "@/lib/auth";
 import { listCatalogueOverrideMetas, saveCatalogueOverride } from "@/lib/catalogue-overrides";
 import { parseUploadedCatalogue, type CatalogueUploadKind } from "@/lib/catalogue-upload-parser";
-import { buildMetalsCataloguePdfBytes, staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
+import { staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
 import { buildMiniWorkbookPdf } from "@/lib/mini-workbook-pdf";
 
 export const runtime = "nodejs";
@@ -66,10 +66,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: (error as Error).message || "This workbook does not match the selected catalogue." }, { status: 400 });
     }
     let miniPdf: Uint8Array | null = null;
+    let metalsPdf: Uint8Array | null = null;
     if (parsed.catalogue === "mini") {
       const template = await staticCatalogueAssetResponse(request, "/catalogue/mini-catalogue.pdf");
       if (!template.ok) throw new Error("The fixed Mini drawings could not be loaded. Nothing has been updated.");
       miniPdf = await buildMiniWorkbookPdf(parsed.products, new Uint8Array(await template.arrayBuffer()));
+    } else {
+      const template = await staticCatalogueAssetResponse(request, "/catalogue/metals-catalogue.pdf");
+      if (!template.ok) throw new Error("The original Metals catalogue PDF could not be loaded. The website prices have not been updated.");
+      metalsPdf = new Uint8Array(await template.arrayBuffer());
     }
     const user = await getCurrentUser();
     const upload = parsed.catalogue === "mini"
@@ -86,7 +91,8 @@ export async function POST(request: Request) {
       : await saveCatalogueOverride({
           catalogue: "metals",
           products: parsed.products,
-          pdfBytes: await buildMetalsCataloguePdfBytes(parsed.products),
+          pdfBytes: metalsPdf!,
+          originalPdf: true,
           sourceBytes: bytes,
           sourceFilename: file.name,
           sourceContentType: file.type || undefined,

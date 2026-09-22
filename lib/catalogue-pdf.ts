@@ -114,14 +114,7 @@ async function createContext(title: string): Promise<PdfContext> {
     font: bold,
     color: rgb(0.06, 0.24, 0.18),
   });
-  ctx.page.drawText(`Generated ${new Date().toLocaleDateString("en-GB")}`, {
-    x: MARGIN,
-    y: ctx.y - 20,
-    size: 9,
-    font: regular,
-    color: rgb(0.34, 0.29, 0.24),
-  });
-  ctx.y -= 52;
+  ctx.y -= 32;
   return ctx;
 }
 
