@@ -48,7 +48,7 @@ export default function MetalsCatalogueClient({
   const shapeOptions = cat === "all" ? [] : shapeFiltersByCategory[cat] || [];
   const selectedShapeLabel = shapeOptions.find((option) => option.key === shape)?.label || "";
   const downloadVersion = pdfVersion || metalsCatalogueVersion;
-  const metalsCatalogueUrl = `/api/catalogue/metals/pdf?v=${encodeURIComponent(downloadVersion)}`;
+  const metalsCatalogueUrl = `/catalogue/metals-catalogue.pdf?v=${encodeURIComponent(downloadVersion)}`;
 
   useEffect(() => {
     if (firstRun.current) {

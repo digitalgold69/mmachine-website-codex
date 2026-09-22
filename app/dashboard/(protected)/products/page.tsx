@@ -468,9 +468,23 @@ export default function DashboardProductsPage() {
                     </div>
                   </div>
                   {status && (
-                    <span className="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-800">
-                      Live upload
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <a
+                        href={`/api/catalogue-uploads/${kind}/source`}
+                        download
+                        title={`Download latest uploaded ${kind === "mini" ? "Mini" : "Metals"} Excel catalogue`}
+                        aria-label={`Download latest uploaded ${kind === "mini" ? "Mini" : "Metals"} Excel catalogue`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-racing/15 bg-white text-racing shadow-sm transition hover:bg-cream-dark focus:outline-none focus:ring-2 focus:ring-racing/30"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+                          <path d="M10 2.5a.75.75 0 0 1 .75.75v7.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06l2.22 2.22V3.25A.75.75 0 0 1 10 2.5Z" />
+                          <path d="M4.25 13.75a.75.75 0 0 1 .75.75v1h10v-1a.75.75 0 0 1 1.5 0v1.25A1.25 1.25 0 0 1 15.25 17H4.75a1.25 1.25 0 0 1-1.25-1.25V14.5a.75.75 0 0 1 .75-.75Z" />
+                        </svg>
+                      </a>
+                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-800">
+                        Live upload
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="mb-3 min-h-[2.25rem] text-sm leading-6 text-ink-muted">

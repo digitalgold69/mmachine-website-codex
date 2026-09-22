@@ -126,6 +126,8 @@ async function main() {
   assert.match(dashboardProductsPage, /No file selected/, "Catalogue upload cards must show the selected workbook state");
   assert.match(dashboardProductsPage, /Upload \{kind/, "Catalogue upload button must use the requested label");
   assert.match(dashboardProductsPage, /\/api\/catalogue-uploads/, "Dashboard uploads must save via the catalogue upload API");
+  assert.match(dashboardProductsPage, /href=\{`\/api\/catalogue-uploads\/\$\{kind\}\/source`\}/, "Dashboard upload cards must expose a direct source workbook download icon");
+  assert.match(dashboardProductsPage, /Download latest uploaded \$\{kind === "mini" \? "Mini" : "Metals"\} Excel catalogue/, "Source workbook download icons must be labelled for the selected catalogue");
 
   const manualProductsLib = read("lib/manual-mini-products.ts");
   assert.match(manualProductsLib, /create table if not exists manual_mini_products/, "Manual Mini products must be stored outside generated catalogue files");
@@ -150,15 +152,24 @@ async function main() {
   assert.match(dashboardProductsPage, /MAX_CATALOGUE_WORKBOOK_MB/, "Dashboard upload copy must follow the server-side workbook size limit");
 
   const metalsCatalogueClient = read("app/(site)/catalogue/metals/MetalsCatalogueClient.tsx");
-  assert.match(metalsCatalogueClient, /\/api\/catalogue\/metals\/pdf\?v=/, "Metals catalogue downloads must use the dynamic uploaded PDF route");
-  assert.match(metalsCatalogueClient, /pdfVersion \|\| metalsCatalogueVersion/, "Metals catalogue downloads must cache-bust with the active uploaded version");
+  assert.match(metalsCatalogueClient, /\/catalogue\/metals-catalogue\.pdf\?v=/, "Metals catalogue downloads must use the canonical customer PDF URL");
+  assert.doesNotMatch(metalsCatalogueClient, /\/api\/catalogue\/metals\/pdf\?v=/, "Metals catalogue downloads must not point customers at the legacy API PDF URL");
+  assert.match(metalsCatalogueClient, /pdfVersion \|\| metalsCatalogueVersion/, "Metals catalogue downloads must cache-bust with the active uploaded or bundled PDF version");
+
+  const metalsPage = read("app/(site)/catalogue/metals/page.tsx");
+  assert.match(metalsPage, /override\?\.pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\) \? override\.version : undefined/, "Metals page must only use uploaded version cache-busting when the canonical route will serve that uploaded PDF");
 
   const metalsPdfRoute = read("app/api/catalogue/metals/pdf/route.ts");
-  assert.match(metalsPdfRoute, /getCatalogueOverridePdfObject\("metals"\)/, "Metals PDF route must check uploaded catalogue metadata");
-  assert.match(metalsPdfRoute, /pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\)/, "Metals PDF route must only serve uploaded PDFs that preserve the original catalogue format");
-  assert.match(metalsPdfRoute, /Cache-Control", "no-store"/, "Metals PDF route must avoid stale catalogue downloads");
+  assert.match(metalsPdfRoute, /metalsCatalogueUrl/, "Legacy Metals PDF API route must redirect to the canonical PDF URL");
+  assert.match(metalsPdfRoute, /status: 308/, "Legacy Metals PDF API route must permanently redirect to avoid a second PDF source");
+  assert.match(metalsPdfRoute, /Cache-Control": "no-store"/, "Legacy Metals PDF redirect must avoid stale catalogue redirects");
   const metalsStaticPdfRoute = read("app/catalogue/metals-catalogue.pdf/route.ts");
   assert.match(metalsStaticPdfRoute, /pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\)/, "Static Metals PDF route must not serve stripped generated override PDFs");
+
+  const sourceWorkbookRoute = read("app/api/catalogue-uploads/[catalogue]/source/route.ts");
+  assert.match(sourceWorkbookRoute, /requireLogin/, "Uploaded source workbook downloads must require dashboard login");
+  assert.match(sourceWorkbookRoute, /getCatalogueOverrideSourceObject/, "Uploaded source workbook downloads must read the latest saved workbook source");
+  assert.match(sourceWorkbookRoute, /Content-Disposition[\s\S]+attachment/, "Uploaded source workbook downloads must download directly without a dialog route");
 
   const cataloguePdfLib = read("lib/catalogue-pdf.ts");
   assert.match(cataloguePdfLib, /METALS_TEMPLATE_FRONT_PAGES = 4/, "Metals catalogue PDFs must preserve the original intro, carriage, terms and conversion pages");
@@ -173,6 +184,7 @@ async function main() {
   const overridesLib = read("lib/catalogue-overrides.ts");
   assert.match(overridesLib, /catalogue_overrides/, "Uploaded catalogue metadata must be stored separately from manual Mini products");
   assert.match(overridesLib, /catalogue-overrides\/\$\{input\.catalogue\}/, "Uploaded workbooks, products and PDFs must be stored in a catalogue override R2 path");
+  assert.match(overridesLib, /getCatalogueOverrideSourceObject/, "Latest uploaded source workbooks must be retrievable for dashboard downloads");
 
   assert.equal(catalogueMoney(0), "POA", "Catalogue prices entered as zero must display as POA");
   assert.equal(catalogueMoney(0.17), "\u00a30.17", "Sub-pound catalogue prices must remain valid");

@@ -164,6 +164,15 @@ export async function getCatalogueOverridePdfObject(catalogue: CatalogueUploadKi
   return object?.body ? { meta, object } : null;
 }
 
+export async function getCatalogueOverrideSourceObject(catalogue: CatalogueUploadKind) {
+  const meta = await getCatalogueOverrideMeta(catalogue);
+  if (!meta?.sourceKey) return null;
+
+  const bucket = await getBucket();
+  const object = await bucket.get(meta.sourceKey);
+  return object?.body ? { meta, object } : null;
+}
+
 export async function saveCatalogueOverride<T>(input: {
   catalogue: CatalogueUploadKind;
   products: T[];
