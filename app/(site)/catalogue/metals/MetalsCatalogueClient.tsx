@@ -127,8 +127,8 @@ export default function MetalsCatalogueClient({
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <header className="mb-8">
-        <div className="relative sm:flex sm:items-start sm:justify-between sm:gap-4">
-          <div className="min-w-0 pr-40 sm:pr-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
             <h1 className="mt-2 font-display text-4xl text-racing">Metals catalogue</h1>
             <p className="mt-2 max-w-3xl text-ink-muted">
@@ -136,12 +136,12 @@ export default function MetalsCatalogueClient({
               Prices are shown ex VAT and inc VAT.
             </p>
           </div>
-          <div className="absolute right-0 top-7 flex w-36 flex-col items-end gap-2 sm:static sm:mt-7 sm:w-auto">
-            <a href={metalsCatalogueUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap px-3 text-xs sm:w-auto sm:text-sm">
+          <div className="grid gap-2 sm:mt-7 sm:shrink-0">
+            <a href={metalsCatalogueUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-3 text-sm sm:w-auto">
               <DownloadIcon />
               Download Old PDF
             </a>
-            <Link href="/metals/weight-calculator" className="btn-secondary inline-flex w-full items-center justify-center whitespace-nowrap px-3 text-xs sm:w-auto sm:text-sm">
+            <Link href="/metals/weight-calculator" className="btn-secondary inline-flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-3 text-sm sm:w-auto">
               Weight calculator
             </Link>
           </div>

@@ -355,7 +355,35 @@ function shouldSeparateMetalsRows(previous: MetalProduct | null, current: MetalP
 }
 
 type MetalsPageRange = { start: number; end: number };
-type WorkbookFrontSheet = { name: string; rows: string[][] };
+type WorkbookFrontImage = {
+  relId: string;
+  bytes: Uint8Array;
+  extension: string;
+  from: { col: number; row: number; colOff: number; rowOff: number };
+  to: { col: number; row: number; colOff: number; rowOff: number };
+};
+
+type WorkbookFrontSheet = {
+  name: string;
+  rows: string[][];
+  range: XLSX.Range;
+  merges: XLSX.Range[];
+  colWidths: number[];
+  rowHeights: number[];
+  images: WorkbookFrontImage[];
+};
+
+type WorkbookWithFiles = XLSX.WorkBook & {
+  files?: Record<string, { content?: Uint8Array; data?: Uint8Array }>;
+};
+
+const EMUS_PER_POINT = 12700;
+const DEFAULT_EXCEL_COL_WIDTH_POINTS = 48;
+const DEFAULT_EXCEL_ROW_HEIGHT_POINTS = 12.75;
+const WORKBOOK_GRID_BORDER = rgb(0.76, 0.72, 0.64);
+const WORKBOOK_HEADER_FILL = rgb(0.94, 0.91, 0.82);
+const WORKBOOK_PANEL_FILL = rgb(0.98, 0.96, 0.9);
+const WORKBOOK_RED = rgb(0.72, 0.06, 0.04);
 
 function metalsTableStartY() {
   return METALS_TABLE_TOP - METALS_HEADER_HEIGHT - 16;
@@ -412,6 +440,131 @@ function cellDisplayValue(cell: XLSX.CellObject | undefined) {
   return cleanPdfText(cell?.w ?? cell?.v ?? "", 500);
 }
 
+function xmlUnescape(value: string) {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function xmlAttr(attrs: string, name: string) {
+  const match = attrs.match(new RegExp(`(?:^|\\s)(?:[a-zA-Z0-9_]+:)?${name}="([^"]*)"`));
+  return match ? xmlUnescape(match[1]) : "";
+}
+
+function workbookFileBytes(workbook: WorkbookWithFiles, path: string) {
+  const file = workbook.files?.[path.replace(/^\/+/, "")];
+  const content = file?.content || file?.data;
+  return content ? new Uint8Array(content) : null;
+}
+
+function workbookFileText(workbook: WorkbookWithFiles, path: string) {
+  const bytes = workbookFileBytes(workbook, path);
+  return bytes ? new TextDecoder().decode(bytes) : "";
+}
+
+function xlsxDir(path: string) {
+  const index = path.lastIndexOf("/");
+  return index >= 0 ? path.slice(0, index) : "";
+}
+
+function normaliseXlsxPath(path: string) {
+  const parts: string[] = [];
+  for (const part of path.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") parts.pop();
+    else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+function resolveXlsxTarget(basePath: string, target: string) {
+  if (target.startsWith("/")) return normaliseXlsxPath(target);
+  return normaliseXlsxPath(`${xlsxDir(basePath)}/${target}`);
+}
+
+function relationshipMap(xml: string) {
+  const map = new Map<string, { target: string; type: string }>();
+  for (const match of xml.matchAll(/<Relationship\b([^>]*)\/>/g)) {
+    const id = xmlAttr(match[1], "Id");
+    const target = xmlAttr(match[1], "Target");
+    if (id && target) map.set(id, { target, type: xmlAttr(match[1], "Type") });
+  }
+  return map;
+}
+
+function workbookSheetPath(workbook: WorkbookWithFiles, sheetName: string) {
+  const workbookXml = workbookFileText(workbook, "xl/workbook.xml");
+  const workbookRels = relationshipMap(workbookFileText(workbook, "xl/_rels/workbook.xml.rels"));
+  for (const match of workbookXml.matchAll(/<sheet\b([^>]*)\/>/g)) {
+    if (xmlAttr(match[1], "name") !== sheetName) continue;
+    const rel = workbookRels.get(xmlAttr(match[1], "id"));
+    if (!rel) return null;
+    return resolveXlsxTarget("xl/workbook.xml", rel.target);
+  }
+  return null;
+}
+
+function worksheetDrawingPath(workbook: WorkbookWithFiles, sheetPath: string) {
+  const fileName = sheetPath.split("/").pop();
+  if (!fileName) return null;
+  const relsPath = `${xlsxDir(sheetPath)}/_rels/${fileName}.rels`;
+  const rels = relationshipMap(workbookFileText(workbook, relsPath));
+  for (const rel of rels.values()) {
+    if (rel.type.includes("/drawing")) return resolveXlsxTarget(sheetPath, rel.target);
+  }
+  return null;
+}
+
+function drawingRelsPath(drawingPath: string) {
+  const fileName = drawingPath.split("/").pop();
+  return fileName ? `${xlsxDir(drawingPath)}/_rels/${fileName}.rels` : "";
+}
+
+function anchorMarker(anchor: string, tag: "from" | "to") {
+  const marker = anchor.match(new RegExp(`<(?:xdr:)?${tag}>[\\s\\S]*?<\\/(?:xdr:)?${tag}>`))?.[0] || "";
+  function number(name: string) {
+    return Number(marker.match(new RegExp(`<(?:xdr:)?${name}>(-?\\d+)<\\/(?:xdr:)?${name}>`))?.[1] || 0);
+  }
+  return {
+    col: number("col"),
+    row: number("row"),
+    colOff: number("colOff") / EMUS_PER_POINT,
+    rowOff: number("rowOff") / EMUS_PER_POINT,
+  };
+}
+
+function workbookSheetImages(workbook: WorkbookWithFiles, sheetName: string): WorkbookFrontImage[] {
+  const sheetPath = workbookSheetPath(workbook, sheetName);
+  const drawingPath = sheetPath ? worksheetDrawingPath(workbook, sheetPath) : null;
+  if (!drawingPath) return [];
+
+  const drawingXml = workbookFileText(workbook, drawingPath);
+  const rels = relationshipMap(workbookFileText(workbook, drawingRelsPath(drawingPath)));
+  const images: WorkbookFrontImage[] = [];
+
+  for (const anchorMatch of drawingXml.matchAll(/<xdr:twoCellAnchor\b[\s\S]*?<\/xdr:twoCellAnchor>/g)) {
+    const anchor = anchorMatch[0];
+    const relId = anchor.match(/r:embed="([^"]+)"/)?.[1] || "";
+    const rel = rels.get(relId);
+    if (!rel) continue;
+    const target = resolveXlsxTarget(drawingPath, rel.target);
+    const bytes = workbookFileBytes(workbook, target);
+    if (!bytes) continue;
+    images.push({
+      relId,
+      bytes,
+      extension: target.split(".").pop()?.toLowerCase() || "jpg",
+      from: anchorMarker(anchor, "from"),
+      to: anchorMarker(anchor, "to"),
+    });
+  }
+
+  return images;
+}
+
 function workbookPrintRange(workbook: XLSX.WorkBook, sheetName: string) {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) return null;
@@ -458,124 +611,471 @@ function replaceCarriageIndexRows(rows: string[][], ranges: Map<string, MetalsPa
 
 function workbookFrontSheets(workbook: XLSX.WorkBook, ranges?: Map<string, MetalsPageRange>) {
   return METALS_FRONT_SHEETS.flatMap<WorkbookFrontSheet>((name) => {
+    const sheet = workbook.Sheets[name];
+    const range = workbookPrintRange(workbook, name);
     let rows = rowsFromWorkbookSheet(workbook, name);
-    if (!rows.length) return [];
+    if (!sheet || !range || !rows.length) return [];
     if (name === "Carriage Rates" && ranges) rows = replaceCarriageIndexRows(rows, ranges);
-    return [{ name, rows }];
+
+    const rowCount = Math.max(rows.length, range.e.r - range.s.r + 1);
+    const colCount = range.e.c - range.s.c + 1;
+    const cols = sheet["!cols"] || [];
+    const sheetRows = sheet["!rows"] || [];
+    const colWidths = Array.from({ length: colCount }, (_, index) => {
+      const col = cols[range.s.c + index];
+      return Number(col?.wpx ? col.wpx * 0.75 : col?.width ? col.width * 5.25 : DEFAULT_EXCEL_COL_WIDTH_POINTS);
+    });
+    const rowHeights = Array.from({ length: rowCount }, (_, index) => {
+      const row = sheetRows[range.s.r + index];
+      return Number(row?.hpt || row?.hpx || DEFAULT_EXCEL_ROW_HEIGHT_POINTS);
+    });
+
+    return [{
+      name,
+      rows,
+      range,
+      merges: sheet["!merges"] || [],
+      colWidths,
+      rowHeights,
+      images: workbookSheetImages(workbook as WorkbookWithFiles, name),
+    }];
   });
 }
 
-function workbookSheetCellWidth(sheetName: string, row: string[], index: number, usableWidth: number) {
-  const nonEmptyCount = row.filter(Boolean).length;
-  if (nonEmptyCount <= 1) return usableWidth;
-  if (sheetName === "Conversion table") return usableWidth / Math.max(1, Math.min(7, row.length));
-  const nonEmptyIndexes = row.map((cell, cellIndex) => cell ? cellIndex : -1).filter((cellIndex) => cellIndex >= 0);
-  const first = nonEmptyIndexes[0];
-  const second = nonEmptyIndexes[1];
-  if (index === first && row[index].length <= 4 && typeof second === "number") return 28;
-  if (index === second && row[first]?.length <= 4) return usableWidth - 34;
-  if (sheetName === "Carriage Rates" && index === 1) return 52;
-  if (sheetName === "Carriage Rates" && index === 2) return 72;
-  if (sheetName === "Carriage Rates" && index >= 3) return usableWidth - 136;
-  const columns = Math.max(1, Math.min(10, row.length));
-  if (index === row.length - 1) return usableWidth / columns;
-  return usableWidth / columns;
+function workbookRowsPageCount() {
+  return 1;
 }
 
-function workbookSheetCellX(sheetName: string, row: string[], index: number, usableWidth: number) {
-  const nonEmptyCount = row.filter(Boolean).length;
-  if (nonEmptyCount <= 1) return MARGIN;
-  if (sheetName === "Conversion table") {
-    const columns = Math.max(1, Math.min(7, row.length));
-    return MARGIN + (usableWidth / columns) * index;
-  }
-  const nonEmptyIndexes = row.map((cell, cellIndex) => cell ? cellIndex : -1).filter((cellIndex) => cellIndex >= 0);
-  const first = nonEmptyIndexes[0];
-  const second = nonEmptyIndexes[1];
-  if (index === first && row[index].length <= 4 && typeof second === "number") return MARGIN;
-  if (index === second && row[first]?.length <= 4) return MARGIN + 34;
-  if (sheetName === "Carriage Rates" && index === 1) return MARGIN + 34;
-  if (sheetName === "Carriage Rates" && index === 2) return MARGIN + 88;
-  if (sheetName === "Carriage Rates" && index >= 3) return MARGIN + 136;
-  const columns = Math.max(1, Math.min(10, row.length));
-  return MARGIN + (usableWidth / columns) * index;
+function sum(values: number[], end = values.length) {
+  return values.slice(0, end).reduce((total, value) => total + value, 0);
 }
 
-function workbookRowsPageCount(sheet: WorkbookFrontSheet, regular: PDFFont, bold: PDFFont) {
-  let pages = 1;
-  let y = A4_HEIGHT - MARGIN;
-  const usableWidth = A4_WIDTH - MARGIN * 2;
-
-  for (const [rowIndex, row] of sheet.rows.entries()) {
-    const metrics = workbookRowMetrics(sheet.name, row, rowIndex, usableWidth, regular, bold);
-    if (y - metrics.height < MARGIN) {
-      pages += 1;
-      y = A4_HEIGHT - MARGIN;
-    }
-    y -= metrics.height;
-  }
-
-  return pages;
+function workbookMergeForCell(sheet: WorkbookFrontSheet, row: number, col: number) {
+  return sheet.merges.find((merge) => (
+    row >= merge.s.r && row <= merge.e.r && col >= merge.s.c && col <= merge.e.c
+  ));
 }
 
-function workbookRowMetrics(
-  sheetName: string,
-  row: string[],
-  rowIndex: number,
-  usableWidth: number,
-  regular: PDFFont,
-  bold: PDFFont
-) {
-  const isTitle = rowIndex === 0 && row.filter(Boolean).length <= 2;
-  const isIndexHeading = row.some((cell) => cell.trim().toLowerCase() === "index");
-  const isConversion = sheetName === "Conversion table";
-  const size = isTitle ? 14 : isIndexHeading ? 10.5 : isConversion ? 7.4 : 8.7;
-  const font = isTitle || isIndexHeading ? bold : regular;
-  const lineHeight = size + (isConversion ? 1.4 : 2.2);
-  const maxLines = Math.max(
-    1,
-    ...row.map((cell, index) =>
-      cell ? lineWrap(cell, font, size, workbookSheetCellWidth(sheetName, row, index, usableWidth) - 6).length : 1
-    )
-  );
+function workbookCellRect(sheet: WorkbookFrontSheet, rowIndex: number, colIndex: number) {
+  const merge = workbookMergeForCell(sheet, sheet.range.s.r + rowIndex, sheet.range.s.c + colIndex);
+  if (merge && (merge.s.r !== sheet.range.s.r + rowIndex || merge.s.c !== sheet.range.s.c + colIndex)) return null;
+
+  const startCol = Math.max(sheet.range.s.c, merge?.s.c ?? sheet.range.s.c + colIndex) - sheet.range.s.c;
+  const endCol = Math.min(sheet.range.e.c, merge?.e.c ?? sheet.range.s.c + colIndex) - sheet.range.s.c;
+  const startRow = Math.max(sheet.range.s.r, merge?.s.r ?? sheet.range.s.r + rowIndex) - sheet.range.s.r;
+  const endRow = Math.min(sheet.range.e.r, merge?.e.r ?? sheet.range.s.r + rowIndex) - sheet.range.s.r;
+
   return {
-    font,
-    size,
-    lineHeight,
-    height: Math.max(isTitle ? 24 : isConversion ? 10 : 13, maxLines * lineHeight + 3),
+    col: startCol,
+    row: startRow,
+    x: sum(sheet.colWidths, startCol),
+    y: sum(sheet.rowHeights, startRow),
+    width: sum(sheet.colWidths.slice(startCol, endCol + 1)),
+    height: sum(sheet.rowHeights.slice(startRow, endRow + 1)),
   };
 }
 
-function drawWorkbookRowsPage(ctx: PdfContext, sheet: WorkbookFrontSheet) {
-  const usableWidth = A4_WIDTH - MARGIN * 2;
+function workbookCellStyle(
+  sheetName: string,
+  rowIndex: number,
+  colIndex: number,
+  text: string,
+  row: string[],
+  regular: PDFFont,
+  bold: PDFFont
+) {
+  const lower = text.trim().toLowerCase();
+  const nonEmpty = row.filter(Boolean).length;
+  const isTitle = rowIndex === 0 || lower.includes("terms of business") || lower.includes("conversion table");
+  const isIndex = lower === "index";
+  const isSectionHeading = ["payment", "goods", "prices", "claims", "carriage"].includes(lower);
+  const isFrontDate = sheetName === "Front sheet" && /^[a-z]+ \d{4}$/i.test(text.trim());
+
+  let size = sheetName === "Conversion table" ? 7.2 : sheetName === "T&Cs" ? 8.1 : 8.8;
+  let font = regular;
+  let align: "left" | "center" | "right" = sheetName === "T&Cs" ? "left" : "center";
+  let color = rgb(0, 0, 0);
+  let fill: ReturnType<typeof rgb> | null = null;
+  let border = false;
+
+  if (isTitle) {
+    size = sheetName === "Front sheet" ? 11 : 15;
+    font = bold;
+    align = "center";
+    fill = WORKBOOK_HEADER_FILL;
+    border = true;
+  } else if (isIndex || isSectionHeading) {
+    size = isIndex ? 12 : 9;
+    font = bold;
+    align = isIndex ? "center" : "left";
+    fill = isIndex ? WORKBOOK_HEADER_FILL : null;
+  } else if (isFrontDate) {
+    size = 13;
+    font = bold;
+    align = "center";
+    color = WORKBOOK_RED;
+  } else if (/^\d+$/.test(text.trim()) && sheetName === "T&Cs") {
+    font = bold;
+    align = "right";
+  } else if (sheetName === "Conversion table" && rowIndex >= 2 && rowIndex <= 3) {
+    font = bold;
+    align = "center";
+    fill = WORKBOOK_PANEL_FILL;
+    border = true;
+  } else if (sheetName === "Carriage Rates" && rowIndex > 15 && nonEmpty >= 3) {
+    border = true;
+    if (colIndex === 1 || colIndex === 2) align = "center";
+    if (colIndex >= 3) align = "left";
+  }
+
+  if (sheetName === "Conversion table" && rowIndex >= 5) {
+    border = true;
+    align = "center";
+  }
+
+  return { size, font, align, color, fill, border };
+}
+
+function drawWorkbookCellText(
+  ctx: PdfContext,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: ReturnType<typeof workbookCellStyle>
+) {
+  const padding = 3.5;
+  const lineHeight = style.size + 1.8;
+  const lines = lineWrap(text, style.font, style.size, width - padding * 2);
+  const maxLines = Math.max(1, Math.floor((height - padding * 2) / lineHeight) + 1);
+  const visibleLines = lines.slice(0, maxLines);
+  const blockHeight = visibleLines.length * lineHeight;
+  const startY = y + Math.max(padding, (height - blockHeight) / 2) + blockHeight - style.size;
+
+  visibleLines.forEach((line, index) => {
+    const textWidth = style.font.widthOfTextAtSize(line, style.size);
+    let drawX = x + padding;
+    if (style.align === "center") drawX = x + Math.max(padding, (width - textWidth) / 2);
+    if (style.align === "right") drawX = x + width - padding - textWidth;
+    ctx.page.drawText(line, {
+      x: drawX,
+      y: startY - index * lineHeight,
+      size: style.size,
+      font: style.font,
+      color: style.color,
+      maxWidth: width - padding * 2,
+    });
+  });
+}
+
+async function drawWorkbookImages(ctx: PdfContext, sheet: WorkbookFrontSheet, scale: number, xOrigin: number, yTop: number) {
+  for (const image of sheet.images) {
+    const fromCol = image.from.col - sheet.range.s.c;
+    const toCol = image.to.col - sheet.range.s.c;
+    const fromRow = image.from.row - sheet.range.s.r;
+    const toRow = image.to.row - sheet.range.s.r;
+    if (toCol < 0 || toRow < 0 || fromCol >= sheet.colWidths.length || fromRow >= sheet.rowHeights.length) continue;
+
+    const rawX = sum(sheet.colWidths, Math.max(0, fromCol)) + image.from.colOff;
+    const rawY = sum(sheet.rowHeights, Math.max(0, fromRow)) + image.from.rowOff;
+    const rawRight = sum(sheet.colWidths, Math.max(0, toCol)) + image.to.colOff;
+    const rawBottom = sum(sheet.rowHeights, Math.max(0, toRow)) + image.to.rowOff;
+    const width = Math.max(1, (rawRight - rawX) * scale);
+    const height = Math.max(1, (rawBottom - rawY) * scale);
+    const x = xOrigin + rawX * scale;
+    const y = yTop - (rawY + (rawBottom - rawY)) * scale;
+
+    const embedded = image.extension === "png"
+      ? await ctx.doc.embedPng(image.bytes)
+      : await ctx.doc.embedJpg(image.bytes);
+    ctx.page.drawImage(embedded, { x, y, width, height });
+  }
+}
+
+function drawWorkbookWrappedText(
+  ctx: PdfContext,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  options: {
+    size: number;
+    font?: PDFFont;
+    color?: ReturnType<typeof rgb>;
+    lineHeight?: number;
+    align?: "left" | "center" | "right";
+  }
+) {
+  const font = options.font || ctx.regular;
+  const size = options.size;
+  const lineHeight = options.lineHeight || size + 3.5;
+  const lines = lineWrap(text, font, size, width);
+  lines.forEach((line, index) => {
+    const lineWidth = font.widthOfTextAtSize(line, size);
+    let drawX = x;
+    if (options.align === "center") drawX = x + Math.max(0, (width - lineWidth) / 2);
+    if (options.align === "right") drawX = x + Math.max(0, width - lineWidth);
+    ctx.page.drawText(line, {
+      x: drawX,
+      y: y - index * lineHeight,
+      size,
+      font,
+      color: options.color || rgb(0, 0, 0),
+      maxWidth: width,
+    });
+  });
+  return lines.length * lineHeight;
+}
+
+function firstRowText(row: string[] | undefined) {
+  return row?.map((cell) => cell.trim()).find(Boolean) || "";
+}
+
+function drawCarriageRatesPage(ctx: PdfContext, sheet: WorkbookFrontSheet) {
   ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
   ctx.y = A4_HEIGHT - MARGIN;
 
-  sheet.rows.forEach((row, rowIndex) => {
-    const metrics = workbookRowMetrics(sheet.name, row, rowIndex, usableWidth, ctx.regular, ctx.bold);
-    if (ctx.y - metrics.height < MARGIN) {
-      ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
-      ctx.y = A4_HEIGHT - MARGIN;
-    }
+  const title = firstRowText(sheet.rows[0]) || "Carriage Rates (incl VAT)";
+  drawWorkbookWrappedText(ctx, title, MARGIN, A4_HEIGHT - 78, A4_WIDTH - MARGIN * 2, {
+    size: 20,
+    font: ctx.bold,
+    align: "center",
+  });
+  ctx.page.drawLine({
+    start: { x: 178, y: A4_HEIGHT - 84 },
+    end: { x: 417, y: A4_HEIGHT - 84 },
+    color: rgb(0, 0, 0),
+    thickness: 1.1,
+  });
 
+  const boxedRows = [2, 4, 6]
+    .map((rowIndex) => firstRowText(sheet.rows[rowIndex]))
+    .filter(Boolean);
+  let y = A4_HEIGHT - 122;
+  boxedRows.forEach((line) => {
+    ctx.page.drawRectangle({
+      x: 58,
+      y: y - 14,
+      width: 478,
+      height: 23,
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 0.8,
+    });
+    drawWorkbookWrappedText(ctx, line, 64, y - 8, 466, {
+      size: 16,
+      font: ctx.regular,
+      align: "center",
+      lineHeight: 18,
+    });
+    y -= 34;
+  });
+
+  y -= 7;
+  [8, 9].forEach((rowIndex) => {
+    const line = firstRowText(sheet.rows[rowIndex]);
+    if (!line) return;
+    drawWorkbookWrappedText(ctx, line, MARGIN, y, A4_WIDTH - MARGIN * 2, {
+      size: 10.5,
+      align: "center",
+      lineHeight: 13,
+    });
+    y -= 15;
+  });
+
+  y -= 8;
+  [11, 12].forEach((rowIndex) => {
+    const line = firstRowText(sheet.rows[rowIndex]);
+    if (!line) return;
+    drawWorkbookWrappedText(ctx, line, 74, y, A4_WIDTH - 148, {
+      size: 10.5,
+      font: ctx.bold,
+      align: "center",
+      lineHeight: 13,
+    });
+    y -= 15;
+  });
+
+  y = A4_HEIGHT - 358;
+  drawWorkbookWrappedText(ctx, "INDEX", MARGIN, y, A4_WIDTH - MARGIN * 2, {
+    size: 20,
+    font: ctx.bold,
+    align: "center",
+  });
+  y -= 38;
+
+  const indexRow = sheet.rows.findIndex((row) => row.some((cell) => cell.trim().toLowerCase() === "index"));
+  const indexRows = indexRow >= 0 ? sheet.rows.slice(indexRow + 1) : [];
+  for (const row of indexRows) {
+    const cells = row.map((cell) => cell.trim()).filter(Boolean);
+    if (cells.length < 3) continue;
+    const [prefix, pages, ...labelParts] = cells;
+    const label = labelParts.join(" ");
+    ctx.page.drawText(prefix, { x: 108, y, size: 10, font: ctx.regular, color: rgb(0, 0, 0) });
+    ctx.page.drawText(pages, { x: 164, y, size: 10, font: ctx.regular, color: rgb(0, 0, 0) });
+    const used = drawWorkbookWrappedText(ctx, label, 218, y, 295, {
+      size: 10,
+      font: ctx.regular,
+      lineHeight: 13,
+    });
+    y -= Math.max(18, used + 3);
+  }
+}
+
+function drawTermsWorkbookPage(ctx: PdfContext, sheet: WorkbookFrontSheet) {
+  ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
+  ctx.y = A4_HEIGHT - MARGIN;
+
+  const title = sheet.rows.flatMap((row) => row).find((cell) => /terms of business/i.test(cell)) || "Terms of Business, Pricing and Delivery";
+
+  drawWorkbookWrappedText(ctx, title, 88, A4_HEIGHT - 92, A4_WIDTH - 176, {
+    size: 16,
+    font: ctx.bold,
+    align: "center",
+  });
+
+  type TermsItem = { number: string; text: string };
+  type TermsSection = { heading: string; items: TermsItem[] };
+  const sections: TermsSection[] = [];
+  let currentSection: TermsSection | null = null;
+  let currentItem: TermsItem | null = null;
+
+  function cleanTermsText(texts: string[]) {
+    if (!texts.length) return "";
+    const main = texts[0];
+    const combined = texts.join(" ");
+    if (/maximum/i.test(main) && /2\s*meters/i.test(combined)) {
+      return "We can supply lengths up to a maximum of 2 meters";
+    }
+    if (/minimum/i.test(main) && /\b12\b/.test(combined) && /small orders/i.test(combined)) {
+      return "We reserve the right to charge a minimum of £12 for goods on small orders.";
+    }
+    return main;
+  }
+
+  for (const row of sheet.rows) {
+    const first = row[0]?.trim() || "";
+    const texts = row.slice(1).map((cell) => cell.trim()).filter(Boolean);
+    if (/terms of business/i.test(texts.join(" "))) continue;
+    if (first && !/^\d+$/.test(first)) {
+      currentSection = { heading: first, items: [] };
+      sections.push(currentSection);
+      currentItem = null;
+      continue;
+    }
+    if (/^\d+$/.test(first)) {
+      if (!currentSection) {
+        currentSection = { heading: "", items: [] };
+        sections.push(currentSection);
+      }
+      currentItem = { number: first, text: cleanTermsText(texts) };
+      currentSection.items.push(currentItem);
+      continue;
+    }
+    if (currentItem && texts.length) {
+      const continuation = cleanTermsText(texts);
+      if (continuation) currentItem.text = `${currentItem.text} ${continuation}`.trim();
+    }
+  }
+
+  let y = A4_HEIGHT - 156;
+  const left = 86;
+  const numberX = 112;
+  const textX = 142;
+  const textWidth = A4_WIDTH - textX - 84;
+  for (const section of sections) {
+    if (!section.heading && !section.items.length) continue;
+    if (section.heading) {
+      ctx.page.drawText(section.heading, {
+        x: left,
+        y,
+        size: 11,
+        font: ctx.bold,
+        color: rgb(0, 0, 0),
+      });
+      y -= 34;
+    }
+    for (const item of section.items) {
+      ctx.page.drawText(item.number, {
+        x: numberX,
+        y,
+        size: 9.6,
+        font: ctx.bold,
+        color: rgb(0, 0, 0),
+      });
+      const used = drawWorkbookWrappedText(ctx, item.text, textX, y, textWidth, {
+        size: 9.6,
+        font: ctx.regular,
+        lineHeight: 14,
+      });
+      y -= Math.max(32, used + 16);
+    }
+    y -= 6;
+  }
+}
+
+async function drawWorkbookRowsPage(ctx: PdfContext, sheet: WorkbookFrontSheet) {
+  if (sheet.name === "Carriage Rates") {
+    drawCarriageRatesPage(ctx, sheet);
+    return;
+  }
+  if (sheet.name === "T&Cs") {
+    drawTermsWorkbookPage(ctx, sheet);
+    return;
+  }
+
+  ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
+  ctx.y = A4_HEIGHT - MARGIN;
+  const totalWidth = sum(sheet.colWidths);
+  const totalHeight = sum(sheet.rowHeights);
+  const scale = Math.min((A4_WIDTH - MARGIN * 2) / totalWidth, (A4_HEIGHT - MARGIN * 2) / totalHeight, 1.25);
+  const pageWidth = totalWidth * scale;
+  const pageHeight = totalHeight * scale;
+  const xOrigin = (A4_WIDTH - pageWidth) / 2;
+  const yTop = (A4_HEIGHT + pageHeight) / 2;
+
+  await drawWorkbookImages(ctx, sheet, scale, xOrigin, yTop);
+
+  sheet.rows.forEach((row, rowIndex) => {
     row.forEach((cell, index) => {
       if (!cell) return;
-      const x = workbookSheetCellX(sheet.name, row, index, usableWidth);
-      const width = workbookSheetCellWidth(sheet.name, row, index, usableWidth);
-      lineWrap(cell, metrics.font, metrics.size, width - 6).slice(0, 3).forEach((line, lineIndex) => {
-        ctx.page.drawText(line, {
-          x,
-          y: ctx.y - metrics.size - lineIndex * metrics.lineHeight,
-          size: metrics.size,
-          font: metrics.font,
-          color: rgb(0, 0, 0),
-          maxWidth: width - 6,
-        });
-      });
-    });
+      const rect = workbookCellRect(sheet, rowIndex, index);
+      if (!rect) return;
+      const x = xOrigin + rect.x * scale;
+      const y = yTop - (rect.y + rect.height) * scale;
+      const width = rect.width * scale;
+      const height = rect.height * scale;
+      const style = workbookCellStyle(sheet.name, rowIndex, index, cell, row, ctx.regular, ctx.bold);
 
-    ctx.y -= metrics.height;
+      if (style.fill) {
+        ctx.page.drawRectangle({ x, y, width, height, color: style.fill });
+      }
+
+      if (style.border) {
+        ctx.page.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          borderColor: WORKBOOK_GRID_BORDER,
+          borderWidth: 0.5,
+        });
+      }
+
+      drawWorkbookCellText(ctx, cell, x, y, width, height, style);
+    });
   });
+
+  if (sheet.name === "Front sheet") {
+    ctx.page.drawRectangle({
+      x: xOrigin,
+      y: yTop - pageHeight,
+      width: pageWidth,
+      height: pageHeight,
+      borderColor: rgb(0.86, 0.82, 0.72),
+      borderWidth: 0.65,
+    });
+  }
 }
 
 async function createMetalsCatalogueContext(workbookBytes?: Uint8Array, products: MetalProduct[] = []): Promise<PdfContext> {
@@ -595,16 +1095,17 @@ async function createMetalsCatalogueContext(workbookBytes?: Uint8Array, products
   };
   doc.removePage(doc.getPageCount() - 1);
 
-  let workbook: XLSX.WorkBook | null = null;
+  let workbook: WorkbookWithFiles | null = null;
   if (workbookBytes?.byteLength) {
     try {
       workbook = XLSX.read(workbookBytes, {
         type: "array",
         cellDates: false,
         cellNF: false,
-        cellStyles: false,
+        cellStyles: true,
+        bookFiles: true,
         bookVBA: false,
-      });
+      } as XLSX.ParsingOptions & { bookFiles: true }) as WorkbookWithFiles;
     } catch {
       workbook = null;
     }
@@ -612,13 +1113,13 @@ async function createMetalsCatalogueContext(workbookBytes?: Uint8Array, products
 
   if (workbook) {
     let frontSheets = workbookFrontSheets(workbook);
-    let frontPageCount = frontSheets.reduce((sum, sheet) => sum + workbookRowsPageCount(sheet, regular, bold), 0);
+    let frontPageCount = frontSheets.reduce((total) => total + workbookRowsPageCount(), 0);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const ranges = calculateMetalsCategoryPageRanges(products, regular, frontPageCount);
       const nextFrontSheets = workbookFrontSheets(workbook, ranges);
       const nextFrontPageCount = nextFrontSheets.reduce(
-        (sum, sheet) => sum + workbookRowsPageCount(sheet, regular, bold),
+        (total) => total + workbookRowsPageCount(),
         0
       );
       frontSheets = nextFrontSheets;
@@ -626,7 +1127,9 @@ async function createMetalsCatalogueContext(workbookBytes?: Uint8Array, products
       frontPageCount = nextFrontPageCount;
     }
 
-    frontSheets.forEach((sheet) => drawWorkbookRowsPage(ctx, sheet));
+    for (const sheet of frontSheets) {
+      await drawWorkbookRowsPage(ctx, sheet);
+    }
   }
 
   addMetalsTablePage(ctx);

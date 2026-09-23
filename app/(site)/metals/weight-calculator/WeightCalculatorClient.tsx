@@ -287,7 +287,7 @@ export default function WeightCalculatorClient() {
         <h2 className="font-display text-2xl text-racing">How to use it</h2>
         <div className="mt-4 space-y-4 text-sm leading-6 text-ink-muted">
           <p>
-            Choose the units, material and shape, then enter the requested dimensions. The calculator uses the same formulas from the old M-Machine metals site.
+            Choose the units, material and shape, then enter the requested dimensions to estimate the approximate weight.
           </p>
           <p>
             Metric entries use millimetres for all dimensions including length. Imperial entries use inches for all dimensions including length.

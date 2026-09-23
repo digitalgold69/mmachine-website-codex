@@ -116,8 +116,8 @@ export default function MiniCataloguePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="relative mb-8 sm:flex sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 pr-40 sm:pr-0">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <Link href="/" className="text-sm text-ink-muted hover:text-racing">
             &larr; Home
           </Link>
@@ -128,15 +128,17 @@ export default function MiniCataloguePage() {
             {catalogueProducts.length} parts across {catalogueSections.length} sections, organised in the same down-the-list order as the printed catalogue.
           </p>
         </div>
-        <a
-          href={miniCatalogueUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary absolute right-0 top-7 inline-flex w-36 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-xs sm:static sm:mt-7 sm:w-auto sm:text-sm"
-        >
-          <DownloadIcon />
-          Download Old PDF
-        </a>
+        <div className="grid gap-2 sm:mt-7 sm:shrink-0">
+          <a
+            href={miniCatalogueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary inline-flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-3 text-sm sm:w-auto"
+          >
+            <DownloadIcon />
+            Download Old PDF
+          </a>
+        </div>
       </div>
 
       <Mini3DViewer selectedSection={section} onSelect={chooseSection} />
