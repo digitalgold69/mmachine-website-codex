@@ -67,11 +67,11 @@ export default function AnalyticsConsent() {
         helps us understand which pages are useful. You can change your choice in Cookie settings at any time.
         {" "}<Link href="/privacy" className="underline underline-offset-2">Privacy policy</Link>
       </p>
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button type="button" onClick={() => choose("rejected")}
-          className="min-h-11 flex-1 rounded-lg border border-racing px-4 py-2 text-sm font-semibold text-racing hover:bg-racing/5">Reject analytics</button>
+          className="min-h-11 w-full rounded-lg border border-racing px-4 py-2 text-sm font-semibold text-racing hover:bg-racing/5 sm:flex-1">Reject analytics</button>
         <button type="button" onClick={() => choose("accepted")}
-          className="min-h-11 flex-1 rounded-lg border border-racing bg-racing px-4 py-2 text-sm font-semibold text-white hover:bg-racing-light">Accept analytics</button>
+          className="min-h-11 w-full rounded-lg border border-racing bg-racing px-4 py-2 text-sm font-semibold text-white hover:bg-racing-light sm:flex-1">Accept analytics</button>
         {choice !== null && <button type="button" onClick={() => setOpen(false)}
           className="min-h-11 px-3 text-sm underline">Close</button>}
       </div>
