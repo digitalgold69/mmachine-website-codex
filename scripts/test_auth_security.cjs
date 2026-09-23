@@ -121,7 +121,9 @@ assert.match(ordersClient, /Measurements for this line/, "owner-added metal line
 assert.match(ordersClient, /renderPendingMetalLinePanel\(product\)/, "owner-added metal dimension inputs must render underneath the selected search result");
 assert.match(ordersClient, /max-w-\[92rem\]/, "invoice editor modal must use the available screen width for line editing");
 assert.match(ordersClient, /max-h-\[22rem\]/, "add-line catalogue results must have a clear internal scroll area");
-assert.match(ordersClient, /ADD_LINE_RESULT_LIMITS[\s\S]+mini: "1200"[\s\S]+metals: "5000"/, "add-line catalogue search must load enough rows for a scrollable picker");
+assert.match(ordersClient, /ADD_LINE_RESULT_BATCH = 30/, "add-line catalogue search must load a practical first batch");
+assert.match(ordersClient, /loadMoreAddLineResults/, "add-line catalogue search must let staff load further rows for a scrollable picker");
+assert.match(ordersClient, /Load next[\s\S]+ADD_LINE_RESULT_BATCH/, "add-line catalogue search must expose a clear load-more button");
 assert.match(ordersClient, /openMetalMeasurementKeys/, "existing metal measurement editors must be collapsed until opened");
 assert.match(ordersClient, /aria-expanded=\{metalMeasurementsOpen\}/, "measurement edit pill must expose its expanded state");
 assert.match(ordersClient, /function updateMetalLineMeasurement/, "existing metal invoice lines must expose measurement edits");

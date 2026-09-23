@@ -184,7 +184,10 @@ async function main() {
   assert.match(productsRoute, /filterAndRankCatalogueProducts/, "Product API searches must use ranked any-token catalogue matching");
 
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
-  assert.match(ordersClient, /ADD_LINE_RESULT_LIMITS[\s\S]+mini: "1200"[\s\S]+metals: "5000"/, "Dashboard add-line catalogue search must not stop at the first 30 matches");
+  assert.match(ordersClient, /ADD_LINE_RESULT_BATCH = 30/, "Dashboard add-line catalogue search must load a practical first batch");
+  assert.match(ordersClient, /offset: String\(offset\)[\s\S]+limit: String\(ADD_LINE_RESULT_BATCH\)/, "Dashboard add-line catalogue search must fetch catalogue matches in offset batches");
+  assert.match(ordersClient, /loadMoreAddLineResults/, "Dashboard add-line catalogue search must let staff load further matches");
+  assert.match(ordersClient, /Load next[\s\S]+ADD_LINE_RESULT_BATCH/, "Dashboard add-line catalogue search must expose a visible load-more control");
   assert.match(ordersClient, /PaymentSettingsModal/, "Dashboard must expose editable payment method settings");
   assert.match(ordersClient, /max-h-\[calc\(100vh-2rem\)\]/, "Payment method settings modal must fit short laptop screens");
   assert.match(ordersClient, /min-h-0 flex-1 overflow-y-auto px-4 pb-4/, "Payment method settings modal fields must scroll inside the dialog");

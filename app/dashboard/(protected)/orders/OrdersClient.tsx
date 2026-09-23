@@ -35,10 +35,7 @@ import type {
 
 const GBP = "\u00a3";
 const PAGE_SIZE = 8;
-const ADD_LINE_RESULT_LIMITS: Record<AddLineCatalogue, string> = {
-  mini: "1200",
-  metals: "5000",
-};
+const ADD_LINE_RESULT_BATCH = 30;
 const TZ = "Europe/London";
 const TRADING_NAME = "Craftgrange Limited, Trading as M Machine";
 
@@ -1321,6 +1318,7 @@ export default function OrdersClient({
   const [addLineResults, setAddLineResults] = useState<CatalogueSearchProduct[]>([]);
   const [addLineCount, setAddLineCount] = useState(0);
   const [addLineLoading, setAddLineLoading] = useState(false);
+  const [addLineLoadingMore, setAddLineLoadingMore] = useState(false);
   const [addLineError, setAddLineError] = useState("");
   const [addLineNotice, setAddLineNotice] = useState<{ catalogue: AddLineCatalogue; productId: string; text: string } | null>(null);
   const [pendingMetalLine, setPendingMetalLine] = useState<PendingMetalLine | null>(null);
@@ -1539,6 +1537,7 @@ export default function OrdersClient({
     setAddLineQuery("");
     setAddLineResults([]);
     setAddLineCount(0);
+    setAddLineLoadingMore(false);
     setAddLineError("");
     setAddLineNotice(null);
     setPendingMetalLine(null);
@@ -1546,26 +1545,38 @@ export default function OrdersClient({
     setRefundDraft(blankRefundDraft());
   }, [draft?.id]);
 
+  const fetchAddLineProducts = useCallback(async (offset: number, signal?: AbortSignal) => {
+    const params = new URLSearchParams({
+      catalogue: addLineCatalogue,
+      q: addLineQuery.trim(),
+      offset: String(offset),
+      limit: String(ADD_LINE_RESULT_BATCH),
+    });
+    if (addLineCatalogue === "metals") params.set("category", "all");
+    const response = await fetch(`/api/products?${params}`, { signal });
+    const data = await response.json() as ProductsResponse;
+    if (!response.ok) throw new Error(data.error || "Catalogue search could not be loaded.");
+    return {
+      products: data.products || [],
+      count: Number(data.count || 0),
+    };
+  }, [addLineCatalogue, addLineQuery]);
+
   useEffect(() => {
     if (!addLineOpen) return;
 
     const controller = new AbortController();
+    setAddLineResults([]);
+    setAddLineCount(0);
+    setPendingMetalLine(null);
+    setAddLineLoadingMore(false);
     const timeout = window.setTimeout(async () => {
       setAddLineLoading(true);
       setAddLineError("");
       try {
-        const params = new URLSearchParams({
-          catalogue: addLineCatalogue,
-          q: addLineQuery.trim(),
-          offset: "0",
-          limit: ADD_LINE_RESULT_LIMITS[addLineCatalogue],
-        });
-        if (addLineCatalogue === "metals") params.set("category", "all");
-        const response = await fetch(`/api/products?${params}`, { signal: controller.signal });
-        const data = await response.json() as ProductsResponse;
-        if (!response.ok) throw new Error(data.error || "Catalogue search could not be loaded.");
-        setAddLineResults(data.products || []);
-        setAddLineCount(Number(data.count || 0));
+        const data = await fetchAddLineProducts(0, controller.signal);
+        setAddLineResults(data.products);
+        setAddLineCount(data.count);
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           setAddLineResults([]);
@@ -1581,7 +1592,27 @@ export default function OrdersClient({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [addLineCatalogue, addLineOpen, addLineQuery]);
+  }, [addLineOpen, fetchAddLineProducts]);
+
+  async function loadMoreAddLineResults() {
+    if (addLineLoading || addLineLoadingMore || addLineResults.length >= addLineCount) return;
+
+    setAddLineLoadingMore(true);
+    setAddLineError("");
+    try {
+      const data = await fetchAddLineProducts(addLineResults.length);
+      setAddLineCount(data.count);
+      setAddLineResults((current) => {
+        const seen = new Set(current.map((product) => product.id));
+        const fresh = data.products.filter((product) => !seen.has(product.id));
+        return [...current, ...fresh];
+      });
+    } catch {
+      setAddLineError("More catalogue lines could not be loaded. Please try again.");
+    } finally {
+      setAddLineLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     if (!addLineNotice) return;
@@ -3092,9 +3123,9 @@ export default function OrdersClient({
                             </div>
                           )}
 
-                          <div className="rounded-md border border-racing/10">
-                            <div className="flex items-center justify-between gap-3 border-b border-racing/10 bg-cream-dark px-3 py-2 text-xs text-ink-muted">
-                              <span>{addLineLoading ? "Searching..." : `${addLineResults.length} of ${addLineCount} matches`}</span>
+                            <div className="rounded-md border border-racing/10">
+                              <div className="flex items-center justify-between gap-3 border-b border-racing/10 bg-cream-dark px-3 py-2 text-xs text-ink-muted">
+                              <span>{addLineLoading ? "Searching..." : `Showing ${addLineResults.length} of ${addLineCount} matches`}</span>
                               {addLineQuery.trim() && (
                                 <button
                                   type="button"
@@ -3140,6 +3171,20 @@ export default function OrdersClient({
                                   );
                                 })()
                               ))}
+                              {!addLineLoading && addLineResults.length > 0 && addLineResults.length < addLineCount && (
+                                <div className="bg-white px-4 py-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={loadMoreAddLineResults}
+                                    disabled={addLineLoadingMore}
+                                    className="btn-secondary w-full justify-center px-4 py-2 text-sm sm:w-auto"
+                                  >
+                                    {addLineLoadingMore
+                                      ? "Loading more..."
+                                      : `Load next ${Math.min(ADD_LINE_RESULT_BATCH, addLineCount - addLineResults.length)} matches`}
+                                  </button>
+                                </div>
+                              )}
                               {!addLineLoading && addLineResults.length === 0 && (
                                 <div className="px-3 py-4 text-sm text-ink-muted">
                                   No catalogue lines match that search.
