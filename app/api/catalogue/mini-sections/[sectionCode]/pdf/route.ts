@@ -1,14 +1,12 @@
 import { MINI_PAGE_MAP_PREFIX } from "@/lib/mini-workbook-pdf";
 import { PDFDocument } from "pdf-lib";
-import { getCloudflareEnv } from "@/lib/cloudflare";
-import { miniCatalogueUrl } from "@/lib/catalogue-versions";
 import {
   getMiniSectionForPdf,
   miniSectionPdfFilename,
   miniSectionPdfPageIndexes,
 } from "@/lib/mini-section-pdfs";
 import { getCatalogueOverridePdfObject } from "@/lib/catalogue-overrides";
-import { staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
+import { STATIC_MINI_CATALOGUE_ASSET, staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,13 +25,9 @@ export async function GET(
   }
 
   const uploaded = await getCatalogueOverridePdfObject("mini");
-  const sourceUrl = new URL(miniCatalogueUrl, req.url);
-  const env = await getCloudflareEnv().catch(() => null);
   const sourceResponse = uploaded?.meta.pdfKey?.endsWith("/catalogue-original.pdf") && uploaded.object.body
     ? new Response(uploaded.object.body)
-    : env?.ASSETS
-    ? await env.ASSETS.fetch(new Request(sourceUrl))
-    : await staticCatalogueAssetResponse(req, "/catalogue/mini-catalogue.pdf");
+    : await staticCatalogueAssetResponse(req, STATIC_MINI_CATALOGUE_ASSET);
   if (!sourceResponse.ok) {
     return new Response("Catalogue PDF could not be loaded", { status: 502 });
   }

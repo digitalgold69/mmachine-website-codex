@@ -192,6 +192,9 @@ const METALS_GROUP_GAP = 8.5;
 const METALS_INC_VAT_FILL = rgb(0.79, 0.95, 0.78);
 const METALS_BORDER = rgb(0, 0, 0);
 
+export const STATIC_MINI_CATALOGUE_ASSET = "/catalogue/fallback/mini-catalogue.pdf";
+export const STATIC_METALS_CATALOGUE_ASSET = "/catalogue/fallback/metals-catalogue.pdf";
+
 const METALS_COLUMNS = [
   { key: "form", label: "Shape", width: 70, align: "left" as const },
   { key: "metal", label: "Metal", width: 55, align: "left" as const },
@@ -649,7 +652,18 @@ export async function buildMetalsCataloguePdfBytes(products: MetalProduct[], wor
 export async function staticCatalogueAssetResponse(request: Request, pathname: string) {
   const env = await getCloudflareEnv().catch(() => null);
   if (env?.ASSETS) {
-    return env.ASSETS.fetch(new Request(new URL(pathname, request.url)));
+    const assetResponse = await env.ASSETS.fetch(new Request(new URL(pathname, request.url)));
+    const headers = new Headers(assetResponse.headers);
+    headers.set("Cache-Control", "no-store");
+    if (assetResponse.ok) {
+      headers.set("Content-Type", headers.get("Content-Type") || "application/pdf");
+      headers.set("X-Content-Type-Options", "nosniff");
+    }
+    return new Response(assetResponse.body, {
+      status: assetResponse.status,
+      statusText: assetResponse.statusText,
+      headers,
+    });
   }
 
   try {
@@ -659,7 +673,8 @@ export async function staticCatalogueAssetResponse(request: Request, pathname: s
     return new Response(body, {
       headers: {
         "Content-Type": "application/pdf",
-        "Cache-Control": "public, max-age=60",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

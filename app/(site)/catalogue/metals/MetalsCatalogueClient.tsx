@@ -127,8 +127,8 @@ export default function MetalsCatalogueClient({
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <header className="mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+        <div className="relative sm:flex sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0 pr-40 sm:pr-0">
             <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
             <h1 className="mt-2 font-display text-4xl text-racing">Metals catalogue</h1>
             <p className="mt-2 max-w-3xl text-ink-muted">
@@ -136,9 +136,15 @@ export default function MetalsCatalogueClient({
               Prices are shown ex VAT and inc VAT.
             </p>
           </div>
-          <a href={metalsCatalogueUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary whitespace-nowrap text-sm sm:mt-7">
-            Download Old PDF
-          </a>
+          <div className="absolute right-0 top-7 flex w-36 flex-col items-end gap-2 sm:static sm:mt-7 sm:w-auto">
+            <a href={metalsCatalogueUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap px-3 text-xs sm:w-auto sm:text-sm">
+              <DownloadIcon />
+              Download Old PDF
+            </a>
+            <Link href="/metals/weight-calculator" className="btn-secondary inline-flex w-full items-center justify-center whitespace-nowrap px-3 text-xs sm:w-auto sm:text-sm">
+              Weight calculator
+            </Link>
+          </div>
         </div>
         <div className="mt-6 overflow-hidden rounded-lg border border-racing/10 bg-racing">
           <Image
@@ -339,4 +345,23 @@ function quoteItem(product: MetalProduct) {
     unitPriceExVat: normaliseCataloguePrice(product.priceExVat),
     unitPriceIncVat: normaliseCataloguePrice(product.priceIncVat),
   };
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
+      <path d="M10 3v9" />
+      <path d="m6.5 8.5 3.5 3.5 3.5-3.5" />
+      <path d="M4 15.5h12" />
+    </svg>
+  );
 }

@@ -299,12 +299,9 @@ export default function DashboardProductsPage() {
       setUploadFiles((current) => ({ ...current, [kind]: null }));
       setUploadInputKey((value) => value + 1);
       await refreshLiveCatalogue(kind);
-      const warningText = Array.isArray(data.warnings) && data.warnings.length
-        ? ` Saved with ${data.warnings.length} note${data.warnings.length === 1 ? "" : "s"}.`
-        : "";
       setUploadAction({
         catalogue: kind,
-        text: `${kind === "mini" ? "Mini panels" : "Metals"} updated: ${data.upload.productCount.toLocaleString("en-GB")} catalogue lines.${warningText}`,
+        text: `${kind === "mini" ? "Mini panels" : "Metals"} updated: ${data.upload.productCount.toLocaleString("en-GB")} catalogue lines.`,
         tone: "success",
       });
     } catch (error) {

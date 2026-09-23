@@ -42,8 +42,8 @@ METALS_INVOICE = PROJECT_ROOT / "final-deliverables" / "Metals Invoice.xlsm"
 MINI_INVOICE_SOURCE = source_file("Mini Invoice Template.xlsm")
 METALS_INVOICE_SOURCE = source_file("Metals Invoice.xlsm")
 PARTSBOOK = source_file("PartsbookBenji2014.xlsx")
-MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf"
-METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf"
+MINI_PDF = PROJECT_ROOT / "public" / "catalogue" / "fallback" / "mini-catalogue.pdf"
+METALS_PDF = PROJECT_ROOT / "public" / "catalogue" / "fallback" / "metals-catalogue.pdf"
 CATALOGUE_VERSIONS = PROJECT_ROOT / "lib" / "catalogue-versions.ts"
 
 INVOICE_PRICE_SHEETS = {
@@ -353,3 +353,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

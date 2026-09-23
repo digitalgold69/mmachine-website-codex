@@ -5,6 +5,15 @@ const nextConfig = {
   reactStrictMode: true,
   async redirects() {
     return [...legacyPreviewRedirects, {
+      source: "/info_weightcalc.html",
+      has: [{ type: "host", value: "(?:www\\.)?m-machine-metals\\.co\\.uk" }],
+      destination: "https://m-machine.co.uk/metals/weight-calculator",
+      permanent: true,
+    }, {
+      source: "/info_weightcalc.html",
+      destination: "/metals/weight-calculator",
+      permanent: true,
+    }, {
       source: "/",
       has: [{ type: "host", value: "mmachine-website-codex\\.muddy-silence-4f5b\\.workers\\.dev" }],
       destination: "https://m-machine.co.uk/",

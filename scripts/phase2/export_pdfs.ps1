@@ -9,11 +9,11 @@
 
 param(
     [string]$Source = "final-deliverables\Metals catalogue 2023.xlsx",
-    [string]$Output = "public\catalogue\metals-catalogue.pdf",
+    [string]$Output = "public\catalogue\fallback\metals-catalogue.pdf",
     [string[]]$HideSheets = @("_PriceLookup"),
 
     [string]$Source2 = "final-deliverables\Mini Catalogue Self Updating.xlsm",
-    [string]$Output2 = "public\catalogue\mini-catalogue.pdf",
+    [string]$Output2 = "public\catalogue\fallback\mini-catalogue.pdf",
     [string[]]$HideSheets2 = @("_PriceLookup"),
     [string]$MiniMasterSource = "data-source\More Files\Mini Catalogue Self Updating.xlsm",
     [string]$MiniUpdateManifest = "final-deliverables\mini-catalogue-updates.json",
@@ -539,3 +539,4 @@ if (-not $excelExportSucceeded) {
     }
     Export-CataloguesWithLibreOffice
 }
+

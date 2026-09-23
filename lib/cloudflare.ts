@@ -18,6 +18,10 @@ export type D1DatabaseBinding = {
 };
 
 export type R2BucketBinding = {
+  head?: (key: string) => Promise<{
+    size?: number;
+    httpMetadata?: { contentType?: string };
+  } | null>;
   get: (key: string) => Promise<{
     body: ReadableStream | null;
     httpMetadata?: { contentType?: string };

@@ -101,6 +101,18 @@ async function objectText(object: Awaited<ReturnType<R2BucketBinding["get"]>>) {
   return new Response(object.body).text();
 }
 
+async function assertObjectStored(bucket: R2BucketBinding, key: string, label: string) {
+  const head = await bucket.head?.(key).catch(() => null);
+  if (head) return;
+
+  const object = await bucket.get(key).catch(() => null);
+  if (!object?.body) {
+    throw new Error(`${label} was not saved to catalogue storage.`);
+  }
+
+  await object.body.cancel().catch(() => undefined);
+}
+
 async function getBucket() {
   return getFeaturedImagesBucket();
 }
@@ -204,15 +216,26 @@ export async function saveCatalogueOverride<T>(input: {
   const previous = await getCatalogueOverrideMeta(input.catalogue).catch(() => null);
   const bucket = await getBucket();
 
-  await bucket.put(productsKey, productsBody, {
-    httpMetadata: { contentType: "application/json; charset=utf-8" },
-  });
-  await bucket.put(pdfKey, input.pdfBytes, {
-    httpMetadata: { contentType: "application/pdf" },
-  });
-  await bucket.put(sourceKey, input.sourceBytes, {
-    httpMetadata: { contentType: workbookContentType(safeName, input.sourceContentType) },
-  });
+  try {
+    await bucket.put(productsKey, productsBody, {
+      httpMetadata: { contentType: "application/json; charset=utf-8" },
+    });
+    await bucket.put(pdfKey, input.pdfBytes, {
+      httpMetadata: { contentType: "application/pdf" },
+    });
+    await bucket.put(sourceKey, input.sourceBytes, {
+      httpMetadata: { contentType: workbookContentType(safeName, input.sourceContentType) },
+    });
+
+    await Promise.all([
+      assertObjectStored(bucket, productsKey, "Catalogue products"),
+      assertObjectStored(bucket, pdfKey, "Catalogue PDF"),
+      assertObjectStored(bucket, sourceKey, "Source workbook"),
+    ]);
+  } catch (error) {
+    await Promise.allSettled([bucket.delete(productsKey), bucket.delete(pdfKey), bucket.delete(sourceKey)]);
+    throw error;
+  }
 
   const result = await db.prepare(`
     insert into catalogue_overrides (

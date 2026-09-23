@@ -116,8 +116,8 @@ export default function MiniCataloguePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="relative mb-8 sm:flex sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 pr-40 sm:pr-0">
           <Link href="/" className="text-sm text-ink-muted hover:text-racing">
             &larr; Home
           </Link>
@@ -132,8 +132,9 @@ export default function MiniCataloguePage() {
           href={miniCatalogueUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-secondary whitespace-nowrap text-sm sm:mt-7"
+          className="btn-secondary absolute right-0 top-7 inline-flex w-36 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-xs sm:static sm:mt-7 sm:w-auto sm:text-sm"
         >
+          <DownloadIcon />
           Download Old PDF
         </a>
       </div>
@@ -471,5 +472,24 @@ function NoImageIcon() {
       <span className="relative block h-4 w-5 rounded-[3px] border border-current before:absolute before:-top-1 before:left-1 before:h-1 before:w-2 before:rounded-sm before:border before:border-current before:content-[''] after:absolute after:left-1/2 after:top-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-current after:content-['']" />
       <span className="mt-1 text-[8px] font-bold uppercase leading-none">No image</span>
     </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
+      <path d="M10 3v9" />
+      <path d="m6.5 8.5 3.5 3.5 3.5-3.5" />
+      <path d="M4 15.5h12" />
+    </svg>
   );
 }

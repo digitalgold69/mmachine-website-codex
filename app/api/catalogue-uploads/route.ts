@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, requireLogin } from "@/lib/auth";
 import { listCatalogueOverrideMetas, saveCatalogueOverride } from "@/lib/catalogue-overrides";
 import { parseUploadedCatalogue, type CatalogueUploadKind } from "@/lib/catalogue-upload-parser";
-import { buildMetalsCataloguePdfBytes, staticCatalogueAssetResponse } from "@/lib/catalogue-pdf";
+import {
+  STATIC_MINI_CATALOGUE_ASSET,
+  buildMetalsCataloguePdfBytes,
+  staticCatalogueAssetResponse,
+} from "@/lib/catalogue-pdf";
 import { buildMiniWorkbookPdf } from "@/lib/mini-workbook-pdf";
 
 export const runtime = "nodejs";
@@ -68,7 +72,7 @@ export async function POST(request: Request) {
     let miniPdf: Uint8Array | null = null;
     let metalsPdf: Uint8Array | null = null;
     if (parsed.catalogue === "mini") {
-      const template = await staticCatalogueAssetResponse(request, "/catalogue/mini-catalogue.pdf");
+      const template = await staticCatalogueAssetResponse(request, STATIC_MINI_CATALOGUE_ASSET);
       if (!template.ok) throw new Error("The fixed Mini drawings could not be loaded. Nothing has been updated.");
       miniPdf = await buildMiniWorkbookPdf(parsed.products, new Uint8Array(await template.arrayBuffer()));
     } else {

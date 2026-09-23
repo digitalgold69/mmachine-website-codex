@@ -34,7 +34,7 @@ function workbookBytes(sheets) {
 }
 
 async function main() {
-  const pdfBytes = fs.readFileSync(path.join(root, "public/catalogue/mini-catalogue.pdf"));
+  const pdfBytes = fs.readFileSync(path.join(root, "public/catalogue/fallback/mini-catalogue.pdf"));
   const pdf = await PDFDocument.load(pdfBytes, { updateMetadata: false });
   await validateCatalogueUploadPdf(pdfBytes, "mini");
   const missingDrawings = await PDFDocument.create();
@@ -134,10 +134,10 @@ async function main() {
   assert.match(manualProductsLib, /on conflict\(id\) do update/, "Manual Mini products must support dashboard edits without duplicate rows");
 
   const sectionPdfRoute = read("app/api/catalogue/mini-sections/[sectionCode]/pdf/route.ts");
-  assert.match(sectionPdfRoute, /ASSETS\.fetch/, "Deployed section PDFs must read the catalogue through the Cloudflare assets binding");
+  assert.match(sectionPdfRoute, /STATIC_MINI_CATALOGUE_ASSET/, "Section PDFs must read the bundled Mini PDF from the fallback catalogue asset");
   assert.match(sectionPdfRoute, /getCatalogueOverridePdfObject/, "Section PDFs must extract from the original uploaded PDF");
   assert.doesNotMatch(sectionPdfRoute, /buildMiniSectionPdfBytes/, "Section PDFs must not replace original drawings with generated tables");
-  assert.match(sectionPdfRoute, /staticCatalogueAssetResponse/, "Local section PDF generation must keep a static asset fallback");
+  assert.match(sectionPdfRoute, /staticCatalogueAssetResponse/, "Section PDF generation must use the shared Cloudflare asset fallback");
   assert.match(sectionPdfRoute, /"Content-Disposition": `inline;/, "Section PDFs should render in-browser by default");
   assert.match(sectionPdfRoute, /"Cache-Control": "no-store"/, "Section PDFs should not keep stale download headers cached");
 
@@ -318,3 +318,4 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+

@@ -12,8 +12,8 @@ PROJECT_ROOT = HERE.parent
 OUTPUT = PROJECT_ROOT / "lib" / "catalogue-versions.ts"
 
 CATALOGUES = {
-    "mini": PROJECT_ROOT / "public" / "catalogue" / "mini-catalogue.pdf",
-    "metals": PROJECT_ROOT / "public" / "catalogue" / "metals-catalogue.pdf",
+    "mini": PROJECT_ROOT / "public" / "catalogue" / "fallback" / "mini-catalogue.pdf",
+    "metals": PROJECT_ROOT / "public" / "catalogue" / "fallback" / "metals-catalogue.pdf",
 }
 
 
@@ -42,3 +42,4 @@ export const metalsCatalogueUrl =
 
 if __name__ == "__main__":
     main()
+
