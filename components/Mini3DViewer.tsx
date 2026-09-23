@@ -863,12 +863,12 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
   const modeLabel = mode === "exterior" ? "EXTERIOR" : "INTERIOR · CHASSIS";
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-racing/10 bg-cream-dark">
+    <div className="relative w-full max-w-full overflow-hidden rounded-2xl border border-racing/10 bg-cream-dark">
       <div ref={mountRef} className="h-[360px] w-full select-none sm:h-[440px] lg:h-[560px]" />
 
       {/* Top-left: status chip */}
-      <div className="absolute left-4 top-16 z-10 flex gap-2 sm:top-4">
-        <div className="max-w-[calc(100vw-64px)] rounded-md bg-racing/90 px-3 py-1.5 text-[12px] tracking-wider text-cream">
+      <div className="absolute left-4 right-4 top-16 z-10 flex gap-2 sm:right-auto sm:top-4">
+        <div className="w-full rounded-md bg-racing/90 px-3 py-1.5 text-center text-[11px] tracking-wider text-cream sm:w-auto sm:max-w-[calc(100vw-64px)] sm:text-left sm:text-[12px]">
           {modelStatus === "loading"     && "LOADING MODEL…"}
           {modelStatus === "placeholder" && "NO MODEL — DROP mini.glb IN /public/models/"}
           {modelStatus === "loaded"      && `${modeLabel} · DRAG TO ORBIT · CLICK TO FILTER`}
@@ -876,12 +876,12 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
       </div>
 
       {/* Top-right: mode toggle */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <div className="bg-white/95 rounded-lg p-1 flex border border-racing/10 shadow-sm">
+      <div className="absolute left-4 right-4 top-4 z-10 flex gap-2 sm:left-auto sm:right-4">
+        <div className="grid w-full grid-cols-2 rounded-lg border border-racing/10 bg-white/95 p-1 shadow-sm sm:flex sm:w-auto">
           <button
             type="button"
             onClick={() => setMode("exterior")}
-            className={`px-3 py-1.5 rounded text-[12px] font-semibold tracking-wider transition-colors ${
+            className={`rounded px-2 py-1.5 text-[11px] font-semibold tracking-wider transition-colors sm:px-3 sm:text-[12px] ${
               mode === "exterior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
             }`}
           >
@@ -890,7 +890,7 @@ export default function Mini3DViewer({ selectedSection, onSelect }: Props) {
           <button
             type="button"
             onClick={() => setMode("interior")}
-            className={`px-3 py-1.5 rounded text-[12px] font-semibold tracking-wider transition-colors ${
+            className={`rounded px-2 py-1.5 text-[11px] font-semibold tracking-wider transition-colors sm:px-3 sm:text-[12px] ${
               mode === "interior" ? "bg-racing text-cream" : "text-racing hover:bg-cream-dark"
             }`}
           >
