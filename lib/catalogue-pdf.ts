@@ -1,7 +1,8 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import * as XLSX from "xlsx";
 import { getCloudflareEnv } from "@/lib/cloudflare";
 import { sections, type Product, type Section } from "@/lib/mini-data";
-import { type MetalProduct } from "@/lib/metals-data";
+import { metalCategories, type MetalProduct } from "@/lib/metals-data";
 import { catalogueMoney } from "@/lib/catalogue-pricing";
 
 const A4_WIDTH = 595.28;
@@ -178,8 +179,8 @@ export async function buildMiniSectionPdfBytes(section: Section, products: Produ
   return ctx.doc.save();
 }
 
-const METALS_TEMPLATE_FRONT_PAGES = 4;
-const METALS_CATALOGUE_TITLE = "Metals Catalogue 2026";
+const METALS_FRONT_SHEETS = ["Front sheet", "Carriage Rates", "T&Cs", "Conversion table"] as const;
+const METALS_CATALOGUE_TITLE = "Metals Catalogue";
 const METALS_TABLE_LEFT = 70;
 const METALS_TABLE_TOP = 781;
 const METALS_TABLE_BOTTOM = 78;
@@ -305,7 +306,7 @@ function drawMetalsDataCell(ctx: PdfContext, column: MetalsColumn, index: number
   });
 }
 
-function drawMetalsRow(ctx: PdfContext, product: MetalProduct) {
+function metalsRowHeight(ctx: Pick<PdfContext, "regular">, product: MetalProduct) {
   const values = [
     product.form,
     product.metal,
@@ -319,8 +320,13 @@ function drawMetalsRow(ctx: PdfContext, product: MetalProduct) {
     metalsCellLines(value, ctx.regular, METALS_COLUMNS[index].width, index === 3 ? 4 : 2)
   );
   const lineCount = Math.max(1, ...rowLines.map((lines) => lines.length));
-  const rowHeight = Math.max(METALS_MIN_ROW_HEIGHT, lineCount * METALS_ROW_LINE_HEIGHT + 2.8);
+  return { rowLines, rowHeight: Math.max(METALS_MIN_ROW_HEIGHT, lineCount * METALS_ROW_LINE_HEIGHT + 2.8) };
+}
+
+function drawMetalsRow(ctx: PdfContext, product: MetalProduct) {
+  const { rowLines, rowHeight } = metalsRowHeight(ctx, product);
   ensureMetalsRowSpace(ctx, rowHeight);
+  const pageNumber = ctx.doc.getPageCount();
 
   const incIndex = METALS_COLUMNS.length - 1;
   const incX = metalsColumnX(incIndex);
@@ -337,6 +343,7 @@ function drawMetalsRow(ctx: PdfContext, product: MetalProduct) {
   });
 
   ctx.y -= rowHeight;
+  return pageNumber;
 }
 
 function shouldSeparateMetalsRows(previous: MetalProduct | null, current: MetalProduct) {
@@ -344,23 +351,237 @@ function shouldSeparateMetalsRows(previous: MetalProduct | null, current: MetalP
   return previous.sourceSheet !== current.sourceSheet || previous.form !== current.form;
 }
 
-async function createMetalsCatalogueContext(templatePdfBytes?: Uint8Array): Promise<PdfContext> {
+type MetalsPageRange = { start: number; end: number };
+type WorkbookFrontSheet = { name: string; rows: string[][] };
+
+function metalsTableStartY() {
+  return METALS_TABLE_TOP - METALS_HEADER_HEIGHT - 16;
+}
+
+function calculateMetalsCategoryPageRanges(
+  products: MetalProduct[],
+  regular: PDFFont,
+  frontPageCount: number
+) {
+  const ranges = new Map<string, MetalsPageRange>();
+  let y = metalsTableStartY();
+  let pageNumber = frontPageCount + 1;
+  let previous: MetalProduct | null = null;
+
+  for (const product of products) {
+    if (shouldSeparateMetalsRows(previous, product)) {
+      if (y - (METALS_GROUP_GAP + METALS_MIN_ROW_HEIGHT) < METALS_TABLE_BOTTOM) {
+        pageNumber += 1;
+        y = metalsTableStartY();
+      }
+      y -= METALS_GROUP_GAP;
+    }
+
+    const { rowHeight } = metalsRowHeight({ regular }, product);
+    if (y - rowHeight < METALS_TABLE_BOTTOM) {
+      pageNumber += 1;
+      y = metalsTableStartY();
+    }
+
+    const range = ranges.get(product.category);
+    if (range) {
+      range.end = pageNumber;
+    } else {
+      ranges.set(product.category, { start: pageNumber, end: pageNumber });
+    }
+
+    y -= rowHeight;
+    previous = product;
+  }
+
+  return ranges;
+}
+
+function metalsPageRangeLabel(range: MetalsPageRange) {
+  return range.start === range.end ? `${range.start}` : `${range.start}-${range.end}`;
+}
+
+function metalsPageRangePrefix(range: MetalsPageRange) {
+  return range.start === range.end ? "Page" : "Pages";
+}
+
+function cellDisplayValue(cell: XLSX.CellObject | undefined) {
+  return cleanPdfText(cell?.w ?? cell?.v ?? "", 500);
+}
+
+function workbookPrintRange(workbook: XLSX.WorkBook, sheetName: string) {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return null;
+  const sheetIndex = workbook.SheetNames.indexOf(sheetName);
+  const printArea = (workbook.Workbook?.Names || []).find((name) => {
+    if (name.Name !== "_xlnm.Print_Area") return false;
+    if (typeof name.Sheet === "number" && name.Sheet === sheetIndex) return true;
+    return typeof name.Ref === "string" && name.Ref.startsWith(`'${sheetName.replace(/'/g, "''")}'!`);
+  });
+  const ref = printArea?.Ref?.split("!").pop()?.replace(/\$/g, "") || sheet["!ref"];
+  return ref ? XLSX.utils.decode_range(ref) : null;
+}
+
+function rowsFromWorkbookSheet(workbook: XLSX.WorkBook, sheetName: string) {
+  const sheet = workbook.Sheets[sheetName];
+  const range = workbookPrintRange(workbook, sheetName);
+  if (!sheet || !range) return [];
+
+  const rows: string[][] = [];
+  for (let rowIndex = range.s.r; rowIndex <= range.e.r; rowIndex += 1) {
+    const row: string[] = [];
+    for (let colIndex = range.s.c; colIndex <= range.e.c; colIndex += 1) {
+      row.push(cellDisplayValue(sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })]));
+    }
+    rows.push(row);
+  }
+
+  while (rows.length && rows[rows.length - 1].every((cell) => !cell)) rows.pop();
+  return rows;
+}
+
+function replaceCarriageIndexRows(rows: string[][], ranges: Map<string, MetalsPageRange>) {
+  const indexRow = rows.findIndex((row) => row.some((cell) => cell.trim().toLowerCase() === "index"));
+  if (indexRow < 0) return rows;
+
+  const indexRows = metalCategories.flatMap((category) => {
+    const range = ranges.get(category.key);
+    if (!range) return [];
+    return [["", metalsPageRangePrefix(range), metalsPageRangeLabel(range), category.label]];
+  });
+
+  return [...rows.slice(0, indexRow + 1), ...indexRows];
+}
+
+function workbookFrontSheets(workbook: XLSX.WorkBook, ranges?: Map<string, MetalsPageRange>) {
+  return METALS_FRONT_SHEETS.flatMap<WorkbookFrontSheet>((name) => {
+    let rows = rowsFromWorkbookSheet(workbook, name);
+    if (!rows.length) return [];
+    if (name === "Carriage Rates" && ranges) rows = replaceCarriageIndexRows(rows, ranges);
+    return [{ name, rows }];
+  });
+}
+
+function workbookSheetCellWidth(sheetName: string, row: string[], index: number, usableWidth: number) {
+  const nonEmptyCount = row.filter(Boolean).length;
+  if (nonEmptyCount <= 1) return usableWidth;
+  if (sheetName === "Conversion table") return usableWidth / Math.max(1, Math.min(7, row.length));
+  const nonEmptyIndexes = row.map((cell, cellIndex) => cell ? cellIndex : -1).filter((cellIndex) => cellIndex >= 0);
+  const first = nonEmptyIndexes[0];
+  const second = nonEmptyIndexes[1];
+  if (index === first && row[index].length <= 4 && typeof second === "number") return 28;
+  if (index === second && row[first]?.length <= 4) return usableWidth - 34;
+  if (sheetName === "Carriage Rates" && index === 1) return 52;
+  if (sheetName === "Carriage Rates" && index === 2) return 72;
+  if (sheetName === "Carriage Rates" && index >= 3) return usableWidth - 136;
+  const columns = Math.max(1, Math.min(10, row.length));
+  if (index === row.length - 1) return usableWidth / columns;
+  return usableWidth / columns;
+}
+
+function workbookSheetCellX(sheetName: string, row: string[], index: number, usableWidth: number) {
+  const nonEmptyCount = row.filter(Boolean).length;
+  if (nonEmptyCount <= 1) return MARGIN;
+  if (sheetName === "Conversion table") {
+    const columns = Math.max(1, Math.min(7, row.length));
+    return MARGIN + (usableWidth / columns) * index;
+  }
+  const nonEmptyIndexes = row.map((cell, cellIndex) => cell ? cellIndex : -1).filter((cellIndex) => cellIndex >= 0);
+  const first = nonEmptyIndexes[0];
+  const second = nonEmptyIndexes[1];
+  if (index === first && row[index].length <= 4 && typeof second === "number") return MARGIN;
+  if (index === second && row[first]?.length <= 4) return MARGIN + 34;
+  if (sheetName === "Carriage Rates" && index === 1) return MARGIN + 34;
+  if (sheetName === "Carriage Rates" && index === 2) return MARGIN + 88;
+  if (sheetName === "Carriage Rates" && index >= 3) return MARGIN + 136;
+  const columns = Math.max(1, Math.min(10, row.length));
+  return MARGIN + (usableWidth / columns) * index;
+}
+
+function workbookRowsPageCount(sheet: WorkbookFrontSheet, regular: PDFFont, bold: PDFFont) {
+  let pages = 1;
+  let y = A4_HEIGHT - MARGIN;
+  const usableWidth = A4_WIDTH - MARGIN * 2;
+
+  for (const [rowIndex, row] of sheet.rows.entries()) {
+    const metrics = workbookRowMetrics(sheet.name, row, rowIndex, usableWidth, regular, bold);
+    if (y - metrics.height < MARGIN) {
+      pages += 1;
+      y = A4_HEIGHT - MARGIN;
+    }
+    y -= metrics.height;
+  }
+
+  return pages;
+}
+
+function workbookRowMetrics(
+  sheetName: string,
+  row: string[],
+  rowIndex: number,
+  usableWidth: number,
+  regular: PDFFont,
+  bold: PDFFont
+) {
+  const isTitle = rowIndex === 0 && row.filter(Boolean).length <= 2;
+  const isIndexHeading = row.some((cell) => cell.trim().toLowerCase() === "index");
+  const isConversion = sheetName === "Conversion table";
+  const size = isTitle ? 14 : isIndexHeading ? 10.5 : isConversion ? 7.4 : 8.7;
+  const font = isTitle || isIndexHeading ? bold : regular;
+  const lineHeight = size + (isConversion ? 1.4 : 2.2);
+  const maxLines = Math.max(
+    1,
+    ...row.map((cell, index) =>
+      cell ? lineWrap(cell, font, size, workbookSheetCellWidth(sheetName, row, index, usableWidth) - 6).length : 1
+    )
+  );
+  return {
+    font,
+    size,
+    lineHeight,
+    height: Math.max(isTitle ? 24 : isConversion ? 10 : 13, maxLines * lineHeight + 3),
+  };
+}
+
+function drawWorkbookRowsPage(ctx: PdfContext, sheet: WorkbookFrontSheet) {
+  const usableWidth = A4_WIDTH - MARGIN * 2;
+  ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
+  ctx.y = A4_HEIGHT - MARGIN;
+
+  sheet.rows.forEach((row, rowIndex) => {
+    const metrics = workbookRowMetrics(sheet.name, row, rowIndex, usableWidth, ctx.regular, ctx.bold);
+    if (ctx.y - metrics.height < MARGIN) {
+      ctx.page = ctx.doc.addPage([A4_WIDTH, A4_HEIGHT]);
+      ctx.y = A4_HEIGHT - MARGIN;
+    }
+
+    row.forEach((cell, index) => {
+      if (!cell) return;
+      const x = workbookSheetCellX(sheet.name, row, index, usableWidth);
+      const width = workbookSheetCellWidth(sheet.name, row, index, usableWidth);
+      lineWrap(cell, metrics.font, metrics.size, width - 6).slice(0, 3).forEach((line, lineIndex) => {
+        ctx.page.drawText(line, {
+          x,
+          y: ctx.y - metrics.size - lineIndex * metrics.lineHeight,
+          size: metrics.size,
+          font: metrics.font,
+          color: rgb(0, 0, 0),
+          maxWidth: width - 6,
+        });
+      });
+    });
+
+    ctx.y -= metrics.height;
+  });
+}
+
+async function createMetalsCatalogueContext(workbookBytes?: Uint8Array, products: MetalProduct[] = []): Promise<PdfContext> {
   const doc = await PDFDocument.create();
   doc.setTitle("M-Machine Metals Catalogue");
   doc.setAuthor("M-Machine");
   doc.setProducer("M-Machine catalogue upload");
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-
-  if (templatePdfBytes?.byteLength) {
-    const template = await PDFDocument.load(templatePdfBytes, { updateMetadata: false });
-    const frontPageIndexes = Array.from(
-      { length: Math.min(METALS_TEMPLATE_FRONT_PAGES, template.getPageCount()) },
-      (_, index) => index
-    );
-    const copiedPages = await doc.copyPages(template, frontPageIndexes);
-    copiedPages.forEach((page) => doc.addPage(page));
-  }
 
   const ctx: PdfContext = {
     doc,
@@ -370,12 +591,47 @@ async function createMetalsCatalogueContext(templatePdfBytes?: Uint8Array): Prom
     y: METALS_TABLE_TOP,
   };
   doc.removePage(doc.getPageCount() - 1);
+
+  let workbook: XLSX.WorkBook | null = null;
+  if (workbookBytes?.byteLength) {
+    try {
+      workbook = XLSX.read(workbookBytes, {
+        type: "array",
+        cellDates: false,
+        cellNF: false,
+        cellStyles: false,
+        bookVBA: false,
+      });
+    } catch {
+      workbook = null;
+    }
+  }
+
+  if (workbook) {
+    let frontSheets = workbookFrontSheets(workbook);
+    let frontPageCount = frontSheets.reduce((sum, sheet) => sum + workbookRowsPageCount(sheet, regular, bold), 0);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const ranges = calculateMetalsCategoryPageRanges(products, regular, frontPageCount);
+      const nextFrontSheets = workbookFrontSheets(workbook, ranges);
+      const nextFrontPageCount = nextFrontSheets.reduce(
+        (sum, sheet) => sum + workbookRowsPageCount(sheet, regular, bold),
+        0
+      );
+      frontSheets = nextFrontSheets;
+      if (nextFrontPageCount === frontPageCount) break;
+      frontPageCount = nextFrontPageCount;
+    }
+
+    frontSheets.forEach((sheet) => drawWorkbookRowsPage(ctx, sheet));
+  }
+
   addMetalsTablePage(ctx);
   return ctx;
 }
 
-export async function buildMetalsCataloguePdfBytes(products: MetalProduct[], templatePdfBytes?: Uint8Array) {
-  const ctx = await createMetalsCatalogueContext(templatePdfBytes);
+export async function buildMetalsCataloguePdfBytes(products: MetalProduct[], workbookBytes?: Uint8Array) {
+  const ctx = await createMetalsCatalogueContext(workbookBytes, products);
   let previous: MetalProduct | null = null;
 
   for (const product of products) {

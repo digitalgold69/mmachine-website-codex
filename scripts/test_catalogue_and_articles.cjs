@@ -146,7 +146,7 @@ async function main() {
   assert.match(uploadRoute, /saveCatalogueOverride/, "Catalogue upload API must save live override data");
   assert.match(uploadRoute, /buildMiniWorkbookPdf/, "Mini uploads must preserve the matching original PDF");
   assert.match(uploadRoute, /buildMetalsCataloguePdfBytes/, "Metals workbook uploads must regenerate the PDF tables from the uploaded workbook products");
-  assert.match(uploadRoute, /staticCatalogueAssetResponse\(request, "\/catalogue\/metals-catalogue\.pdf"\)[\s\S]+buildMetalsCataloguePdfBytes\([\s\S]+parsed\.products/, "Metals workbook uploads must use the original front matter while regenerating tables from parsed products");
+  assert.match(uploadRoute, /buildMetalsCataloguePdfBytes\(parsed\.products,\s*bytes\)/, "Metals uploads must build future PDFs from the uploaded workbook instead of copied static front matter");
   assert.match(uploadRoute, /catalogue: "metals"[\s\S]+pdfBytes: metalsPdf![\s\S]+originalPdf: true/, "Metals workbook uploads must mark the regenerated original-style PDF so download routes can serve it safely");
   assert.match(uploadRoute, /100 \* 1024 \* 1024/, "Catalogue uploads must allow current owner workbooks larger than 24 MB");
   assert.match(dashboardProductsPage, /MAX_CATALOGUE_WORKBOOK_MB/, "Dashboard upload copy must follow the server-side workbook size limit");
@@ -155,6 +155,8 @@ async function main() {
   assert.match(metalsCatalogueClient, /\/catalogue\/metals-catalogue\.pdf\?v=/, "Metals catalogue downloads must use the canonical customer PDF URL");
   assert.doesNotMatch(metalsCatalogueClient, /\/api\/catalogue\/metals\/pdf\?v=/, "Metals catalogue downloads must not point customers at the legacy API PDF URL");
   assert.match(metalsCatalogueClient, /pdfVersion \|\| metalsCatalogueVersion/, "Metals catalogue downloads must cache-bust with the active uploaded or bundled PDF version");
+  assert.match(metalsCatalogueClient, /Download Old PDF/, "Metals catalogue must include a top-right old PDF download link");
+  assert.match(miniPage, /Download Old PDF/, "Mini catalogue must include a top-right old PDF download link");
 
   const metalsPage = read("app/(site)/catalogue/metals/page.tsx");
   assert.match(metalsPage, /override\?\.pdfKey\?\.endsWith\("\/catalogue-original\.pdf"\) \? override\.version : undefined/, "Metals page must only use uploaded version cache-busting when the canonical route will serve that uploaded PDF");
@@ -172,11 +174,17 @@ async function main() {
   assert.match(sourceWorkbookRoute, /Content-Disposition[\s\S]+attachment/, "Uploaded source workbook downloads must download directly without a dialog route");
 
   const cataloguePdfLib = read("lib/catalogue-pdf.ts");
-  assert.match(cataloguePdfLib, /METALS_TEMPLATE_FRONT_PAGES = 4/, "Metals catalogue PDFs must preserve the original intro, carriage, terms and conversion pages");
+  assert.match(cataloguePdfLib, /METALS_FRONT_SHEETS = \["Front sheet", "Carriage Rates", "T&Cs", "Conversion table"\]/, "Metals catalogue PDFs must read the uploaded workbook front, carriage, terms and conversion sheets");
+  assert.match(cataloguePdfLib, /replaceCarriageIndexRows/, "Metals catalogue PDFs must replace the carriage index with calculated page ranges");
+  assert.match(cataloguePdfLib, /calculateMetalsCategoryPageRanges/, "Metals catalogue PDFs must calculate category page ranges from the generated rows");
   assert.match(cataloguePdfLib, /product\.form[\s\S]+product\.metal[\s\S]+product\.spec[\s\S]+product\.size[\s\S]+money\(product\.priceExVat\)[\s\S]+product\.unit[\s\S]+money\(product\.priceIncVat\)/, "Metals catalogue PDF rows must be rendered from the uploaded product fields, prices and units");
   assert.doesNotMatch(cataloguePdfLib, /Generated[\s\S]+new Date/, "Catalogue PDF fallback generator must not print a generated date on customer PDFs");
+  assert.doesNotMatch(cataloguePdfLib, /Metals Catalogue 20\d{2}/, "Metals catalogue PDF generation must not invent a year in the header");
+
+  assert.match(productsRoute, /filterAndRankCatalogueProducts/, "Product API searches must use ranked any-token catalogue matching");
 
   const ordersClient = read("app/dashboard/(protected)/orders/OrdersClient.tsx");
+  assert.match(ordersClient, /ADD_LINE_RESULT_LIMITS[\s\S]+mini: "1200"[\s\S]+metals: "5000"/, "Dashboard add-line catalogue search must not stop at the first 30 matches");
   assert.match(ordersClient, /PaymentSettingsModal/, "Dashboard must expose editable payment method settings");
   assert.match(ordersClient, /max-h-\[calc\(100vh-2rem\)\]/, "Payment method settings modal must fit short laptop screens");
   assert.match(ordersClient, /min-h-0 flex-1 overflow-y-auto px-4 pb-4/, "Payment method settings modal fields must scroll inside the dialog");

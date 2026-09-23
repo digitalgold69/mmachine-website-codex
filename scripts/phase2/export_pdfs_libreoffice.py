@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 
 import uno
@@ -83,26 +82,6 @@ def export_pdf(document, output: Path) -> None:
 
 def prepare_metals(document) -> None:
     page_styles = document.StyleFamilies.getByName("PageStyles")
-    year = datetime.now().year
-    month_names = (
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    )
-    now = datetime.now()
-    document.Sheets.getByName("Front sheet").getCellRangeByName("A19").String = (
-        f"{month_names[now.month - 1]} {year}"
-    )
-
     default_scale = 96
     scale_overrides = {
         "St St Dia sq hex": 100,
@@ -121,8 +100,6 @@ def prepare_metals(document) -> None:
             continue
 
         page_style = page_styles.getByName(sheet.PageStyle)
-        if sheet.Name != "Front sheet":
-            set_header(page_style, f"Metals Catalogue {year}")
         if sheet.Name not in unscaled_sheets:
             page_style.PageScale = scale_overrides.get(sheet.Name, default_scale)
 

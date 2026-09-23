@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { metalShapeKey } from "@/lib/metals-filters";
 import { getLiveMetalCatalogueProducts, getLiveMiniCatalogueProducts } from "@/lib/catalogue-products";
+import { filterAndRankCatalogueProducts } from "@/lib/catalogue-search";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -19,14 +20,7 @@ export async function GET(request: Request) {
     if (category && category !== "all") list = list.filter((product) => product.category === category);
     if (shape && shape !== "all") list = list.filter((product) => metalShapeKey(product.form) === shape);
     if (search?.trim()) {
-      const query = search.trim().toLowerCase();
-      list = list.filter((product) =>
-        [product.form, product.metal, product.spec, product.size, product.unit, product.code, product.stockSize, product.sourceSheet]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(query)
-      );
+      list = filterAndRankCatalogueProducts(list, search);
     }
 
     return NextResponse.json(
@@ -43,15 +37,7 @@ export async function GET(request: Request) {
   const live = await getLiveMiniCatalogueProducts({ includeManual: true });
   let list = live.products;
   if (section && section !== "all") list = list.filter((p) => p.section === section);
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (p) =>
-        p.code.toLowerCase().includes(q) ||
-        p.name.toLowerCase().includes(q) ||
-        p.fits.toLowerCase().includes(q)
-    );
-  }
+  if (search) list = filterAndRankCatalogueProducts(list, search);
 
   const count = list.length;
   return NextResponse.json({

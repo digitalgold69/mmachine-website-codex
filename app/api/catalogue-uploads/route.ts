@@ -72,12 +72,7 @@ export async function POST(request: Request) {
       if (!template.ok) throw new Error("The fixed Mini drawings could not be loaded. Nothing has been updated.");
       miniPdf = await buildMiniWorkbookPdf(parsed.products, new Uint8Array(await template.arrayBuffer()));
     } else {
-      const template = await staticCatalogueAssetResponse(request, "/catalogue/metals-catalogue.pdf");
-      if (!template.ok) throw new Error("The original Metals catalogue PDF front matter could not be loaded. The website prices have not been updated.");
-      metalsPdf = await buildMetalsCataloguePdfBytes(
-        parsed.products,
-        new Uint8Array(await template.arrayBuffer())
-      );
+      metalsPdf = await buildMetalsCataloguePdfBytes(parsed.products, bytes);
     }
     const user = await getCurrentUser();
     const upload = parsed.catalogue === "mini"

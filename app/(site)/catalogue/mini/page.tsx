@@ -8,6 +8,7 @@ import { products, sections, getSection, type Product, type Section } from "@/li
 import { miniCatalogueUrl, miniCatalogueVersion } from "@/lib/catalogue-versions";
 import { MANUAL_MINI_SECTION_CODE, manualMiniSection } from "@/lib/manual-mini-product-shared";
 import { catalogueMoney, normaliseCataloguePrice } from "@/lib/catalogue-pricing";
+import { catalogueSearchMatches, filterAndRankCatalogueProducts } from "@/lib/catalogue-search";
 
 const Mini3DViewer = dynamic(() => import("@/components/Mini3DViewer"), {
   ssr: false,
@@ -76,24 +77,16 @@ export default function MiniCataloguePage() {
   const filtered = useMemo(() => {
     let list = catalogueProducts;
     if (section !== "all") list = list.filter((p) => p.section === section);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.fits.toLowerCase().includes(q)
-      );
-    }
+    if (search.trim()) list = filterAndRankCatalogueProducts(list, search);
     return list;
   }, [catalogueProducts, section, search]);
 
   const sectionCounts = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = search.trim();
     const counts: Record<string, number> = { all: 0 };
 
     for (const product of catalogueProducts) {
-      if (query && ![product.code, product.name, product.fits].join(" ").toLowerCase().includes(query)) continue;
+      if (query && !catalogueSearchMatches(product, query)) continue;
 
       counts.all += 1;
       counts[product.section] = (counts[product.section] || 0) + 1;
@@ -123,16 +116,26 @@ export default function MiniCataloguePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="mb-8">
-        <Link href="/" className="text-sm text-ink-muted hover:text-racing">
-          &larr; Home
-        </Link>
-        <h1 className="font-display text-4xl text-racing mt-2 mb-2">
-          Classic Mini panels catalogue
-        </h1>
-        <p className="text-ink-muted">
-          {catalogueProducts.length} parts across {catalogueSections.length} sections, organised in the same down-the-list order as the printed catalogue.
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <Link href="/" className="text-sm text-ink-muted hover:text-racing">
+            &larr; Home
+          </Link>
+          <h1 className="font-display text-4xl text-racing mt-2 mb-2">
+            Classic Mini panels catalogue
+          </h1>
+          <p className="text-ink-muted">
+            {catalogueProducts.length} parts across {catalogueSections.length} sections, organised in the same down-the-list order as the printed catalogue.
+          </p>
+        </div>
+        <a
+          href={miniCatalogueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-secondary whitespace-nowrap text-sm sm:mt-7"
+        >
+          Download Old PDF
+        </a>
       </div>
 
       <Mini3DViewer selectedSection={section} onSelect={chooseSection} />

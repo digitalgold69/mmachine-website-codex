@@ -35,6 +35,10 @@ import type {
 
 const GBP = "\u00a3";
 const PAGE_SIZE = 8;
+const ADD_LINE_RESULT_LIMITS: Record<AddLineCatalogue, string> = {
+  mini: "1200",
+  metals: "5000",
+};
 const TZ = "Europe/London";
 const TRADING_NAME = "Craftgrange Limited, Trading as M Machine";
 
@@ -1554,7 +1558,7 @@ export default function OrdersClient({
           catalogue: addLineCatalogue,
           q: addLineQuery.trim(),
           offset: "0",
-          limit: "30",
+          limit: ADD_LINE_RESULT_LIMITS[addLineCatalogue],
         });
         if (addLineCatalogue === "metals") params.set("category", "all");
         const response = await fetch(`/api/products?${params}`, { signal: controller.signal });

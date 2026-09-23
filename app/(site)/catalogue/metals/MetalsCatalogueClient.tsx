@@ -127,12 +127,19 @@ export default function MetalsCatalogueClient({
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <header className="mb-8">
-        <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
-        <h1 className="mt-2 font-display text-4xl text-racing">Metals catalogue</h1>
-        <p className="mt-2 max-w-3xl text-ink-muted">
-          Browse the metals catalogue in the same column format as the printed customer catalogue.
-          Prices are shown ex VAT and inc VAT.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Link href="/" className="text-sm text-ink-muted hover:text-racing">&larr; Home</Link>
+            <h1 className="mt-2 font-display text-4xl text-racing">Metals catalogue</h1>
+            <p className="mt-2 max-w-3xl text-ink-muted">
+              Browse the metals catalogue in the same column format as the printed customer catalogue.
+              Prices are shown ex VAT and inc VAT.
+            </p>
+          </div>
+          <a href={metalsCatalogueUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary whitespace-nowrap text-sm sm:mt-7">
+            Download Old PDF
+          </a>
+        </div>
         <div className="mt-6 overflow-hidden rounded-lg border border-racing/10 bg-racing">
           <Image
             src="/catalogue/m-machine-metals-cutting.gif"
