@@ -62,6 +62,7 @@ export default function Footer() {
                   Facebook
                 </a>
               </li>
+              <li><Link href="/metals/weight-calculator" className="hover:text-gold">Metals weight calculator</Link></li>
               <li><Link href="/privacy" className="hover:text-gold">Privacy policy</Link></li>
               <li><CookieSettingsButton /></li>
             </ul>

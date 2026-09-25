@@ -91,6 +91,14 @@ async function main() {
   const footer = read("components/Footer.tsx");
   assert.match(footer, /https:\/\/winter\.marketing\//, "Footer must include the Winter Marketing website credit link");
   assert.match(footer, /Website designed by Winter Marketing/, "Footer must use the requested subtle website design credit");
+  assert.match(footer, /href="\/metals\/weight-calculator"[\s\S]*Metals weight calculator/, "Footer information links must include the metals weight calculator");
+
+  const weightCalculatorClient = read("app/(site)/metals/weight-calculator/WeightCalculatorClient.tsx");
+  assert.match(weightCalculatorClient, /function parseImperialInches/, "Weight calculator must parse imperial inch entries separately from metric decimals");
+  assert.match(weightCalculatorClient, /unicodeFractions/, "Weight calculator must accept common single-character imperial fractions");
+  assert.match(weightCalculatorClient, /0\.5, 1\/2 or 1 1\/2/, "Weight calculator must tell users that decimal and fraction inches are accepted");
+  assert.match(weightCalculatorClient, /inputMode=\{units === "Imperial" \? "text" : "decimal"\}/, "Imperial calculator fields must allow slash-based fractions on mobile keyboards");
+  assert.match(weightCalculatorClient, /result\.measurements[\s\S]*item\.display/, "Weight calculator result must echo dimensions in the same notation the user entered");
 
   const productsRoute = read("app/api/products/route.ts");
   assert.match(productsRoute, /getLiveMiniCatalogueProducts\(\{ includeManual: true \}\)/, "Products API must merge active manual Mini parts through the live Mini catalogue helper");
